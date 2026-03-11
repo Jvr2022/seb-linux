@@ -1,0 +1,22 @@
+pkgname=safe-exam-browser
+pkgver=0.1.0
+pkgrel=1
+pkgdesc="Qt-based Linux port of Safe Exam Browser"
+arch=('x86_64')
+url="https://github.com/example/safe-exam-browser-linux"
+license=('MPL2')
+depends=('qt6-base' 'qt6-webengine' 'zlib' 'hicolor-icon-theme' 'shared-mime-info' 'desktop-file-utils')
+makedepends=('qt6-tools' 'gcc' 'make')
+source=("safe-exam-browser-${pkgver}.tar.gz")
+sha256sums=('SKIP')
+
+build() {
+  cd "${srcdir}/safe-exam-browser-${pkgver}"
+  qmake6 seb-linux-qt.pro
+  make -j"$(nproc)"
+}
+
+package() {
+  cd "${srcdir}/safe-exam-browser-${pkgver}"
+  make INSTALL_ROOT="${pkgdir}" install
+}

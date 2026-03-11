@@ -1,0 +1,10 @@
+/Makefile
+/safe-exam-browser
+/seb-linux-qt
+/*.o
+/.qmake.stash
+/moc_*
+/ui_*
+/qrc_*
+/build/
+/dist/

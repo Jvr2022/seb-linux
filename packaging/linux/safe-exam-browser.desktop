@@ -1,0 +1,13 @@
+[Desktop Entry]
+Version=1.0
+Type=Application
+Name=Safe Exam Browser
+GenericName=Secure exam browser
+Comment=Open Safe Exam Browser sessions and .seb exam configuration files
+Exec=safe-exam-browser %u
+Icon=safe-exam-browser
+Terminal=false
+Categories=Education;Network;WebBrowser;Qt;
+MimeType=application/x-seb;x-scheme-handler/seb;x-scheme-handler/sebs;
+StartupNotify=true
+StartupWMClass=Safe Exam Browser

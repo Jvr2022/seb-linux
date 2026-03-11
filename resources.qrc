@@ -1,0 +1,6 @@
+<RCC>
+    <qresource prefix="/">
+        <file>assets/icons/safe-exam-browser.png</file>
+        <file>assets/ui/windows-splash.png</file>
+    </qresource>
+</RCC>

@@ -1,0 +1,35 @@
+{
+  "browser": {
+    "startUrl": "about:blank",
+    "homeUrl": "about:blank",
+    "confirmQuitUrl": true,
+    "quitUrl": "https://example.com/quit",
+    "allowDownloads": false,
+    "allowUploads": false,
+    "sendConfigurationKey": true,
+    "sendBrowserExamKey": true,
+    "browserExamKeySalt": "AQIDBA==",
+    "filter": {
+      "processMainRequests": false,
+      "processContentRequests": true,
+      "rules": [
+        {
+          "expression": "*://tracker.example/*",
+          "result": "block",
+          "type": "simplified"
+        }
+      ]
+    },
+    "mainWindow": {
+      "showToolbar": true,
+      "allowAddressBar": false,
+      "allowReloading": true,
+      "showReloadButton": true,
+      "alwaysOnTop": true,
+      "allowMinimize": false
+    }
+  },
+  "security": {
+    "allowTermination": true
+  }
+}
