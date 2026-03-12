@@ -4,6 +4,8 @@ Safe Exam Browser for Linux is a Qt 6 and Qt WebEngine based Linux desktop imple
 
 It supports opening SEB configuration files, handling `seb://` and `sebs://` links, and running as an installed Linux desktop application.
 
+Prebuilt release files can be downloaded from GitHub Releases.
+
 ## Build
 
 ```bash
@@ -32,6 +34,8 @@ build/bin/safe-exam-browser
 ```
 
 Artifacts are written to `dist/`.
+
+Published release downloads are available from the repository Releases page.
 
 ## Install
 
