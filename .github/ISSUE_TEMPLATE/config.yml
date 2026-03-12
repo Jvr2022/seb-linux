@@ -1,0 +1,5 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Security report
+    url: https://github.com/jvr2022/seb-linux/security/advisories/new
+    about: Use a private advisory for sensitive security issues when available.

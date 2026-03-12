@@ -1,0 +1,24 @@
+name: stale
+
+on:
+  schedule:
+    - cron: "0 2 * * 1"
+  workflow_dispatch:
+
+jobs:
+  stale:
+    runs-on: ubuntu-latest
+    permissions:
+      issues: write
+      pull-requests: write
+    steps:
+      - uses: actions/stale@v10
+        with:
+          stale-issue-message: "This issue has been marked stale due to inactivity."
+          stale-pr-message: "This pull request has been marked stale due to inactivity."
+          days-before-stale: 45
+          days-before-close: 14
+          stale-issue-label: stale
+          stale-pr-label: stale
+          exempt-issue-labels: security,pinned
+          exempt-pr-labels: security,pinned

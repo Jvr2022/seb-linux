@@ -1,0 +1,74 @@
+name: release
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Release version without the v prefix"
+        required: true
+        type: string
+
+permissions:
+  contents: write
+
+jobs:
+  build-linux:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Resolve release version
+        id: release_meta
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            version="${{ github.event.inputs.version }}"
+          else
+            version="${GITHUB_REF_NAME#v}"
+          fi
+          echo "version=${version#v}" >> "$GITHUB_OUTPUT"
+          echo "tag=v${version#v}" >> "$GITHUB_OUTPUT"
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            build-essential \
+            desktop-file-utils \
+            dpkg-dev \
+            libqt6svg6-dev \
+            qt6-base-dev \
+            qt6-tools-dev-tools \
+            qt6-webengine-dev \
+            shared-mime-info \
+            zlib1g-dev
+
+      - name: Build release artifacts
+        run: |
+          chmod +x scripts/build-release.sh
+          scripts/build-release.sh "${{ steps.release_meta.outputs.version }}"
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v6
+        with:
+          name: safe-exam-browser-linux
+          path: |
+            dist/*.deb
+            dist/*.tar.gz
+
+      - name: Create GitHub release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.release_meta.outputs.tag }}
+          target_commitish: ${{ github.sha }}
+          name: Safe Exam Browser Linux ${{ steps.release_meta.outputs.version }}
+          generate_release_notes: true
+          body: |
+            Thanks to everyone who contributed to this release.
+
+            GitHub generated release notes below include the commit summary and new contributors automatically.
+          files: |
+            dist/*.deb
+            dist/*.tar.gz

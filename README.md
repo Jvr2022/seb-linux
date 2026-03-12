@@ -1,13 +1,12 @@
 # Safe Exam Browser for Linux
 
-Safe Exam Browser for Linux is a Qt 6 and Qt WebEngine based Linux desktop implementation focused on native startup, desktop integration, and Linux packaging.
+Safe Exam Browser for Linux is a Qt 6 and Qt WebEngine based Linux desktop implementation focused on native startup, Linux desktop integration, and release packaging.
 
-It supports opening SEB configuration files, handling `seb://` and `sebs://` links, and integrating with the Linux desktop as a regular installed application.
+It supports opening SEB configuration files, handling `seb://` and `sebs://` links, and running as an installed Linux desktop application.
 
 ## Build
 
 ```bash
-cd seb-linux-qt
 ./scripts/build.sh
 ```
 

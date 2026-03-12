@@ -1,0 +1,33 @@
+browser:
+  - changed-files:
+      - any-glob-to-any-file:
+          - "src/browser/**"
+
+settings:
+  - changed-files:
+      - any-glob-to-any-file:
+          - "src/settings/**"
+          - "src/seb_settings.*"
+
+ui:
+  - changed-files:
+      - any-glob-to-any-file:
+          - "src/ui/**"
+          - "src/browser_window.*"
+
+packaging:
+  - changed-files:
+      - any-glob-to-any-file:
+          - "packaging/**"
+          - "scripts/build-release.sh"
+          - ".github/workflows/release.yml"
+
+documentation:
+  - changed-files:
+      - any-glob-to-any-file:
+          - "**/*.md"
+
+ci:
+  - changed-files:
+      - any-glob-to-any-file:
+          - ".github/**"
