@@ -76,27 +76,41 @@ jobs:
           version="${{ steps.release_meta.outputs.version }}"
           previous="${{ steps.previous_tag.outputs.tag }}"
 
+          payload_file="$(mktemp)"
+          if [ -n "$previous" ]; then
+            cat > "$payload_file" <<EOF
+          {
+            "tag_name": "$tag",
+            "target_commitish": "$GITHUB_SHA",
+            "previous_tag_name": "$previous"
+          }
+          EOF
+          else
+            cat > "$payload_file" <<EOF
+          {
+            "tag_name": "$tag",
+            "target_commitish": "$GITHUB_SHA"
+          }
+          EOF
+          fi
+
+          generated_notes="$(gh api \
+            --method POST \
+            -H "Accept: application/vnd.github+json" \
+            "/repos/${GITHUB_REPOSITORY}/releases/generate-notes" \
+            --input "$payload_file" \
+            --jq '.body')"
+
           notes_file="$(mktemp)"
           {
             echo "Thanks to everyone who contributed to this release."
             echo
+            echo "$generated_notes"
           } > "$notes_file"
 
-          if [ -n "$previous" ]; then
-            gh release create "$tag" \
-              dist/*.deb \
-              dist/*.tar.gz \
-              --title "Safe Exam Browser Linux ${version}" \
-              --target "$GITHUB_SHA" \
-              --generate-notes \
-              --notes-start-tag "$previous" \
-              --notes-file "$notes_file"
-          else
-            gh release create "$tag" \
-              dist/*.deb \
-              dist/*.tar.gz \
-              --title "Safe Exam Browser Linux ${version}" \
-              --target "$GITHUB_SHA" \
-              --generate-notes \
-              --notes-file "$notes_file"
-          fi
+          gh release create "$tag" \
+            dist/*.deb \
+            dist/*.tar.gz \
+            --title "Safe Exam Browser Linux ${version}" \
+            --target "$GITHUB_SHA" \
+            --notes-file "$notes_file"
