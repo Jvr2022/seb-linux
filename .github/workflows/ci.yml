@@ -28,4 +28,6 @@ jobs:
         run: ./scripts/build.sh
 
       - name: Verify version
+        env:
+          QT_QPA_PLATFORM: offscreen
         run: ./build/bin/safe-exam-browser --version
