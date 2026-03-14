@@ -125,6 +125,16 @@ PopupPolicy parsePopupPolicyText(const QString &raw, PopupPolicy fallback)
     return fallback;
 }
 
+QString ensureApplicationId(const QVariantMap &data, const QString &fallbackKey)
+{
+    const QString id = data.value(QStringLiteral("identifier")).toString().trimmed();
+    if (!id.isEmpty()) {
+        return id;
+    }
+
+    return fallbackKey.trimmed().toLower();
+}
+
 FilterResult parseFilterResultInt(int raw, FilterResult fallback)
 {
     return raw == 0 ? FilterResult::Block : (raw == 1 ? FilterResult::Allow : fallback);
@@ -339,8 +349,55 @@ QByteArray readBytes(const QVariant &value)
 
 void applyStructuredSettings(const QVariantMap &data, SebSettings &settings)
 {
+    const QVariantMap applications = data.value("applications").toMap();
     const QVariantMap browser = data.value("browser").toMap();
     const QVariantMap security = data.value("security").toMap();
+    const QVariantMap taskbar = data.value("taskbar").toMap();
+
+    if (!applications.isEmpty()) {
+        const QVariantList whitelist = applications.value("whitelist").toList();
+        const QVariantList blacklist = applications.value("blacklist").toList();
+
+        settings.applications.whitelist.clear();
+        for (const QVariant &item : whitelist) {
+            const QVariantMap application = item.toMap();
+            if (application.isEmpty()) {
+                continue;
+            }
+
+            WhitelistApplicationSettings whitelisted;
+            whitelisted.allowCustomPath = readBool(application, "allowCustomPath", whitelisted.allowCustomPath);
+            whitelisted.allowRunning = readBool(application, "allowRunning", whitelisted.allowRunning);
+            whitelisted.autoStart = readBool(application, "autoStart", whitelisted.autoStart);
+            whitelisted.autoTerminate = readBool(application, "autoTerminate", whitelisted.autoTerminate);
+            whitelisted.description = readString(application, "description");
+            whitelisted.displayName = readString(application, "displayName");
+            whitelisted.executableName = readString(application, "executableName");
+            whitelisted.executablePath = readString(application, "executablePath");
+            whitelisted.originalName = readString(application, "originalName");
+            whitelisted.showInShell = readBool(application, "showInShell", whitelisted.showInShell);
+            whitelisted.signature = readString(application, "signature");
+            whitelisted.id = ensureApplicationId(application, whitelisted.executableName);
+            for (const QVariant &argument : application.value("arguments").toList()) {
+                whitelisted.arguments.push_back(argument.toString());
+            }
+            settings.applications.whitelist.push_back(whitelisted);
+        }
+
+        settings.applications.blacklist.clear();
+        for (const QVariant &item : blacklist) {
+            const QVariantMap application = item.toMap();
+            if (application.isEmpty()) {
+                continue;
+            }
+
+            BlacklistApplicationSettings blacklisted;
+            blacklisted.autoTerminate = readBool(application, "autoTerminate", blacklisted.autoTerminate);
+            blacklisted.executableName = readString(application, "executableName");
+            blacklisted.originalName = readString(application, "originalName");
+            settings.applications.blacklist.push_back(blacklisted);
+        }
+    }
 
     if (!browser.isEmpty()) {
         const QString startUrl = readString(browser, "startUrl");
@@ -395,10 +452,74 @@ void applyStructuredSettings(const QVariantMap &data, SebSettings &settings)
         settings.security.allowTermination = readBool(security, "allowTermination", settings.security.allowTermination);
         settings.security.quitPasswordHash = readString(security, "quitPasswordHash");
     }
+
+    if (!taskbar.isEmpty()) {
+        settings.taskbar.enableTaskbar = readBool(taskbar, "enableTaskbar", settings.taskbar.enableTaskbar);
+        settings.taskbar.showApplicationInfo = readBool(taskbar, "showApplicationInfo", settings.taskbar.showApplicationInfo);
+        settings.taskbar.showApplicationLog = readBool(taskbar, "showApplicationLog", settings.taskbar.showApplicationLog);
+        settings.taskbar.showAudio = readBool(taskbar, "showAudio", settings.taskbar.showAudio);
+        settings.taskbar.showClock = readBool(taskbar, "showClock", settings.taskbar.showClock);
+        settings.taskbar.showKeyboardLayout = readBool(taskbar, "showKeyboardLayout", settings.taskbar.showKeyboardLayout);
+        settings.taskbar.showNetwork = readBool(taskbar, "showNetwork", settings.taskbar.showNetwork);
+        settings.taskbar.showVerificator = readBool(taskbar, "showVerificator", settings.taskbar.showVerificator);
+        settings.taskbar.showProctoringNotification =
+            readBool(taskbar, "showProctoringNotification", settings.taskbar.showProctoringNotification);
+    }
 }
 
 void applyRawSettings(const QVariantMap &data, SebSettings &settings)
 {
+    if (data.contains("permittedProcesses")) {
+        settings.applications.whitelist.clear();
+        for (const QVariant &entry : data.value("permittedProcesses").toList()) {
+            const QVariantMap applicationData = entry.toMap();
+            if (applicationData.isEmpty()) {
+                continue;
+            }
+
+            if (applicationData.contains("active") && !applicationData.value("active").toBool()) {
+                continue;
+            }
+
+            WhitelistApplicationSettings application;
+            application.allowCustomPath = readBool(applicationData, "allowUser", application.allowCustomPath);
+            application.allowRunning = readBool(applicationData, "runInBackground", application.allowRunning);
+            application.autoStart = readBool(applicationData, "autostart", application.autoStart);
+            application.autoTerminate = readBool(applicationData, "strongKill", application.autoTerminate);
+            application.description = readString(applicationData, "description");
+            application.displayName = readString(applicationData, "title");
+            application.executableName = readString(applicationData, "executable");
+            application.executablePath = readString(applicationData, "path");
+            application.originalName = readString(applicationData, "originalName");
+            application.showInShell = readBool(applicationData, "iconInTaskbar", application.showInShell);
+            application.signature = readString(applicationData, "signature");
+            application.id = ensureApplicationId(applicationData, application.executableName);
+            for (const QVariant &argument : applicationData.value("arguments").toList()) {
+                application.arguments.push_back(argument.toString());
+            }
+            settings.applications.whitelist.push_back(application);
+        }
+    }
+
+    if (data.contains("prohibitedProcesses")) {
+        settings.applications.blacklist.clear();
+        for (const QVariant &entry : data.value("prohibitedProcesses").toList()) {
+            const QVariantMap applicationData = entry.toMap();
+            if (applicationData.isEmpty()) {
+                continue;
+            }
+            if (applicationData.contains("active") && !applicationData.value("active").toBool()) {
+                continue;
+            }
+
+            BlacklistApplicationSettings application;
+            application.autoTerminate = readBool(applicationData, "strongKill", application.autoTerminate);
+            application.executableName = readString(applicationData, "executable");
+            application.originalName = readString(applicationData, "originalName");
+            settings.applications.blacklist.push_back(application);
+        }
+    }
+
     const QString startUrl = readString(data, "startURL");
     if (!startUrl.isEmpty()) settings.browser.startUrl = startUrl;
 
@@ -429,6 +550,16 @@ void applyRawSettings(const QVariantMap &data, SebSettings &settings)
     settings.browser.useQueryParameter = readBool(data, "startURLAppendQueryParameter", settings.browser.useQueryParameter);
     settings.browser.useStartUrlAsHomeUrl = readBool(data, "restartExamUseStartURL", settings.browser.useStartUrlAsHomeUrl);
     settings.browser.useTemporaryDownAndUploadDirectory = readBool(data, "useTemporaryDownUploadDirectory", settings.browser.useTemporaryDownAndUploadDirectory);
+
+    settings.taskbar.enableTaskbar = readBool(data, "showTaskBar", settings.taskbar.enableTaskbar);
+    settings.taskbar.showApplicationLog = readBool(data, "showApplicationLogButton", settings.taskbar.showApplicationLog);
+    settings.taskbar.showAudio = readBool(data, "audioControlEnabled", settings.taskbar.showAudio);
+    settings.taskbar.showClock = readBool(data, "showTime", settings.taskbar.showClock);
+    settings.taskbar.showKeyboardLayout = readBool(data, "showInputLanguage", settings.taskbar.showKeyboardLayout);
+    settings.taskbar.showNetwork = readBool(data, "allowWlan", settings.taskbar.showNetwork);
+    settings.taskbar.showVerificator = readBool(data, "showQRVerifyButton", settings.taskbar.showVerificator);
+    settings.taskbar.showProctoringNotification =
+        readBool(data, "showProctoringViewButton", settings.taskbar.showProctoringNotification);
 
     if (readBool(data, "downloadPDFFiles", false)) settings.browser.allowPdfReader = false;
 
@@ -498,3 +629,12 @@ void applyRawSettings(const QVariantMap &data, SebSettings &settings)
 }
 
 }  // namespace seb::settingsinternal
+QString ensureApplicationId(const QVariantMap &data, const QString &fallbackKey)
+{
+    const QString id = data.value(QStringLiteral("identifier")).toString().trimmed();
+    if (!id.isEmpty()) {
+        return id;
+    }
+
+    return fallbackKey.trimmed().toLower();
+}

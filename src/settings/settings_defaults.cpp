@@ -69,6 +69,18 @@ SebSettings createDefaultSettings()
     settings.browser.useStartUrlAsHomeUrl = false;
     settings.browser.useTemporaryDownAndUploadDirectory = false;
 
+    settings.taskbar.enableTaskbar = true;
+    settings.taskbar.showApplicationInfo = false;
+    settings.taskbar.showApplicationLog = false;
+    settings.taskbar.showAudio = true;
+    settings.taskbar.showClock = true;
+    settings.taskbar.showKeyboardLayout = true;
+    settings.taskbar.showNetwork = false;
+    settings.taskbar.showVerificator = true;
+    settings.taskbar.showProctoringNotification = true;
+    settings.applications.blacklist.clear();
+    settings.applications.whitelist.clear();
+
     settings.security.allowTermination = true;
     return settings;
 }

@@ -19,11 +19,16 @@ QString wildcardToRegexPattern(const QString &expression)
 RequestFilter::RequestFilter(const seb::FilterSettings &settings)
     : settings_(settings)
 {
-    rules_.reserve(settings.rules.size());
+    allowRules_.reserve(settings.rules.size());
+    blockRules_.reserve(settings.rules.size());
     for (const seb::FilterRuleSettings &rule : settings.rules) {
         const QRegularExpression expression = compileRule(rule);
         if (expression.isValid()) {
-            rules_.push_back({expression, rule.result});
+            if (rule.result == seb::FilterResult::Allow) {
+                allowRules_.push_back({expression, rule.result});
+            } else {
+                blockRules_.push_back({expression, rule.result});
+            }
         }
     }
 }
@@ -36,13 +41,19 @@ FilterDecision RequestFilter::evaluate(const QUrl &url, QWebEngineUrlRequestInfo
     }
 
     const QString decoded = QUrl::fromPercentEncoding(url.toEncoded());
-    for (const CompiledRule &rule : rules_) {
+    for (const CompiledRule &rule : blockRules_) {
         if (rule.expression.match(decoded).hasMatch()) {
-            return rule.result == seb::FilterResult::Allow ? FilterDecision::Allow : FilterDecision::Block;
+            return FilterDecision::Block;
         }
     }
 
-    return FilterDecision::NoMatch;
+    for (const CompiledRule &rule : allowRules_) {
+        if (rule.expression.match(decoded).hasMatch()) {
+            return FilterDecision::Allow;
+        }
+    }
+
+    return FilterDecision::Block;
 }
 
 QRegularExpression RequestFilter::compileRule(const seb::FilterRuleSettings &rule)

@@ -8,6 +8,7 @@
 #include <QAuthenticator>
 #include <QCloseEvent>
 #include <QEvent>
+#include <QFocusEvent>
 #include <QGuiApplication>
 #include <QInputDialog>
 #include <QKeyEvent>
@@ -71,8 +72,8 @@ BrowserWindow::BrowserWindow(
     view_->setPage(page_);
     contentLayout->addWidget(view_, 1);
 
-    if (isMainWindow_) {
-        taskbar_ = new SebTaskbar(session_.settings(), true, contentContainer_);
+    if (isMainWindow_ && session_.settings().taskbar.enableTaskbar) {
+        taskbar_ = new SebTaskbar(session_, session_.settings(), contentContainer_);
         contentLayout->addWidget(taskbar_);
     }
     setCentralWidget(contentContainer_);
@@ -80,7 +81,9 @@ BrowserWindow::BrowserWindow(
     view_->settings()->setAttribute(QWebEngineSettings::FullScreenSupportEnabled, false);
     view_->settings()->setAttribute(QWebEngineSettings::JavascriptCanOpenWindows, true);
 
-    configureToolbar();
+    if (!isMainWindow_) {
+        configureToolbar();
+    }
     configureShortcuts();
     applyWindowGeometry();
 
@@ -91,6 +94,7 @@ BrowserWindow::BrowserWindow(
         if (taskbar_) {
             taskbar_->setWindowTitleText(resolvedTitle);
         }
+        notifyTaskbarStateChanged();
     });
     connect(page_, &QWebEnginePage::newWindowRequested, this, &BrowserWindow::handleNewWindowRequest);
     connect(
@@ -101,19 +105,6 @@ BrowserWindow::BrowserWindow(
             session_.applyProxyAuthentication(proxyHost, authenticator);
         });
     if (taskbar_) {
-        connect(taskbar_, &SebTaskbar::backRequested, this, [this] {
-            if (windowSettings_.allowBackwardNavigation) {
-                view_->back();
-            }
-        });
-        connect(taskbar_, &SebTaskbar::forwardRequested, this, [this] {
-            if (windowSettings_.allowForwardNavigation) {
-                view_->forward();
-            }
-        });
-        connect(taskbar_, &SebTaskbar::reloadRequested, this, &BrowserWindow::reloadPage);
-        connect(taskbar_, &SebTaskbar::homeRequested, this, &BrowserWindow::navigateHome);
-        connect(taskbar_, &SebTaskbar::findRequested, this, &BrowserWindow::findInPage);
         connect(taskbar_, &SebTaskbar::quitRequested, this, [this] {
             if (isMainWindow_ &&
                 session_.requestApplicationQuit(
@@ -127,11 +118,24 @@ BrowserWindow::BrowserWindow(
     if (initialUrl.isValid()) {
         view_->setUrl(initialUrl);
     }
+
+    session_.registerBrowserWindow(this);
+    notifyTaskbarStateChanged();
+}
+
+BrowserWindow::~BrowserWindow()
+{
+    session_.unregisterBrowserWindow(this);
 }
 
 QWebEnginePage *BrowserWindow::page() const
 {
     return page_;
+}
+
+bool BrowserWindow::isMainWindow() const
+{
+    return isMainWindow_;
 }
 
 bool BrowserWindow::shouldAllowNavigation(const QUrl &url)
@@ -171,6 +175,17 @@ bool BrowserWindow::shouldAllowNavigation(const QUrl &url)
     return true;
 }
 
+QString BrowserWindow::taskbarIconPath() const
+{
+    return QStringLiteral(":/assets/icons/safe-exam-browser.png");
+}
+
+QString BrowserWindow::taskbarTitle() const
+{
+    const QString title = windowTitle().trimmed();
+    return title.isEmpty() ? QStringLiteral("Safe Exam Browser") : title;
+}
+
 void BrowserWindow::changeEvent(QEvent *event)
 {
     if (!windowSettings_.allowMinimize &&
@@ -184,6 +199,7 @@ void BrowserWindow::changeEvent(QEvent *event)
     }
 
     QMainWindow::changeEvent(event);
+    notifyTaskbarStateChanged();
 }
 
 void BrowserWindow::closeEvent(QCloseEvent *event)
@@ -261,6 +277,12 @@ void BrowserWindow::keyPressEvent(QKeyEvent *event)
     }
 
     QMainWindow::keyPressEvent(event);
+}
+
+void BrowserWindow::focusInEvent(QFocusEvent *event)
+{
+    QMainWindow::focusInEvent(event);
+    notifyTaskbarStateChanged();
 }
 
 void BrowserWindow::applyWindowFlags()
@@ -522,4 +544,10 @@ void BrowserWindow::updateAddressBar(const QUrl &url)
     if (taskbar_) {
         taskbar_->setCurrentUrl(url);
     }
+    notifyTaskbarStateChanged();
+}
+
+void BrowserWindow::notifyTaskbarStateChanged()
+{
+    session_.notifyBrowserWindowStateChanged(this);
 }

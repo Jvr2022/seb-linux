@@ -9,6 +9,7 @@ QT_BEGIN_NAMESPACE
 class QAuthenticator;
 class QCloseEvent;
 class QEvent;
+class QFocusEvent;
 class QKeyEvent;
 class QLineEdit;
 class QToolBar;
@@ -42,20 +43,27 @@ private:
 
 class BrowserWindow : public QMainWindow
 {
+    Q_OBJECT
+
 public:
     BrowserWindow(
         SebSession &session,
         const seb::WindowSettings &windowSettings,
         const QUrl &initialUrl,
         bool isMainWindow);
+    ~BrowserWindow() override;
 
     QWebEnginePage *page() const;
+    bool isMainWindow() const;
     bool shouldAllowNavigation(const QUrl &url);
+    QString taskbarIconPath() const;
+    QString taskbarTitle() const;
 
 protected:
     void changeEvent(QEvent *event) override;
     void closeEvent(QCloseEvent *event) override;
     void keyPressEvent(QKeyEvent *event) override;
+    void focusInEvent(QFocusEvent *event) override;
 
 private:
     void applyWindowFlags();
@@ -68,6 +76,7 @@ private:
     void handleNewWindowRequest(QWebEngineNewWindowRequest &request);
     void reloadPage();
     void updateAddressBar(const QUrl &url);
+    void notifyTaskbarStateChanged();
 
     SebSession &session_;
     seb::WindowSettings windowSettings_;

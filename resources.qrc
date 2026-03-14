@@ -1,6 +1,32 @@
 <RCC>
     <qresource prefix="/">
+        <file alias="browser/content/Api.js">src/browser/content/Api.js</file>
+        <file alias="browser/content/BlockedContent.html">src/browser/content/BlockedContent.html</file>
+        <file alias="browser/content/BlockedPage.html">src/browser/content/BlockedPage.html</file>
+        <file alias="browser/content/Clipboard.js">src/browser/content/Clipboard.js</file>
+        <file alias="browser/content/PageZoom.js">src/browser/content/PageZoom.js</file>
         <file>assets/icons/safe-exam-browser.png</file>
+        <file>assets/taskbar/about.svg</file>
+        <file>assets/taskbar/audio_100.svg</file>
+        <file>assets/taskbar/audio_33.svg</file>
+        <file>assets/taskbar/audio_66.svg</file>
+        <file>assets/taskbar/audio_muted.svg</file>
+        <file>assets/taskbar/audio_no_device.svg</file>
+        <file>assets/taskbar/back.svg</file>
+        <file>assets/taskbar/battery.svg</file>
+        <file>assets/taskbar/forward.svg</file>
+        <file>assets/taskbar/hand_lowered.svg</file>
+        <file>assets/taskbar/hand_raised.svg</file>
+        <file>assets/taskbar/home.svg</file>
+        <file>assets/taskbar/log.svg</file>
+        <file>assets/taskbar/network_wired.svg</file>
+        <file>assets/taskbar/reload.svg</file>
+        <file>assets/taskbar/shutdown.svg</file>
+        <file>assets/taskbar/verificator.svg</file>
+        <file>assets/taskbar/wifi_0.svg</file>
+        <file>assets/taskbar/wifi_100.svg</file>
+        <file>assets/taskbar/wifi_33.svg</file>
+        <file>assets/taskbar/wifi_66.svg</file>
         <file>assets/ui/windows-splash.png</file>
     </qresource>
 </RCC>

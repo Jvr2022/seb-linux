@@ -1,6 +1,7 @@
 #include "seb_session.h"
 
 #include "browser/request_interceptor.h"
+#include "applications/application_manager.h"
 #include "browser_window.h"
 
 #include <QApplication>
@@ -68,9 +69,19 @@ SebSession::SebSession(const seb::SebSettings &settings, ResourceOpener opener, 
     if (settings_.browser.deleteCookiesOnStartup) {
         profile_->cookieStore()->deleteAllCookies();
     }
+
+    applicationManager_ = std::make_unique<seb::applications::ApplicationManager>(settings_.applications, this);
+    connect(applicationManager_.get(), &seb::applications::ApplicationManager::applicationsChanged, this, &SebSession::externalApplicationsChanged);
+    applicationManager_->initialize();
+    applicationManager_->autoStart();
 }
 
-SebSession::~SebSession() = default;
+SebSession::~SebSession()
+{
+    if (applicationManager_) {
+        applicationManager_->terminate();
+    }
+}
 
 BrowserWindow *SebSession::createWindow(const QUrl &url, bool isMainWindow)
 {
@@ -246,6 +257,57 @@ bool SebSession::openSebResource(const QUrl &url, QWidget *parent) const
 
     const QString resource = url.isLocalFile() ? url.toLocalFile() : url.toString();
     return opener_(resource, parent);
+}
+
+QList<BrowserWindow *> SebSession::browserWindows() const
+{
+    return browserWindows_;
+}
+
+QList<seb::applications::ExternalApplication *> SebSession::externalApplications() const
+{
+    return applicationManager_ ? applicationManager_->applications() : QList<seb::applications::ExternalApplication *>{};
+}
+
+void SebSession::registerBrowserWindow(BrowserWindow *window)
+{
+    if (!window || browserWindows_.contains(window)) {
+        return;
+    }
+
+    browserWindows_.push_back(window);
+    emit browserWindowsChanged();
+}
+
+void SebSession::unregisterBrowserWindow(BrowserWindow *window)
+{
+    if (!window) {
+        return;
+    }
+
+    browserWindows_.removeAll(window);
+    emit browserWindowsChanged();
+}
+
+void SebSession::notifyBrowserWindowStateChanged(BrowserWindow *window)
+{
+    if (window && browserWindows_.contains(window)) {
+        emit browserWindowsChanged();
+    }
+}
+
+void SebSession::activateWindow(BrowserWindow *window)
+{
+    if (!window) {
+        return;
+    }
+
+    window->show();
+    if (window->isMinimized()) {
+        window->showNormal();
+    }
+    window->raise();
+    window->activateWindow();
 }
 
 void SebSession::handleDownloadRequested(QWebEngineDownloadRequest *download)

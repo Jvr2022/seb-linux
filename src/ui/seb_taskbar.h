@@ -5,38 +5,28 @@
 #include <QWidget>
 
 QT_BEGIN_NAMESPACE
-class QLabel;
-class QHBoxLayout;
-class QTimer;
+class QUrl;
 QT_END_NAMESPACE
+
+class SebSession;
+
+namespace seb::ui::taskbar {
+class TaskbarWidget;
+}
 
 class SebTaskbar : public QWidget
 {
     Q_OBJECT
 
 public:
-    explicit SebTaskbar(const seb::SebSettings &settings, bool isMainWindow, QWidget *parent = nullptr);
+    explicit SebTaskbar(SebSession &session, const seb::SebSettings &settings, QWidget *parent = nullptr);
 
     void setCurrentUrl(const QUrl &url);
     void setWindowTitleText(const QString &title);
 
 signals:
-    void backRequested();
-    void findRequested();
-    void forwardRequested();
-    void homeRequested();
     void quitRequested();
-    void reloadRequested();
 
 private:
-    void refreshClock();
-
-    QWidget *applicationArea_ = nullptr;
-    QHBoxLayout *applicationLayout_ = nullptr;
-    QWidget *metaArea_ = nullptr;
-    QHBoxLayout *metaLayout_ = nullptr;
-    QLabel *titleLabel_ = nullptr;
-    QLabel *statusLabel_ = nullptr;
-    QLabel *clockLabel_ = nullptr;
-    QTimer *clockTimer_ = nullptr;
+    seb::ui::taskbar::TaskbarWidget *taskbarWidget_ = nullptr;
 };

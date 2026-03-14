@@ -5,11 +5,16 @@
 #include <functional>
 #include <memory>
 
+#include <QList>
 #include <QObject>
 #include <QScopedPointer>
 
 namespace seb::browser {
 class RequestInterceptor;
+}
+namespace seb::applications {
+class ApplicationManager;
+class ExternalApplication;
 }
 
 QT_BEGIN_NAMESPACE
@@ -46,6 +51,18 @@ public:
     QUrl homeUrl() const;
     QUrl initialUrl() const;
     bool openSebResource(const QUrl &url, QWidget *parent) const;
+    QList<BrowserWindow *> browserWindows() const;
+    QList<seb::applications::ExternalApplication *> externalApplications() const;
+    void registerBrowserWindow(BrowserWindow *window);
+    void unregisterBrowserWindow(BrowserWindow *window);
+    void notifyBrowserWindowStateChanged(BrowserWindow *window);
+
+signals:
+    void browserWindowsChanged();
+    void externalApplicationsChanged();
+
+public slots:
+    void activateWindow(BrowserWindow *window);
 
 private:
     void handleDownloadRequested(QWebEngineDownloadRequest *download);
@@ -59,5 +76,7 @@ private:
     QScopedPointer<seb::browser::RequestInterceptor> interceptor_;
     std::unique_ptr<QTemporaryDir> profileDirectory_;
     std::unique_ptr<QTemporaryDir> downloadDirectory_;
+    std::unique_ptr<seb::applications::ApplicationManager> applicationManager_;
     ResourceOpener opener_;
+    QList<BrowserWindow *> browserWindows_;
 };

@@ -153,6 +153,49 @@ struct BrowserSettings
     PopupPolicy popupPolicy = PopupPolicy::Allow;
 };
 
+struct TaskbarSettings
+{
+    bool enableTaskbar = true;
+    bool showApplicationInfo = false;
+    bool showApplicationLog = false;
+    bool showAudio = true;
+    bool showClock = true;
+    bool showKeyboardLayout = true;
+    bool showNetwork = false;
+    bool showVerificator = true;
+    bool showProctoringNotification = true;
+};
+
+struct BlacklistApplicationSettings
+{
+    bool autoTerminate = false;
+    QString executableName;
+    QString originalName;
+};
+
+struct WhitelistApplicationSettings
+{
+    bool allowCustomPath = false;
+    bool allowRunning = false;
+    QStringList arguments;
+    bool autoStart = false;
+    bool autoTerminate = false;
+    QString description;
+    QString displayName;
+    QString executableName;
+    QString executablePath;
+    QString id;
+    QString originalName;
+    bool showInShell = true;
+    QString signature;
+};
+
+struct ApplicationSettings
+{
+    QList<BlacklistApplicationSettings> blacklist;
+    QList<WhitelistApplicationSettings> whitelist;
+};
+
 struct SecuritySettings
 {
     bool allowTermination = true;
@@ -161,8 +204,10 @@ struct SecuritySettings
 
 struct SebSettings
 {
+    ApplicationSettings applications;
     BrowserSettings browser;
     SecuritySettings security;
+    TaskbarSettings taskbar;
     QString sourceFile;
 };
 

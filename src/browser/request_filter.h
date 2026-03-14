@@ -37,7 +37,8 @@ private:
     static bool isMainRequest(QWebEngineUrlRequestInfo::ResourceType resourceType);
 
     seb::FilterSettings settings_;
-    QVector<CompiledRule> rules_;
+    QVector<CompiledRule> allowRules_;
+    QVector<CompiledRule> blockRules_;
 };
 
 }  // namespace seb::browser
