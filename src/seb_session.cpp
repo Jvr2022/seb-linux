@@ -26,6 +26,8 @@
 #include <QWebEngineCookieStore>
 #include <QWebEngineDownloadRequest>
 #include <QWebEngineProfile>
+#include <QWebEngineScript>
+#include <QWebEngineScriptCollection>
 #include <QWebEngineSettings>
 #include <QTimer>
 
@@ -114,6 +116,19 @@ SebSession::SebSession(const seb::SebSettings &settings, ResourceOpener opener, 
     profile_->setSpellCheckEnabled(settings_.browser.allowSpellChecking);
     profile_->setSpellCheckLanguages(QStringList{QLocale::system().bcp47Name()});
     profile_->setHttpUserAgent(buildUserAgent());
+
+    if (!settings_.browser.injectedScript.isEmpty()) {
+        QFile scriptFile(settings_.browser.injectedScript);
+        if (scriptFile.open(QIODevice::ReadOnly | QIODevice::Text)) {
+            QWebEngineScript script;
+            script.setName(QStringLiteral("InjectScript"));
+            script.setSourceCode(QString::fromUtf8(scriptFile.readAll()));
+            script.setInjectionPoint(QWebEngineScript::DocumentReady);
+            script.setWorldId(QWebEngineScript::MainWorld);
+            script.setRunsOnSubFrames(true);
+            profile_->scripts()->insert(script);
+        }
+    }
 
     interceptor_.reset(new seb::browser::RequestInterceptor(settings_, this));
     profile_->setUrlRequestInterceptor(interceptor_.data());

@@ -85,6 +85,10 @@ void applyCommandLineOverrides(const QCommandLineParser &parser, seb::SebSetting
     if (parser.isSet("disable-quit")) {
         settings.security.allowTermination = false;
     }
+
+    if (parser.isSet("inject")) {
+        settings.browser.injectedScript = parser.value("inject").trimmed();
+    }
 }
 
 }  // namespace
@@ -134,6 +138,10 @@ int main(int argc, char *argv[])
     parser.addOption(QCommandLineOption(
         QStringLiteral("disable-quit"),
         QStringLiteral("Disable manual termination even if the configuration allows it.")));
+    parser.addOption(QCommandLineOption(
+        QStringList{QStringLiteral("i"), QStringLiteral("inject")},
+        QStringLiteral("Inject a JavaScript file into each page."),
+        QStringLiteral("file")));
 
     parser.process(app);
 
