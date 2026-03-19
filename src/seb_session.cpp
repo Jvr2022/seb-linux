@@ -27,6 +27,7 @@
 #include <QWebEngineDownloadRequest>
 #include <QWebEngineProfile>
 #include <QWebEngineSettings>
+#include <QTimer>
 
 namespace {
 
