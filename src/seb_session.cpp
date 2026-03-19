@@ -19,6 +19,7 @@
 #include <QNetworkAccessManager>
 #include <QNetworkReply>
 #include <QNetworkRequest>
+#include <QRegularExpression>
 #include <QStandardPaths>
 #include <QTemporaryDir>
 #include <QUrl>
@@ -408,10 +409,17 @@ void SebSession::handleDownloadRequested(QWebEngineDownloadRequest *download)
 
 QString SebSession::buildUserAgent() const
 {
-    QString agent = profile_->httpUserAgent();
+    QString agent;
 
     if (settings_.browser.useCustomUserAgent && !settings_.browser.customUserAgent.isEmpty()) {
         agent = settings_.browser.customUserAgent.trimmed();
+    } else {
+        QString defaultAgent = profile_->httpUserAgent();
+        QRegularExpression regex(QStringLiteral("Chrome/([0-9.]+)"));
+        QRegularExpressionMatch match = regex.match(defaultAgent);
+        QString chromeVersion = match.hasMatch() ? match.captured(1) : QStringLiteral("110.0.0.0");
+        
+        agent = QStringLiteral("Mozilla/5.0 (Windows NT 10.0) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/") + chromeVersion;
     }
 
     const QString sebVersion = QStringLiteral("SEB/") + getCachedSebVersion();
