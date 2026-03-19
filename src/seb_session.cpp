@@ -47,7 +47,12 @@ QString getCachedSebVersion()
     QEventLoop loop;
     QNetworkReply *reply = manager.get(request);
     QObject::connect(reply, &QNetworkReply::finished, &loop, &QEventLoop::quit);
+    QTimer::singleShot(5000, &loop, &QEventLoop::quit);
     loop.exec();
+
+    if (!reply->isFinished()) {
+        reply->abort();
+    }
 
     if (reply->error() == QNetworkReply::NoError) {
         const QByteArray responseData = reply->readAll();
