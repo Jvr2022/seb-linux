@@ -21,6 +21,11 @@ QString findConfigPath(int argc, char *argv[])
         if ((argument == QStringLiteral("--config") || argument == QStringLiteral("-c")) && index + 1 < argc) {
             return QString::fromLocal8Bit(argv[index + 1]);
         }
+        if (argument == QStringLiteral("--url") || argument == QStringLiteral("-u") ||
+            argument == QStringLiteral("--inject") || argument == QStringLiteral("-i")) {
+            ++index;
+            continue;
+        }
         if (!argument.startsWith('-')) {
             return argument;
         }
