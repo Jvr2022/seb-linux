@@ -7,8 +7,10 @@
 #include <QApplication>
 #include <QAuthenticator>
 #include <QCryptographicHash>
+#include <QDebug>
 #include <QDir>
 #include <QEventLoop>
+#include <QFile>
 #include <QFileDialog>
 #include <QFileInfo>
 #include <QInputDialog>
@@ -22,6 +24,7 @@
 #include <QRegularExpression>
 #include <QStandardPaths>
 #include <QTemporaryDir>
+#include <QTextStream>
 #include <QUrl>
 #include <QWebEngineCookieStore>
 #include <QWebEngineDownloadRequest>
@@ -122,11 +125,14 @@ SebSession::SebSession(const seb::SebSettings &settings, ResourceOpener opener, 
         if (scriptFile.open(QIODevice::ReadOnly | QIODevice::Text)) {
             QWebEngineScript script;
             script.setName(QStringLiteral("InjectScript"));
-            script.setSourceCode(QString::fromUtf8(scriptFile.readAll()));
+            QTextStream in(&scriptFile);
+            script.setSourceCode(in.readAll());
             script.setInjectionPoint(QWebEngineScript::DocumentReady);
-            script.setWorldId(QWebEngineScript::MainWorld);
+            script.setWorldId(QWebEngineScript::UserWorld);
             script.setRunsOnSubFrames(true);
             profile_->scripts()->insert(script);
+        } else {
+            qWarning() << "Failed to open injection script:" << scriptFile.fileName() << scriptFile.errorString();
         }
     }
 

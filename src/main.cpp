@@ -10,6 +10,7 @@
 #include <QLineEdit>
 #include <QTextStream>
 #include <QUrl>
+#include <QFileInfo>
 
 namespace {
 
@@ -87,7 +88,7 @@ void applyCommandLineOverrides(const QCommandLineParser &parser, seb::SebSetting
     }
 
     if (parser.isSet("inject")) {
-        settings.browser.injectedScript = parser.value("inject").trimmed();
+        settings.browser.injectedScript = QFileInfo(parser.value("inject")).absoluteFilePath();
     }
 }
 
