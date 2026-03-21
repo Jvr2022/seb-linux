@@ -8,11 +8,18 @@
 #include <QAuthenticator>
 #include <QCryptographicHash>
 #include <QDir>
+#include <QEventLoop>
 #include <QFileDialog>
 #include <QFileInfo>
 #include <QInputDialog>
+#include <QJsonDocument>
+#include <QJsonObject>
 #include <QLocale>
 #include <QMessageBox>
+#include <QNetworkAccessManager>
+#include <QNetworkReply>
+#include <QNetworkRequest>
+#include <QRegularExpression>
 #include <QStandardPaths>
 #include <QTemporaryDir>
 #include <QUrl>
@@ -20,6 +27,53 @@
 #include <QWebEngineDownloadRequest>
 #include <QWebEngineProfile>
 #include <QWebEngineSettings>
+#include <QTimer>
+
+namespace {
+
+QString getCachedSebVersion()
+{
+    static QString cachedVersion;
+    if (!cachedVersion.isEmpty()) {
+        return cachedVersion;
+    }
+
+    cachedVersion = QStringLiteral("3.10.1");
+
+    QNetworkAccessManager manager;
+    QNetworkRequest request(QUrl(QStringLiteral("https://api.github.com/repos/SafeExamBrowser/seb-win-refactoring/releases/latest")));
+    request.setAttribute(QNetworkRequest::RedirectPolicyAttribute, QNetworkRequest::NoLessSafeRedirectPolicy);
+    request.setHeader(QNetworkRequest::UserAgentHeader, QStringLiteral("SEB Linux Qt/") + QApplication::applicationVersion());
+
+    QEventLoop loop;
+    QNetworkReply *reply = manager.get(request);
+    QObject::connect(reply, &QNetworkReply::finished, &loop, &QEventLoop::quit);
+    QTimer::singleShot(5000, &loop, &QEventLoop::quit);
+    loop.exec();
+
+    if (!reply->isFinished()) {
+        reply->abort();
+    }
+
+    if (reply->error() == QNetworkReply::NoError) {
+        const QByteArray responseData = reply->readAll();
+        QJsonDocument json = QJsonDocument::fromJson(responseData);
+        if (json.isObject()) {
+            QString tag = json.object().value(QStringLiteral("tag_name")).toString();
+            if (!tag.isEmpty()) {
+                if (tag.startsWith(QLatin1Char('v'), Qt::CaseInsensitive)) {
+                    tag = tag.mid(1);
+                }
+                cachedVersion = tag;
+            }
+        }
+    }
+    reply->deleteLater();
+
+    return cachedVersion;
+}
+
+}  // namespace
 
 SebSession::SebSession(const seb::SebSettings &settings, ResourceOpener opener, QObject *parent)
     : QObject(parent)
@@ -361,11 +415,24 @@ void SebSession::handleDownloadRequested(QWebEngineDownloadRequest *download)
 
 QString SebSession::buildUserAgent() const
 {
-    QString agent = profile_->httpUserAgent();
+    QString agent;
 
     if (settings_.browser.useCustomUserAgent && !settings_.browser.customUserAgent.isEmpty()) {
         agent = settings_.browser.customUserAgent.trimmed();
+    } else {
+        QString defaultAgent = profile_->httpUserAgent();
+        QRegularExpression regex(QStringLiteral("Chrome/([0-9.]+)"));
+        QRegularExpressionMatch match = regex.match(defaultAgent);
+        QString chromeVersion = match.hasMatch() ? match.captured(1) : QStringLiteral("110.0.0.0");
+        
+        agent = QStringLiteral("Mozilla/5.0 (Windows NT 10.0) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/") + chromeVersion;
     }
+
+    const QString sebVersion = QStringLiteral("SEB/") + getCachedSebVersion();
+    if (!agent.endsWith(' ')) {
+        agent += QLatin1Char(' ');
+    }
+    agent += sebVersion;
 
     if (!settings_.browser.userAgentSuffix.trimmed().isEmpty()) {
         if (!agent.endsWith(' ')) {
