@@ -120,6 +120,7 @@ SebSession::SebSession(const seb::SebSettings &settings, ResourceOpener opener, 
     profile_->setSpellCheckLanguages(QStringList{QLocale::system().bcp47Name()});
     profile_->setHttpUserAgent(buildUserAgent());
 
+#ifdef QT_DEBUG
     if (!settings_.browser.injectedScript.isEmpty()) {
         QFile scriptFile(settings_.browser.injectedScript);
         if (scriptFile.open(QIODevice::ReadOnly | QIODevice::Text)) {
@@ -135,6 +136,7 @@ SebSession::SebSession(const seb::SebSettings &settings, ResourceOpener opener, 
             qWarning() << "Failed to open injection script:" << scriptFile.fileName() << scriptFile.errorString();
         }
     }
+#endif
 
     interceptor_.reset(new seb::browser::RequestInterceptor(settings_, this));
     profile_->setUrlRequestInterceptor(interceptor_.data());
