@@ -10,6 +10,7 @@
 #include <QLineEdit>
 #include <QTextStream>
 #include <QUrl>
+#include <QFileInfo>
 
 namespace {
 
@@ -19,6 +20,14 @@ QString findConfigPath(int argc, char *argv[])
         const QString argument = QString::fromLocal8Bit(argv[index]);
         if ((argument == QStringLiteral("--config") || argument == QStringLiteral("-c")) && index + 1 < argc) {
             return QString::fromLocal8Bit(argv[index + 1]);
+        }
+        if (argument == QStringLiteral("--url") || argument == QStringLiteral("-u")
+#ifdef QT_DEBUG
+            || argument == QStringLiteral("--inject") || argument == QStringLiteral("-i")
+#endif
+        ) {
+            ++index;
+            continue;
         }
         if (!argument.startsWith('-')) {
             return argument;
@@ -85,6 +94,12 @@ void applyCommandLineOverrides(const QCommandLineParser &parser, seb::SebSetting
     if (parser.isSet("disable-quit")) {
         settings.security.allowTermination = false;
     }
+
+#ifdef QT_DEBUG
+    if (parser.isSet("inject")) {
+        settings.browser.injectedScript = QFileInfo(parser.value("inject")).absoluteFilePath();
+    }
+#endif
 }
 
 }  // namespace
@@ -134,6 +149,12 @@ int main(int argc, char *argv[])
     parser.addOption(QCommandLineOption(
         QStringLiteral("disable-quit"),
         QStringLiteral("Disable manual termination even if the configuration allows it.")));
+#ifdef QT_DEBUG
+    parser.addOption(QCommandLineOption(
+        QStringList{QStringLiteral("i"), QStringLiteral("inject")},
+        QStringLiteral("Inject a JavaScript file into each page."),
+        QStringLiteral("file")));
+#endif
 
     parser.process(app);
 

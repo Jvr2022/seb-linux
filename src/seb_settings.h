@@ -125,6 +125,7 @@ struct BrowserSettings
     QString startUrl;
     QString startUrlQuery;
     QString userAgentSuffix;
+    QString injectedScript;
     bool allowConfigurationDownloads = true;
     bool allowCustomDownAndUploadLocation = false;
     bool allowDownloads = true;

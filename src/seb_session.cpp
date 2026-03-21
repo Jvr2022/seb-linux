@@ -7,8 +7,10 @@
 #include <QApplication>
 #include <QAuthenticator>
 #include <QCryptographicHash>
+#include <QDebug>
 #include <QDir>
 #include <QEventLoop>
+#include <QFile>
 #include <QFileDialog>
 #include <QFileInfo>
 #include <QInputDialog>
@@ -22,10 +24,13 @@
 #include <QRegularExpression>
 #include <QStandardPaths>
 #include <QTemporaryDir>
+#include <QTextStream>
 #include <QUrl>
 #include <QWebEngineCookieStore>
 #include <QWebEngineDownloadRequest>
 #include <QWebEngineProfile>
+#include <QWebEngineScript>
+#include <QWebEngineScriptCollection>
 #include <QWebEngineSettings>
 #include <QTimer>
 
@@ -114,6 +119,24 @@ SebSession::SebSession(const seb::SebSettings &settings, ResourceOpener opener, 
     profile_->setSpellCheckEnabled(settings_.browser.allowSpellChecking);
     profile_->setSpellCheckLanguages(QStringList{QLocale::system().bcp47Name()});
     profile_->setHttpUserAgent(buildUserAgent());
+
+#ifdef QT_DEBUG
+    if (!settings_.browser.injectedScript.isEmpty()) {
+        QFile scriptFile(settings_.browser.injectedScript);
+        if (scriptFile.open(QIODevice::ReadOnly | QIODevice::Text)) {
+            QWebEngineScript script;
+            script.setName(QStringLiteral("InjectScript"));
+            QTextStream in(&scriptFile);
+            script.setSourceCode(in.readAll());
+            script.setInjectionPoint(QWebEngineScript::DocumentReady);
+            script.setWorldId(QWebEngineScript::UserWorld);
+            script.setRunsOnSubFrames(true);
+            profile_->scripts()->insert(script);
+        } else {
+            qWarning() << "Failed to open injection script:" << scriptFile.fileName() << scriptFile.errorString();
+        }
+    }
+#endif
 
     interceptor_.reset(new seb::browser::RequestInterceptor(settings_, this));
     profile_->setUrlRequestInterceptor(interceptor_.data());
