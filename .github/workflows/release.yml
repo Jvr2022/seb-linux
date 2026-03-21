@@ -19,9 +19,6 @@ jobs:
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v6
-        with:
-          fetch-depth: 0
-          fetch-tags: true
 
       - name: Resolve release version
         id: release_meta
@@ -61,56 +58,17 @@ jobs:
             dist/*.deb
             dist/*.tar.gz
 
-      - name: Resolve previous release tag
-        id: previous_tag
-        run: |
-          current="${{ steps.release_meta.outputs.tag }}"
-          previous="$(git tag --sort=-version:refname | grep -Fxv "$current" | head -n1 || true)"
-          echo "tag=${previous}" >> "$GITHUB_OUTPUT"
-
       - name: Create GitHub release
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          tag="${{ steps.release_meta.outputs.tag }}"
-          version="${{ steps.release_meta.outputs.version }}"
-          previous="${{ steps.previous_tag.outputs.tag }}"
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.release_meta.outputs.tag }}
+          target_commitish: ${{ github.sha }}
+          name: Safe Exam Browser Linux ${{ steps.release_meta.outputs.version }}
+          generate_release_notes: true
+          body: |
+            Thanks to everyone who contributed to this release.
 
-          payload_file="$(mktemp)"
-          if [ -n "$previous" ]; then
-            cat > "$payload_file" <<EOF
-          {
-            "tag_name": "$tag",
-            "target_commitish": "$GITHUB_SHA",
-            "previous_tag_name": "$previous"
-          }
-          EOF
-          else
-            cat > "$payload_file" <<EOF
-          {
-            "tag_name": "$tag",
-            "target_commitish": "$GITHUB_SHA"
-          }
-          EOF
-          fi
-
-          generated_notes="$(gh api \
-            --method POST \
-            -H "Accept: application/vnd.github+json" \
-            "/repos/${GITHUB_REPOSITORY}/releases/generate-notes" \
-            --input "$payload_file" \
-            --jq '.body')"
-
-          notes_file="$(mktemp)"
-          {
-            echo "Thanks to everyone who contributed to this release."
-            echo
-            echo "$generated_notes"
-          } > "$notes_file"
-
-          gh release create "$tag" \
-            dist/*.deb \
-            dist/*.tar.gz \
-            --title "Safe Exam Browser Linux ${version}" \
-            --target "$GITHUB_SHA" \
-            --notes-file "$notes_file"
+            GitHub generated release notes below include the commit summary and new contributors automatically.
+          files: |
+            dist/*.deb
+            dist/*.tar.gz
