@@ -313,11 +313,11 @@ int main(int argc, char *argv[])
             child.setProgram(QStringLiteral("pkexec"));
             
             QStringList pkexecArgs;
+            pkexecArgs << QStringLiteral("--keep-cwd");
             if (usedPassword) {
                 pkexecArgs << QStringLiteral("env");
                 pkexecArgs << (QStringLiteral("SEB_PASSWORD=") + userPassword);
             }
-            pkexecArgs << QStringLiteral("--keep-cwd");
             pkexecArgs << QCoreApplication::applicationFilePath();
             pkexecArgs << args;
             
