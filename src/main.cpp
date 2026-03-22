@@ -24,14 +24,16 @@ namespace {
 
 int g_tty0_fd = -1;
 int g_new_tty_fd = -1;
+int g_original_vt = -1;
 
 void cleanup_vt_and_exit() {
     if (g_new_tty_fd >= 0) {
         ioctl(g_new_tty_fd, KDSETMODE, KD_TEXT);
     }
     if (g_tty0_fd >= 0) {
-        ioctl(g_tty0_fd, VT_ACTIVATE, 1);
-        ioctl(g_tty0_fd, VT_WAITACTIVE, 1);
+        int target_vt = (g_original_vt > 0) ? g_original_vt : 1;
+        ioctl(g_tty0_fd, VT_ACTIVATE, target_vt);
+        ioctl(g_tty0_fd, VT_WAITACTIVE, target_vt);
     }
     if (g_new_tty_fd >= 0) close(g_new_tty_fd);
     if (g_tty0_fd >= 0) close(g_tty0_fd);
@@ -73,6 +75,11 @@ void setup_barebones_vt() {
     if (g_new_tty_fd < 0) {
         qWarning() << "Could not open VT" << vt_name;
         return;
+    }
+
+    struct vt_stat vts;
+    if (ioctl(g_tty0_fd, VT_GETSTATE, &vts) == 0) {
+        g_original_vt = vts.v_active;
     }
 
     ioctl(g_tty0_fd, VT_ACTIVATE, free_vt);
