@@ -12,8 +12,6 @@
 #include <QUrl>
 #include <QProcess>
 #include <QProcessEnvironment>
-#include <QTemporaryFile>
-#include <QDir>
 
 #include <fcntl.h>
 #include <unistd.h>
@@ -259,19 +257,10 @@ int main(int argc, char *argv[])
     QStringList warnings;
     if (!resource.isEmpty()) {
         const seb::ResourceLoadResult loaded = seb::loadSettingsFromResource(resource, [&userPassword, &usedPassword](bool hashed) {
-            if (qEnvironmentVariableIsSet("SEB_PASSWORD_FILE")) {
-                QString tempFilePath = QString::fromUtf8(qgetenv("SEB_PASSWORD_FILE"));
-                QFile file(tempFilePath);
-                if (file.open(QIODevice::ReadOnly)) {
-                    QByteArray data = file.readAll();
-                    userPassword = QString::fromUtf8(data);
-                    if (userPassword.endsWith('\n')) {
-                        userPassword.chop(1);
-                    }
-                    file.remove(); // Unlink immediately
-                    usedPassword = true;
-                    return userPassword;
-                }
+            if (qEnvironmentVariableIsSet("SEB_PASSWORD")) {
+                userPassword = QString::fromUtf8(qgetenv("SEB_PASSWORD"));
+                usedPassword = true;
+                return userPassword;
             }
 
             bool accepted = false;
@@ -313,17 +302,9 @@ int main(int argc, char *argv[])
             child.setProgram(QStringLiteral("pkexec"));
             
             QStringList pkexecArgs;
-            QTemporaryFile *tempFile = nullptr;
             if (usedPassword) {
-                tempFile = new QTemporaryFile(QDir::tempPath() + QStringLiteral("/seb-pass-XXXXXX"));
-                tempFile->setAutoRemove(false);
-                if (tempFile->open()) {
-                    tempFile->write(userPassword.toUtf8());
-                    tempFile->close();
-                    
-                    pkexecArgs << QStringLiteral("env");
-                    pkexecArgs << (QStringLiteral("SEB_PASSWORD_FILE=") + tempFile->fileName());
-                }
+                pkexecArgs << QStringLiteral("env");
+                pkexecArgs << (QStringLiteral("SEB_PASSWORD=") + userPassword);
             }
             
             pkexecArgs << QCoreApplication::applicationFilePath();
@@ -334,7 +315,6 @@ int main(int argc, char *argv[])
             if (child.startDetached()) {
                 return 0;
             }
-            delete tempFile;
             return 1;
         }
     }
