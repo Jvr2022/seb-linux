@@ -49,7 +49,7 @@ void barebones_sig_handler(int signum) {
     }
 }
 
-void setup_barebones_vt() {
+bool setup_barebones_vt() {
     signal(SIGINT, barebones_sig_handler);
     signal(SIGTERM, barebones_sig_handler);
     signal(SIGSEGV, barebones_sig_handler);
@@ -60,13 +60,15 @@ void setup_barebones_vt() {
     g_tty0_fd = open("/dev/tty0", O_RDWR);
     if (g_tty0_fd < 0) {
         qWarning() << "Could not open /dev/tty0. Did you run the app as root?";
-        return;
+        return false;
     }
 
     int free_vt = -1;
     if (ioctl(g_tty0_fd, VT_OPENQRY, &free_vt) < 0 || free_vt == -1) {
         qWarning() << "Could not find a free VT.";
-        return;
+        close(g_tty0_fd);
+        g_tty0_fd = -1;
+        return false;
     }
 
     char vt_name[20];
@@ -74,7 +76,9 @@ void setup_barebones_vt() {
     g_new_tty_fd = open(vt_name, O_RDWR);
     if (g_new_tty_fd < 0) {
         qWarning() << "Could not open VT" << vt_name;
-        return;
+        close(g_tty0_fd);
+        g_tty0_fd = -1;
+        return false;
     }
 
     struct vt_stat vts;
@@ -82,14 +86,31 @@ void setup_barebones_vt() {
         g_original_vt = vts.v_active;
     }
 
-    ioctl(g_tty0_fd, VT_ACTIVATE, free_vt);
-    ioctl(g_tty0_fd, VT_WAITACTIVE, free_vt);
+    if (ioctl(g_tty0_fd, VT_ACTIVATE, free_vt) < 0 ||
+        ioctl(g_tty0_fd, VT_WAITACTIVE, free_vt) < 0) {
+        qWarning() << "Could not switch to VT" << free_vt;
+        close(g_new_tty_fd);
+        g_new_tty_fd = -1;
+        close(g_tty0_fd);
+        g_tty0_fd = -1;
+        return false;
+    }
 
     if (ioctl(g_new_tty_fd, KDSETMODE, KD_GRAPHICS) < 0) {
         qWarning() << "Error setting graphics mode on VT" << free_vt;
+        // Switch back to the original VT before giving up.
+        int target_vt = (g_original_vt > 0) ? g_original_vt : 1;
+        ioctl(g_tty0_fd, VT_ACTIVATE, target_vt);
+        ioctl(g_tty0_fd, VT_WAITACTIVE, target_vt);
+        close(g_new_tty_fd);
+        g_new_tty_fd = -1;
+        close(g_tty0_fd);
+        g_tty0_fd = -1;
+        return false;
     }
 
     atexit(cleanup_vt_and_exit);
+    return true;
 }
 
 QString findConfigPath(int argc, char *argv[])
@@ -118,7 +139,10 @@ void applyEarlyEnvironment(int argc, char *argv[])
     }
     for (int i = 0; i < argc; ++i) { // we have to use a loop because the command line parser was not yet loaded.
         if (QString::fromLocal8Bit(argv[i]) == QStringLiteral("--anti-cheat")) {
-            setup_barebones_vt();
+            if (!setup_barebones_vt()) {
+                qCritical() << "Anti-cheat VT setup failed; aborting.";
+                _exit(1);
+            }
             qputenv("QT_QPA_PLATFORM", "linuxfb");
             qputenv("QTWEBENGINE_CHROMIUM_FLAGS", "--no-sandbox");
             qputenv("QT_QUICK_BACKEND", "software");
