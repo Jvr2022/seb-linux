@@ -26,7 +26,7 @@ Section: education
 Priority: optional
 Architecture: amd64
 Maintainer: SEB Linux contributors
-Depends: libqt6core6, libqt6gui6, libqt6network6, libqt6webenginecore6, libqt6webenginewidgets6, shared-mime-info
+Depends: libqt6core6, libqt6gui6, libqt6network6, libqt6webenginecore6, libqt6webenginewidgets6, shared-mime-info, pkexec
 Description: Safe Exam Browser Linux Qt port
  Qt-based Safe Exam Browser launcher for Linux with .seb file and sebs:// support.
 EOF
