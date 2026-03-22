@@ -98,7 +98,6 @@ bool setup_barebones_vt() {
 
     if (ioctl(g_new_tty_fd, KDSETMODE, KD_GRAPHICS) < 0) {
         qWarning() << "Error setting graphics mode on VT" << free_vt;
-        // Switch back to the original VT before giving up.
         int target_vt = (g_original_vt > 0) ? g_original_vt : 1;
         ioctl(g_tty0_fd, VT_ACTIVATE, target_vt);
         ioctl(g_tty0_fd, VT_WAITACTIVE, target_vt);
@@ -318,7 +317,7 @@ int main(int argc, char *argv[])
                 pkexecArgs << QStringLiteral("env");
                 pkexecArgs << (QStringLiteral("SEB_PASSWORD=") + userPassword);
             }
-            
+            pkexecArgs << QStringLiteral("--keep-cwd");
             pkexecArgs << QCoreApplication::applicationFilePath();
             pkexecArgs << args;
             
