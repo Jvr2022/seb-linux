@@ -118,7 +118,7 @@ void applyEarlyEnvironment(int argc, char *argv[])
             settings = loaded.settings;
         }
     }
-    for (int i = 0; i <= argc; ++i) { // we have to use a loop because the command line parser was not yet loaded.
+    for (int i = 0; i < argc; ++i) { // we have to use a loop because the command line parser was not yet loaded.
         if (QString::fromLocal8Bit(argv[i]) == QStringLiteral("--anti-cheat")) {
             setup_barebones_vt();
             qputenv("QT_QPA_PLATFORM", "linuxfb");
