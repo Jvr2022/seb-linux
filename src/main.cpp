@@ -12,6 +12,7 @@
 #include <QUrl>
 #include <QProcess>
 #include <QProcessEnvironment>
+#include <QFileInfo>
 
 #include <fcntl.h>
 #include <unistd.h>
