@@ -146,6 +146,60 @@ void appendPkexecEnvironmentVariable(QStringList &pkexecArgs, const char *name)
     pkexecArgs << QStringLiteral("%1=%2").arg(QString::fromLatin1(name), QString::fromLocal8Bit(qgetenv(name)));
 }
 
+void applyProtectedWindowSettings(seb::WindowSettings &settings, bool fullScreen)
+{
+    settings.absoluteHeight = 0;
+    settings.absoluteWidth = 0;
+    settings.relativeHeight = 100;
+    settings.relativeWidth = 100;
+    settings.allowAddressBar = false;
+    settings.allowBackwardNavigation = false;
+    settings.allowDeveloperConsole = false;
+    settings.allowForwardNavigation = false;
+    settings.allowMinimize = false;
+    settings.allowReloading = false;
+    settings.alwaysOnTop = true;
+    settings.frameless = true;
+    settings.fullScreenMode = fullScreen;
+    settings.showHomeButton = false;
+    settings.showReloadButton = false;
+    settings.showReloadWarning = false;
+    settings.showToolbar = false;
+    settings.position = seb::WindowPosition::Center;
+}
+
+void applyProtectedSessionSettings(
+    seb::SebSettings &settings,
+    bool fullScreen,
+    bool allowConfiguredApps,
+    bool allowTermination)
+{
+    applyProtectedWindowSettings(settings.browser.mainWindow, fullScreen);
+    applyProtectedWindowSettings(settings.browser.additionalWindow, false);
+    settings.browser.additionalWindow.relativeWidth = 100;
+    settings.browser.popupPolicy = seb::PopupPolicy::AllowSameWindow;
+    settings.browser.allowConfigurationDownloads = false;
+    settings.browser.allowCustomDownAndUploadLocation = false;
+    settings.browser.allowDownloads = false;
+    settings.browser.allowFind = false;
+    settings.browser.allowPageZoom = false;
+    settings.browser.allowPrint = false;
+    settings.browser.allowSpellChecking = false;
+    settings.browser.allowUploads = false;
+    settings.taskbar.showApplicationInfo = false;
+    settings.taskbar.showApplicationLog = false;
+    settings.taskbar.showAudio = false;
+    settings.taskbar.showKeyboardLayout = false;
+    settings.taskbar.showNetwork = false;
+    settings.security.allowTermination = allowTermination;
+
+    if (!allowConfiguredApps) {
+        settings.applications.whitelist.clear();
+        settings.applications.blacklist.clear();
+        settings.taskbar.showProctoringNotification = false;
+    }
+}
+
 void applyEarlyEnvironment(int argc, char *argv[])
 {
     seb::SebSettings settings = seb::defaultSettings();
@@ -329,6 +383,7 @@ int main(int argc, char *argv[])
 
     const bool launchedWithoutExam = resource.isEmpty();
     const bool menuLockdown = parser.isSet("menu-lockdown");
+    const bool examAntiCheat = parser.isSet("anti-cheat");
 
     if (!parser.isSet("anti-cheat") && !menuLockdown) {
         if (launchedWithoutExam) {
@@ -421,17 +476,15 @@ int main(int argc, char *argv[])
     }
 
     if (menuLockdown && launchedWithoutExam) {
-        settings.browser.mainWindow.fullScreenMode = false;
-        settings.browser.mainWindow.alwaysOnTop = true;
-        settings.browser.mainWindow.allowMinimize = false;
-        settings.browser.mainWindow.frameless = true;
-        settings.browser.mainWindow.relativeWidth = 100;
-        settings.browser.mainWindow.relativeHeight = 100;
-        settings.browser.mainWindow.position = seb::WindowPosition::Center;
-        settings.browser.mainWindow.showToolbar = false;
-        settings.browser.mainWindow.allowAddressBar = false;
-        settings.browser.mainWindow.allowBackwardNavigation = false;
-        settings.browser.mainWindow.allowForwardNavigation = false;
+        applyProtectedSessionSettings(settings, false, false, true);
+    } else if (examAntiCheat) {
+        applyProtectedSessionSettings(settings, true, true, false);
+    } else if (!launchedWithoutExam &&
+               settings.browser.mainWindow.fullScreenMode &&
+               settings.browser.mainWindow.alwaysOnTop) {
+        // Re-assert secure settings after command-line parsing so weakening flags
+        // like --windowed/--allow-devtools cannot downgrade a protected exam launch.
+        applyProtectedSessionSettings(settings, true, true, false);
     }
 
     AppController controller;
