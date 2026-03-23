@@ -298,10 +298,17 @@ void BrowserWindow::applyWindowGeometry()
 {
     const QScreen *screen = QGuiApplication::primaryScreen();
     const QRect available = screen ? screen->availableGeometry() : QRect(100, 100, 1280, 800);
+    const QRect screenGeometry = screen ? screen->geometry() : available;
 
     if (windowSettings_.fullScreenMode) {
         resize(available.size());
         showFullScreen();
+        return;
+    }
+
+    if (windowSettings_.frameless && windowSettings_.alwaysOnTop) {
+        setGeometry(screenGeometry);
+        showMaximized();
         return;
     }
 
