@@ -1,10 +1,31 @@
-# Safe Exam Browser for Linux
+<div align="center">
+  <img src="assets/icons/safe-exam-browser.png" alt="Safe Exam Browser for Linux logo" width="120" />
 
-Safe Exam Browser for Linux is a Qt 6 and Qt WebEngine based Linux desktop implementation focused on native startup, Linux desktop integration, and release packaging.
+  # Safe Exam Browser for Linux
 
-It supports opening SEB configuration files, handling `seb://` and `sebs://` links, and running as an installed Linux desktop application.
+  A Linux-first desktop implementation of Safe Exam Browser, built with **Qt 6** and **Qt WebEngine**.
+</div>
 
-Prebuilt release files can be downloaded from GitHub Releases.
+## Overview
+
+This project provides a native Linux client focused on:
+
+- Reliable startup and kiosk-like exam runtime behavior
+- Linux desktop integration (file associations and protocol handling)
+- Packaging and distribution for common Linux ecosystems
+
+It supports:
+
+- Opening `.seb` configuration files
+- Handling `seb://` and `sebs://` links
+- Running as an installed Linux desktop application
+
+> [!IMPORTANT]
+> This repository is an independent Linux implementation and is **not** an official Safe Exam Browser release.
+
+## Prerequisites
+
+Make sure your environment has the dependencies required for a Qt 6 + Qt WebEngine desktop build.
 
 ## Build
 
@@ -12,7 +33,7 @@ Prebuilt release files can be downloaded from GitHub Releases.
 ./scripts/build.sh
 ```
 
-The compiled binary is written to:
+Compiled binary output:
 
 ```bash
 build/bin/safe-exam-browser
@@ -20,38 +41,69 @@ build/bin/safe-exam-browser
 
 ## Run
 
+Start with default behavior:
+
 ```bash
 ./build/bin/safe-exam-browser
+```
+
+Open a local exam file:
+
+```bash
 ./build/bin/safe-exam-browser /path/to/exam.seb
+```
+
+Open a remote exam link:
+
+```bash
 ./build/bin/safe-exam-browser sebs://demo.safeexambrowser.org/exams/DemoExamGeneral.seb
+```
+
+Run with a JSON config file:
+
+```bash
 ./build/bin/safe-exam-browser --config ./examples/minimal-config.json
 ```
 
-## Release Artifacts
+## Create Release Artifacts
 
 ```bash
 ./scripts/build-release.sh 0.1.0
 ```
 
-Artifacts are written to `dist/`.
+Release files are written to `dist/`.
 
-Published release downloads are available from the repository Releases page.
+Prebuilt binaries are available from the GitHub Releases page.
 
-## Install
+## Installation
 
-Debian-based systems:
+### Debian/Ubuntu
 
 ```bash
 sudo apt install ./dist/safe-exam-browser_0.1.0_amd64.deb
 ```
 
-Arch Linux:
+### Arch Linux
 
 ```bash
 cd packaging/arch
 makepkg -si
 ```
 
-## Notice
+## Contributing
 
-This repository is an independent Linux implementation and is not an official Safe Exam Browser release.
+Please review these files before opening a PR:
+
+- [CONTRIBUTING.md](./CONTRIBUTING.md)
+- [CODE_OF_CONDUCT.md](./CODE_OF_CONDUCT.md)
+- [SECURITY.md](./SECURITY.md)
+
+Quick copy/open helper:
+
+```bash
+cat CONTRIBUTING.md CODE_OF_CONDUCT.md SECURITY.md
+```
+
+## License
+
+Licensed under the terms in `LICENSE`.
