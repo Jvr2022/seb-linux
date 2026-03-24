@@ -3,7 +3,7 @@
 
   # Safe Exam Browser for Linux
 
-  A Linux-first desktop implementation of Safe Exam Browser, built with **Qt 6** and **Qt WebEngine**.
+  **A native Linux implementation of Safe Exam Browser, built with Qt 6 and Qt WebEngine.**
 </div>
 
 ## Overview
