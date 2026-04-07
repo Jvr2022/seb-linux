@@ -27,7 +27,10 @@ contracts::LoadStatus PublicKeySymmetricEncryption::decrypt(const QByteArray &da
     qint32 encryptedKeyLength = 0;
     ds >> encryptedKeyLength;
 
-    if (data.size() < (24 + encryptedKeyLength)) return contracts::LoadStatus::InvalidData;
+    const int remainingDataSize = data.size() - 24;
+    if (encryptedKeyLength < 0 || encryptedKeyLength > remainingDataSize) {
+        return contracts::LoadStatus::InvalidData;
+    }
 
     const QByteArray encryptedKey = data.mid(24, encryptedKeyLength);
     const QByteArray payload = data.mid(24 + encryptedKeyLength);

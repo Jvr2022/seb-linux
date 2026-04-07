@@ -1,6 +1,6 @@
 #pragma once
 
-#if !SEB_HAS_QTWEBENGINE
+#if !SEB_HAS_QTWEBENGINE && SEB_HAS_WEBKITGTK
 
 #include <memory>
 #include <QObject>
@@ -22,4 +22,4 @@ public:
 
 }  // namespace seb::browser
 
-#endif
+#endif // !SEB_HAS_QTWEBENGINE && SEB_HAS_WEBKITGTK

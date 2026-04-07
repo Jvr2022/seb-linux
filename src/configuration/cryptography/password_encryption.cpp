@@ -127,6 +127,7 @@ contracts::SaveStatus PasswordEncryption::encrypt(const QByteArray &data,
       kIterations, kKeySize,
       reinterpret_cast<unsigned char *>(authenticationKey.data()));
 
+  encrypted.clear();
   encrypted.append(static_cast<char>(kVersion));
   encrypted.append(static_cast<char>(kOptions));
   encrypted.append(encSalt);

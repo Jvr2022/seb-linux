@@ -1,6 +1,6 @@
 #include "webkitgtk_provider.h"
 
-#if !SEB_HAS_QTWEBENGINE
+#if !SEB_HAS_QTWEBENGINE && SEB_HAS_WEBKITGTK
 #include "webkitgtk_profile.h"
 #include "webkitgtk_view.h"
 #include "../../contracts/i_webprofile.h"
@@ -24,4 +24,4 @@ std::unique_ptr<contracts::IWebView> WebKitGtkProvider::createWebView(contracts:
 
 }  // namespace seb::browser
 
-#endif
+#endif // !SEB_HAS_QTWEBENGINE && SEB_HAS_WEBKITGTK

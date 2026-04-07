@@ -216,17 +216,14 @@ void BrowserWindow::keyPressEvent(QKeyEvent *event)
     const bool devBypass = session_.settings().devBypass;
 
     if (event->key() == Qt::Key_F11) {
-        if (isFullScreen()) {
-            showNormal();
-            if (devBypass) {
+        if (devBypass) {
+            if (isFullScreen()) {
+                showNormal();
                 if (toolbar_) toolbar_->show();
                 if (taskbar_) taskbar_->show();
-            }
-        } else {
-            showFullScreen();
-            if (devBypass) {
+            } else {
+                showFullScreen();
                 if (toolbar_) toolbar_->hide();
-                // User requested taskbar to remain visible in F11 dev-bypass
                 if (taskbar_) taskbar_->show();
             }
         }

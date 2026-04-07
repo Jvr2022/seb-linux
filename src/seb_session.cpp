@@ -132,7 +132,7 @@ SebSession::SebSession(const seb::SebSettings &settings, ResourceOpener opener, 
     profile_->setDevBypass(settings_.devBypass);
 
     interceptor_.reset(new seb::browser::RequestInterceptor(settings_));
-    profile_->setUrlRequestInterceptor(interceptor_.get());
+    profile_->setUrlRequestInterceptor(interceptor_.data());
 
     connect(profile_.get(), &seb::browser::contracts::IWebProfile::downloadRequested,
             this, &SebSession::handleDownloadRequested);

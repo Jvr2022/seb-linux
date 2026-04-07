@@ -1,6 +1,6 @@
 #pragma once
 
-#if !SEB_HAS_QTWEBENGINE
+#if !SEB_HAS_QTWEBENGINE && SEB_HAS_WEBKITGTK
 
 #include "../../contracts/i_webview.h"
 
@@ -39,4 +39,4 @@ private:
 
 }  // namespace seb::browser
 
-#endif
+#endif // !SEB_HAS_QTWEBENGINE && SEB_HAS_WEBKITGTK

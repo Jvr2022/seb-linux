@@ -1,6 +1,6 @@
 #include "webkitgtk_profile.h"
 
-#if !SEB_HAS_QTWEBENGINE
+#if !SEB_HAS_QTWEBENGINE && SEB_HAS_WEBKITGTK
 
 #include <webkit2/webkit2.h>
 
@@ -67,7 +67,7 @@ void WebKitGtkProfile::setHttpUserAgent(const QString &userAgent)
     // Agent is typically set on WebKitSettings per WebView, but can be managed here
 }
 
-void WebKitGtkProfile::setUrlRequestInterceptor(seb::browser::RequestInterceptor *interceptor)
+void WebKitGtkProfile::setUrlRequestInterceptor(seb::browser::contracts::IRequestInterceptor *interceptor)
 {
     // Use WebKitUserContentManager or custom URI scheme handler
 }
@@ -80,4 +80,4 @@ void WebKitGtkProfile::deleteAllCookies()
 
 }  // namespace seb::browser
 
-#endif
+#endif // !SEB_HAS_QTWEBENGINE && SEB_HAS_WEBKITGTK

@@ -1,7 +1,7 @@
 #pragma once
 
 #include "browser/webengine_compat.h"
-#if !SEB_HAS_QTWEBENGINE
+#if !SEB_HAS_QTWEBENGINE && SEB_HAS_WEBKITGTK
 
 #include "browser/contracts/i_webprofile.h"
 
@@ -25,7 +25,7 @@ public:
   void setDevBypass(bool enabled) override {}
 
   void setUrlRequestInterceptor(
-      seb::browser::RequestInterceptor *interceptor) override;
+      seb::browser::contracts::IRequestInterceptor *interceptor) override;
   void deleteAllCookies() override;
 
 private:
@@ -35,4 +35,4 @@ private:
 
 } // namespace seb::browser
 
-#endif
+#endif // !SEB_HAS_QTWEBENGINE && SEB_HAS_WEBKITGTK

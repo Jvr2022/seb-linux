@@ -1,6 +1,6 @@
 #include "webkitgtk_view.h"
 
-#if !SEB_HAS_QTWEBENGINE
+#if !SEB_HAS_QTWEBENGINE && SEB_HAS_WEBKITGTK
 
 #include <gtk/gtk.h>
 #include <webkit2/webkit2.h>
@@ -8,7 +8,6 @@
 #include <QVBoxLayout>
 #include <QWidget>
 #include <QWindow>
-#include <QX11Info> // Requires QtX11Extras in Qt5, or native window handle in Qt6
 
 namespace seb::browser {
 
@@ -31,7 +30,12 @@ WebKitGtkWebView::WebKitGtkWebView(WebKitGtkProfile *profile, QWidget *parent)
     // This is a minimal stub to ensure compilation and linkage to GTK+3 and WebKit2.
     // In a production environment, you would use gtk_plug_new() and QWindow::fromWinId().
     
-    gtk_init(nullptr, nullptr);
+    // gtk_init must be called exactly once per process.
+    static bool gtkInitialized = false;
+    if (!gtkInitialized) {
+        gtk_init(nullptr, nullptr);
+        gtkInitialized = true;
+    }
     d->webView = webkit_web_view_new();
     
     // Connect WebKitGTK signals (load-changed, decide-policy, etc.)
@@ -131,4 +135,4 @@ void WebKitGtkWebView::setNavigationRequestDelegate(NavigationRequestDelegate de
 }
 
 }  // namespace seb::browser
-#endif
+#endif // !SEB_HAS_QTWEBENGINE && SEB_HAS_WEBKITGTK

@@ -3,7 +3,7 @@
 
 #if SEB_HAS_QTWEBENGINE
 #include "qtwebengine/qt_webengine_provider.h"
-#else
+#elif SEB_HAS_WEBKITGTK
 #include "webkitgtk/webkitgtk_provider.h"
 #endif
 
