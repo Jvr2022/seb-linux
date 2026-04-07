@@ -1,11 +1,12 @@
 #include "BrowserControl.h"
 
-#include <QWebEngineHistory>
-#include <QWebEngineView>
+#include "engine/browser_view.h"
+
+#include <QUrl>
 
 namespace seb::browser {
 
-BrowserControl::BrowserControl(QWebEngineView *view, QObject *parent)
+BrowserControl::BrowserControl(seb::browser::engine::BrowserView *view, QObject *parent)
     : QObject(parent)
     , view_(view)
 {
@@ -18,17 +19,17 @@ QString BrowserControl::address() const
 
 bool BrowserControl::canNavigateBackwards() const
 {
-    return view_ && view_->history()->canGoBack();
+    return view_ && view_->canGoBack();
 }
 
 bool BrowserControl::canNavigateForwards() const
 {
-    return view_ && view_->history()->canGoForward();
+    return view_ && view_->canGoForward();
 }
 
 void BrowserControl::navigateTo(const QString &address)
 {
-    if (view_) view_->setUrl(QUrl::fromUserInput(address));
+    if (view_) view_->load(QUrl::fromUserInput(address));
 }
 
 void BrowserControl::navigateBackwards()

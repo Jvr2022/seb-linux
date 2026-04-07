@@ -12,6 +12,9 @@
 namespace seb::browser {
 class RequestInterceptor;
 }
+namespace seb::browser::engine {
+class BrowserView;
+}
 namespace seb::applications {
 class ApplicationManager;
 class ExternalApplication;
@@ -48,6 +51,7 @@ public:
     bool requestApplicationQuit(QWidget *parent, const QString &reason) const;
     const seb::SebSettings &settings() const;
     QWebEngineProfile *profile() const;
+    std::unique_ptr<seb::browser::engine::BrowserView> createBrowserView(QWidget *parentWidget);
     QUrl homeUrl() const;
     QUrl initialUrl() const;
     bool openSebResource(const QUrl &url, QWidget *parent) const;

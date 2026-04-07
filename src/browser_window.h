@@ -2,8 +2,9 @@
 
 #include "seb_settings.h"
 
+#include <memory>
+
 #include <QMainWindow>
-#include <QWebEnginePage>
 
 QT_BEGIN_NAMESPACE
 class QAuthenticator;
@@ -15,31 +16,15 @@ class QLineEdit;
 class QToolBar;
 class QWidget;
 class QUrl;
-class QWebEngineNewWindowRequest;
-class QWebEngineView;
 QT_END_NAMESPACE
 
 class SebSession;
 class SebTaskbar;
 
 class BrowserWindow;
-
-class BrowserPage : public QWebEnginePage
-{
-public:
-    BrowserPage(SebSession &session, BrowserWindow *window);
-
-protected:
-    bool acceptNavigationRequest(const QUrl &url, QWebEnginePage::NavigationType type, bool isMainFrame) override;
-    QStringList chooseFiles(
-        QWebEnginePage::FileSelectionMode mode,
-        const QStringList &oldFiles,
-        const QStringList &acceptedMimeTypes) override;
-
-private:
-    SebSession &session_;
-    BrowserWindow *window_;
-};
+namespace seb::browser::engine {
+class BrowserView;
+}
 
 class BrowserWindow : public QMainWindow
 {
@@ -53,7 +38,7 @@ public:
         bool isMainWindow);
     ~BrowserWindow() override;
 
-    QWebEnginePage *page() const;
+    QUrl currentUrl() const;
     bool isMainWindow() const;
     bool shouldAllowNavigation(const QUrl &url);
     QString taskbarIconPath() const;
@@ -73,15 +58,14 @@ private:
     void findInPage();
     void navigateHome();
     void openDevTools();
-    void handleNewWindowRequest(QWebEngineNewWindowRequest &request);
+    void handleNewWindowRequest(const QUrl &targetUrl, const QUrl &openerUrl);
     void reloadPage();
     void updateAddressBar(const QUrl &url);
     void notifyTaskbarStateChanged();
 
     SebSession &session_;
     seb::WindowSettings windowSettings_;
-    QWebEngineView *view_ = nullptr;
-    BrowserPage *page_ = nullptr;
+    std::unique_ptr<seb::browser::engine::BrowserView> view_;
     QWidget *contentContainer_ = nullptr;
     QToolBar *toolbar_ = nullptr;
     QLineEdit *addressBar_ = nullptr;

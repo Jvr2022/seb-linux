@@ -1,6 +1,7 @@
 #include "seb_session.h"
 
 #include "browser/request_interceptor.h"
+#include "browser/engine/qtwebengine_browser_view.h"
 #include "applications/application_manager.h"
 #include "browser_window.h"
 
@@ -272,6 +273,11 @@ const seb::SebSettings &SebSession::settings() const
 QWebEngineProfile *SebSession::profile() const
 {
     return profile_.data();
+}
+
+std::unique_ptr<seb::browser::engine::BrowserView> SebSession::createBrowserView(QWidget *parentWidget)
+{
+    return std::make_unique<seb::browser::engine::QtWebEngineBrowserView>(*this, profile_.data(), parentWidget);
 }
 
 QUrl SebSession::homeUrl() const

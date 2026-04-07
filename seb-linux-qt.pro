@@ -88,6 +88,7 @@ SOURCES += \
     src/browser/filters/RuleFactory.cpp \
     src/browser/filters/rules/RegexRule.cpp \
     src/browser/filters/rules/SimplifiedRule.cpp \
+    src/browser/engine/qtwebengine_browser_view.cpp \
     src/browser/key_generator.cpp \
     src/browser/request_filter.cpp \
     src/browser/request_interceptor.cpp \
@@ -324,6 +325,8 @@ HEADERS += \
     src/browser/filters/RuleFactory.h \
     src/browser/filters/rules/RegexRule.h \
     src/browser/filters/rules/SimplifiedRule.h \
+    src/browser/engine/browser_view.h \
+    src/browser/engine/qtwebengine_browser_view.h \
     src/browser/handlers/ContextMenuHandler.h \
     src/browser/handlers/CookieVisitor.h \
     src/browser/handlers/DialogHandler.h \

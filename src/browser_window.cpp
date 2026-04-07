@@ -19,37 +19,8 @@
 #include <QToolBar>
 #include <QUrl>
 #include <QVBoxLayout>
-#include <QWebEngineNewWindowRequest>
-#include <QWebEnginePage>
-#include <QWebEngineProfile>
-#include <QWebEngineSettings>
-#include <QWebEngineView>
 
-BrowserPage::BrowserPage(SebSession &session, BrowserWindow *window)
-    : QWebEnginePage(session.profile(), window)
-    , session_(session)
-    , window_(window)
-{
-}
-
-bool BrowserPage::acceptNavigationRequest(const QUrl &url, QWebEnginePage::NavigationType type, bool isMainFrame)
-{
-    if (isMainFrame && !window_->shouldAllowNavigation(url)) {
-        return false;
-    }
-    return QWebEnginePage::acceptNavigationRequest(url, type, isMainFrame);
-}
-
-QStringList BrowserPage::chooseFiles(
-    QWebEnginePage::FileSelectionMode mode,
-    const QStringList &oldFiles,
-    const QStringList &acceptedMimeTypes)
-{
-    if (!session_.settings().browser.allowUploads) {
-        return {};
-    }
-    return QWebEnginePage::chooseFiles(mode, oldFiles, acceptedMimeTypes);
-}
+#include "browser/engine/browser_view.h"
 
 BrowserWindow::BrowserWindow(
     SebSession &session,
@@ -67,10 +38,15 @@ BrowserWindow::BrowserWindow(
     contentLayout->setContentsMargins(0, 0, 0, 0);
     contentLayout->setSpacing(0);
 
-    view_ = new QWebEngineView(contentContainer_);
-    page_ = new BrowserPage(session_, this);
-    view_->setPage(page_);
-    contentLayout->addWidget(view_, 1);
+    view_ = session_.createBrowserView(contentContainer_);
+    view_->setNavigationPolicy([this](const QUrl &url, bool isMainFrame) {
+        if (isMainFrame) {
+            return shouldAllowNavigation(url);
+        }
+        return true;
+    });
+    view_->setUploadsAllowed(session_.settings().browser.allowUploads);
+    contentLayout->addWidget(view_->widget(), 1);
 
     if (isMainWindow_ && session_.settings().taskbar.enableTaskbar) {
         taskbar_ = new SebTaskbar(session_, session_.settings(), contentContainer_);
@@ -78,17 +54,14 @@ BrowserWindow::BrowserWindow(
     }
     setCentralWidget(contentContainer_);
 
-    view_->settings()->setAttribute(QWebEngineSettings::FullScreenSupportEnabled, false);
-    view_->settings()->setAttribute(QWebEngineSettings::JavascriptCanOpenWindows, true);
-
     if (!isMainWindow_) {
         configureToolbar();
     }
     configureShortcuts();
     applyWindowGeometry();
 
-    connect(view_, &QWebEngineView::urlChanged, this, &BrowserWindow::updateAddressBar);
-    connect(view_, &QWebEngineView::titleChanged, this, [this](const QString &title) {
+    connect(view_.get(), &seb::browser::engine::BrowserView::urlChanged, this, &BrowserWindow::updateAddressBar);
+    connect(view_.get(), &seb::browser::engine::BrowserView::titleChanged, this, [this](const QString &title) {
         const QString resolvedTitle = title.trimmed().isEmpty() ? QStringLiteral("SEB Linux") : title;
         setWindowTitle(resolvedTitle);
         if (taskbar_) {
@@ -96,14 +69,7 @@ BrowserWindow::BrowserWindow(
         }
         notifyTaskbarStateChanged();
     });
-    connect(page_, &QWebEnginePage::newWindowRequested, this, &BrowserWindow::handleNewWindowRequest);
-    connect(
-        page_,
-        &QWebEnginePage::proxyAuthenticationRequired,
-        this,
-        [this](const QUrl &, QAuthenticator *authenticator, const QString &proxyHost) {
-            session_.applyProxyAuthentication(proxyHost, authenticator);
-        });
+    connect(view_.get(), &seb::browser::engine::BrowserView::newWindowRequested, this, &BrowserWindow::handleNewWindowRequest);
     if (taskbar_) {
         connect(taskbar_, &SebTaskbar::quitRequested, this, [this] {
             if (isMainWindow_ &&
@@ -116,7 +82,7 @@ BrowserWindow::BrowserWindow(
     }
 
     if (initialUrl.isValid()) {
-        view_->setUrl(initialUrl);
+        view_->load(initialUrl);
     }
 
     session_.registerBrowserWindow(this);
@@ -128,9 +94,9 @@ BrowserWindow::~BrowserWindow()
     session_.unregisterBrowserWindow(this);
 }
 
-QWebEnginePage *BrowserWindow::page() const
+QUrl BrowserWindow::currentUrl() const
 {
-    return page_;
+    return view_ ? view_->url() : QUrl();
 }
 
 bool BrowserWindow::isMainWindow() const
@@ -155,7 +121,7 @@ bool BrowserWindow::shouldAllowNavigation(const QUrl &url)
         if (session_.settings().browser.resetOnQuitUrl) {
             const QUrl home = session_.homeUrl();
             if (home.isValid()) {
-                view_->setUrl(home);
+                view_->load(home);
             }
             return false;
         }
@@ -396,7 +362,9 @@ void BrowserWindow::configureToolbar()
         addressBar_->setPlaceholderText(QStringLiteral("Enter exam URL"));
         toolbar_->addWidget(addressBar_);
         connect(addressBar_, &QLineEdit::returnPressed, this, [this] {
-            view_->setUrl(QUrl::fromUserInput(addressBar_->text().trimmed()));
+            if (view_) {
+                view_->load(QUrl::fromUserInput(addressBar_->text().trimmed()));
+            }
         });
     }
 }
@@ -470,8 +438,10 @@ void BrowserWindow::findInPage()
         return;
     }
 
-    page_->findText(QString());
-    page_->findText(text);
+    if (view_) {
+        view_->findText(QString());
+        view_->findText(text);
+    }
 }
 
 void BrowserWindow::navigateHome()
@@ -485,7 +455,9 @@ void BrowserWindow::navigateHome()
         return;
     }
 
-    view_->setUrl(home);
+    if (view_) {
+        view_->load(home);
+    }
 }
 
 void BrowserWindow::openDevTools()
@@ -493,21 +465,14 @@ void BrowserWindow::openDevTools()
     if (!windowSettings_.allowDeveloperConsole) {
         return;
     }
-
-    auto *devTools = new QWebEngineView();
-    auto *devPage = new QWebEnginePage(session_.profile(), devTools);
-    page_->setDevToolsPage(devPage);
-    devTools->setPage(devPage);
-    devTools->setAttribute(Qt::WA_DeleteOnClose);
-    devTools->resize(1100, 700);
-    devTools->show();
+    if (view_) {
+        view_->openDevTools();
+    }
 }
 
-void BrowserWindow::handleNewWindowRequest(QWebEngineNewWindowRequest &request)
+void BrowserWindow::handleNewWindowRequest(const QUrl &target, const QUrl &opener)
 {
     bool openInSameWindow = false;
-    const QUrl target = request.requestedUrl();
-    const QUrl opener = view_->url();
 
     const QString scheme = target.scheme().toLower();
     if (scheme == QStringLiteral("seb") || scheme == QStringLiteral("sebs") ||
@@ -521,13 +486,14 @@ void BrowserWindow::handleNewWindowRequest(QWebEngineNewWindowRequest &request)
     }
 
     if (openInSameWindow) {
-        request.openIn(page_);
+        if (view_) {
+            view_->load(target);
+        }
         return;
     }
 
     auto *window = session_.createWindow(target, false);
     window->show();
-    request.openIn(window->page());
 }
 
 void BrowserWindow::reloadPage()
@@ -540,7 +506,9 @@ void BrowserWindow::reloadPage()
         return;
     }
 
-    view_->reload();
+    if (view_) {
+        view_->reload();
+    }
 }
 
 void BrowserWindow::updateAddressBar(const QUrl &url)

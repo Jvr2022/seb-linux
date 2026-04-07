@@ -3,9 +3,9 @@
 #include <QObject>
 #include <QString>
 
-QT_BEGIN_NAMESPACE
-class QWebEngineView;
-QT_END_NAMESPACE
+namespace seb::browser::engine {
+class BrowserView;
+}
 
 namespace seb::browser {
 
@@ -14,7 +14,7 @@ class BrowserControl : public QObject
     Q_OBJECT
 
 public:
-    explicit BrowserControl(QWebEngineView *view, QObject *parent = nullptr);
+    explicit BrowserControl(seb::browser::engine::BrowserView *view, QObject *parent = nullptr);
 
     QString address() const;
     bool canNavigateBackwards() const;
@@ -25,7 +25,7 @@ public:
     void reload();
 
 private:
-    QWebEngineView *view_ = nullptr;
+    seb::browser::engine::BrowserView *view_ = nullptr;
 };
 
 }  // namespace seb::browser
