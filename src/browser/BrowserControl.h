@@ -1,11 +1,8 @@
 #pragma once
 
+#include "contracts/i_webview.h"
 #include <QObject>
 #include <QString>
-
-QT_BEGIN_NAMESPACE
-class QWebEngineView;
-QT_END_NAMESPACE
 
 namespace seb::browser {
 
@@ -14,7 +11,7 @@ class BrowserControl : public QObject
     Q_OBJECT
 
 public:
-    explicit BrowserControl(QWebEngineView *view, QObject *parent = nullptr);
+    explicit BrowserControl(contracts::IWebView *view, QObject *parent = nullptr);
 
     QString address() const;
     bool canNavigateBackwards() const;
@@ -25,7 +22,7 @@ public:
     void reload();
 
 private:
-    QWebEngineView *view_ = nullptr;
+    contracts::IWebView *view_ = nullptr;
 };
 
 }  // namespace seb::browser

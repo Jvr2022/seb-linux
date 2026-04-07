@@ -59,7 +59,18 @@ bool AppController::launchResolved(const seb::SebSettings &settings, const QStri
 
 bool AppController::applySettings(const seb::SebSettings &settings, const QStringList &warnings, QString *error)
 {
-    if (!settings.browser.enableBrowser) {
+    seb::SebSettings finalSettings = settings;
+
+    bool currentBypass = false;
+    if (session_) {
+        currentBypass = session_->settings().devBypass;
+    }
+
+    if (currentBypass || finalSettings.devBypass) {
+        seb::applyDevBypassOverrides(finalSettings);
+    }
+
+    if (!finalSettings.browser.enableBrowser) {
         if (error) {
             *error = QStringLiteral("The loaded configuration disables the browser.");
         }
@@ -86,7 +97,7 @@ bool AppController::applySettings(const seb::SebSettings &settings, const QStrin
     startupTimer.start();
 
     auto nextSession = std::make_unique<SebSession>(
-        settings,
+        finalSettings,
         [this](const QString &resource, QWidget *parent) {
             QString error;
             if (launch(resource, &error)) {
@@ -114,8 +125,13 @@ bool AppController::applySettings(const seb::SebSettings &settings, const QStrin
     if (mainWindow_) {
         mainWindow_->hide();
         mainWindow_->deleteLater();
+        mainWindow_ = nullptr;
     }
 
+    if (session_) {
+        session_.release()->deleteLater();
+    }
+    
     mainWindow_ = nextWindow;
     session_ = std::move(nextSession);
 

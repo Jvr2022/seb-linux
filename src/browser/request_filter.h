@@ -1,14 +1,13 @@
 #pragma once
-
 #include "../seb_settings.h"
 
 #include <QRegularExpression>
 #include <QVector>
-#include <QWebEngineUrlRequestInfo>
 
-QT_BEGIN_NAMESPACE
-class QUrl;
-QT_END_NAMESPACE
+#include "contracts/i_request_interceptor.h"
+
+#include <QtGlobal>
+#include <QUrl>
 
 namespace seb::browser {
 
@@ -24,7 +23,7 @@ class RequestFilter
 public:
     explicit RequestFilter(const seb::FilterSettings &settings);
 
-    FilterDecision evaluate(const QUrl &url, QWebEngineUrlRequestInfo::ResourceType resourceType) const;
+    FilterDecision evaluate(const QUrl &url, contracts::ResourceType resourceType) const;
 
 private:
     struct CompiledRule
@@ -34,7 +33,7 @@ private:
     };
 
     static QRegularExpression compileRule(const seb::FilterRuleSettings &rule);
-    static bool isMainRequest(QWebEngineUrlRequestInfo::ResourceType resourceType);
+    static bool isMainRequest(contracts::ResourceType resourceType);
 
     seb::FilterSettings settings_;
     QVector<CompiledRule> allowRules_;

@@ -3,43 +3,38 @@
 #include "seb_settings.h"
 
 #include <QMainWindow>
-#include <QWebEnginePage>
+
+
+#include <memory>
 
 QT_BEGIN_NAMESPACE
+#if SEB_HAS_QTWEBENGINE
 class QAuthenticator;
+#endif
 class QCloseEvent;
 class QEvent;
 class QFocusEvent;
 class QKeyEvent;
 class QLineEdit;
+class QTextBrowser;
 class QToolBar;
 class QWidget;
 class QUrl;
+#if SEB_HAS_QTWEBENGINE
 class QWebEngineNewWindowRequest;
 class QWebEngineView;
+#endif
 QT_END_NAMESPACE
+
+namespace seb::browser::contracts {
+class IWebView;
+}
 
 class SebSession;
 class SebTaskbar;
 
 class BrowserWindow;
 
-class BrowserPage : public QWebEnginePage
-{
-public:
-    BrowserPage(SebSession &session, BrowserWindow *window);
-
-protected:
-    bool acceptNavigationRequest(const QUrl &url, QWebEnginePage::NavigationType type, bool isMainFrame) override;
-    QStringList chooseFiles(
-        QWebEnginePage::FileSelectionMode mode,
-        const QStringList &oldFiles,
-        const QStringList &acceptedMimeTypes) override;
-
-private:
-    SebSession &session_;
-    BrowserWindow *window_;
-};
 
 class BrowserWindow : public QMainWindow
 {
@@ -53,7 +48,8 @@ public:
         bool isMainWindow);
     ~BrowserWindow() override;
 
-    QWebEnginePage *page() const;
+
+    QUrl currentUrl() const;
     bool isMainWindow() const;
     bool shouldAllowNavigation(const QUrl &url);
     QString taskbarIconPath() const;
@@ -64,24 +60,25 @@ protected:
     void closeEvent(QCloseEvent *event) override;
     void keyPressEvent(QKeyEvent *event) override;
     void focusInEvent(QFocusEvent *event) override;
+    void focusOutEvent(QFocusEvent *event) override;
+    bool eventFilter(QObject *watched, QEvent *event) override;
 
 private:
     void applyWindowFlags();
     void applyWindowGeometry();
     void configureToolbar();
+    void configureFallbackView(const QUrl &initialUrl);
     void configureShortcuts();
     void findInPage();
     void navigateHome();
-    void openDevTools();
-    void handleNewWindowRequest(QWebEngineNewWindowRequest &request);
+    void handleNewWindowRequest(const QUrl &url, bool &handled);
     void reloadPage();
     void updateAddressBar(const QUrl &url);
     void notifyTaskbarStateChanged();
 
     SebSession &session_;
     seb::WindowSettings windowSettings_;
-    QWebEngineView *view_ = nullptr;
-    BrowserPage *page_ = nullptr;
+    std::unique_ptr<seb::browser::contracts::IWebView> view_;
     QWidget *contentContainer_ = nullptr;
     QToolBar *toolbar_ = nullptr;
     QLineEdit *addressBar_ = nullptr;

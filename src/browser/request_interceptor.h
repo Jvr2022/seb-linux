@@ -4,19 +4,19 @@
 #include "key_generator.h"
 #include "request_filter.h"
 
-#include <QWebEngineUrlRequestInterceptor>
+#include "contracts/i_request_interceptor.h"
 
 namespace seb::browser {
 
-class RequestInterceptor : public QWebEngineUrlRequestInterceptor
+class RequestInterceptor : public contracts::IRequestInterceptor
 {
 public:
-    explicit RequestInterceptor(const seb::SebSettings &settings, QObject *parent = nullptr);
+    explicit RequestInterceptor(const seb::SebSettings &settings);
 
-    void interceptRequest(QWebEngineUrlRequestInfo &info) override;
+    void interceptRequest(contracts::IRequest &request) override;
 
 private:
-    bool shouldAppendHeaders(const QWebEngineUrlRequestInfo &info) const;
+    bool shouldAppendHeaders(const contracts::IRequest &request) const;
     static bool sameHost(const QUrl &lhs, const QUrl &rhs);
     static QUrl replaceSebScheme(const QUrl &url);
 

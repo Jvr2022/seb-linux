@@ -33,7 +33,19 @@ RequestFilter::RequestFilter(const seb::FilterSettings &settings)
     }
 }
 
-FilterDecision RequestFilter::evaluate(const QUrl &url, QWebEngineUrlRequestInfo::ResourceType resourceType) const
+QRegularExpression RequestFilter::compileRule(const seb::FilterRuleSettings &rule)
+{
+    switch (rule.type) {
+    case seb::FilterRuleType::Regex:
+        return QRegularExpression(rule.expression, QRegularExpression::CaseInsensitiveOption);
+    case seb::FilterRuleType::Simplified:
+        return QRegularExpression(wildcardToRegexPattern(rule.expression), QRegularExpression::CaseInsensitiveOption);
+    }
+
+    return {};
+}
+
+FilterDecision RequestFilter::evaluate(const QUrl &url, contracts::ResourceType resourceType) const
 {
     const bool mainRequest = isMainRequest(resourceType);
     if ((mainRequest && !settings_.processMainRequests) || (!mainRequest && !settings_.processContentRequests)) {
@@ -55,23 +67,10 @@ FilterDecision RequestFilter::evaluate(const QUrl &url, QWebEngineUrlRequestInfo
 
     return FilterDecision::Block;
 }
-
-QRegularExpression RequestFilter::compileRule(const seb::FilterRuleSettings &rule)
+bool RequestFilter::isMainRequest(contracts::ResourceType resourceType)
 {
-    switch (rule.type) {
-    case seb::FilterRuleType::Regex:
-        return QRegularExpression(rule.expression, QRegularExpression::CaseInsensitiveOption);
-    case seb::FilterRuleType::Simplified:
-        return QRegularExpression(wildcardToRegexPattern(rule.expression), QRegularExpression::CaseInsensitiveOption);
-    }
-
-    return {};
-}
-
-bool RequestFilter::isMainRequest(QWebEngineUrlRequestInfo::ResourceType resourceType)
-{
-    return resourceType == QWebEngineUrlRequestInfo::ResourceTypeMainFrame ||
-           resourceType == QWebEngineUrlRequestInfo::ResourceTypeNavigationPreloadMainFrame;
+    return resourceType == contracts::ResourceType::MainFrame ||
+           resourceType == contracts::ResourceType::NavigationPreloadMainFrame;
 }
 
 }  // namespace seb::browser

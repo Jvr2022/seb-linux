@@ -209,6 +209,7 @@ struct SebSettings
     SecuritySettings security;
     TaskbarSettings taskbar;
     QString sourceFile;
+    bool devBypass = false;
 };
 
 struct LoadResult
@@ -238,5 +239,7 @@ LoadResult loadSettingsFromData(
 ResourceLoadResult loadSettingsFromResource(
     const QString &resource,
     const std::function<QString (bool)> &passwordProvider = {});
+
+void applyDevBypassOverrides(SebSettings &settings);
 
 }  // namespace seb

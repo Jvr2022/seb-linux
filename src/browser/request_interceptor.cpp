@@ -1,59 +1,58 @@
 #include "request_interceptor.h"
 
 #include <QUrl>
-#include <QWebEngineUrlRequestInfo>
 
 namespace seb::browser {
 
-RequestInterceptor::RequestInterceptor(const seb::SebSettings &settings, QObject *parent)
-    : QWebEngineUrlRequestInterceptor(parent)
-    , settings_(settings)
+RequestInterceptor::RequestInterceptor(const seb::SebSettings &settings)
+    : settings_(settings)
     , filter_(settings.browser.filter)
     , keyGenerator_(settings)
 {
 }
 
-void RequestInterceptor::interceptRequest(QWebEngineUrlRequestInfo &info)
+void RequestInterceptor::interceptRequest(contracts::IRequest &request)
 {
-    const QUrl requestUrl = info.requestUrl();
+    const QUrl requestUrl = request.requestUrl();
     if (!requestUrl.isValid()) {
         return;
     }
 
     if (requestUrl.scheme() == QStringLiteral("mailto")) {
-        info.block(true);
+        request.block(true);
         return;
     }
 
     if (requestUrl.scheme() == QStringLiteral("seb") || requestUrl.scheme() == QStringLiteral("sebs")) {
-        info.redirect(replaceSebScheme(requestUrl));
+        request.redirect(replaceSebScheme(requestUrl));
         return;
     }
 
-    const FilterDecision decision = filter_.evaluate(requestUrl, info.resourceType());
+    const FilterDecision decision = filter_.evaluate(requestUrl, request.resourceType());
     if (decision == FilterDecision::Block) {
-        info.block(true);
+        request.block(true);
         return;
     }
 
-    if (shouldAppendHeaders(info)) {
+    if (shouldAppendHeaders(request)) {
         if (settings_.browser.sendConfigurationKey && !settings_.browser.configurationKey.isEmpty()) {
-            info.setHttpHeader("X-SafeExamBrowser-ConfigKeyHash", keyGenerator_.configurationKeyHash(requestUrl));
+            request.setHttpHeader("X-SafeExamBrowser-ConfigKeyHash", keyGenerator_.configurationKeyHash(requestUrl));
         }
         if (settings_.browser.sendBrowserExamKey) {
-            info.setHttpHeader("X-SafeExamBrowser-RequestHash", keyGenerator_.requestHash(requestUrl));
+            request.setHttpHeader("X-SafeExamBrowser-RequestHash", keyGenerator_.requestHash(requestUrl));
         }
     }
 }
 
-bool RequestInterceptor::shouldAppendHeaders(const QWebEngineUrlRequestInfo &info) const
+bool RequestInterceptor::shouldAppendHeaders(const contracts::IRequest &request) const
 {
-    if (info.resourceType() == QWebEngineUrlRequestInfo::ResourceTypeMainFrame ||
-        info.resourceType() == QWebEngineUrlRequestInfo::ResourceTypeNavigationPreloadMainFrame) {
+    const auto type = request.resourceType();
+    if (type == contracts::ResourceType::MainFrame ||
+        type == contracts::ResourceType::NavigationPreloadMainFrame) {
         return true;
     }
 
-    return sameHost(info.firstPartyUrl(), info.requestUrl());
+    return sameHost(request.firstPartyUrl(), request.requestUrl());
 }
 
 bool RequestInterceptor::sameHost(const QUrl &lhs, const QUrl &rhs)
@@ -71,5 +70,6 @@ QUrl RequestInterceptor::replaceSebScheme(const QUrl &url)
     }
     return replaced;
 }
+
 
 }  // namespace seb::browser

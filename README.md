@@ -3,107 +3,48 @@
 
   # Safe Exam Browser for Linux
 
-  **A native Linux implementation of Safe Exam Browser, built with Qt 6 and Qt WebEngine.**
+  Hey there! This is a community-driven, native Linux version of Safe Exam Browser. We built it with Qt 6 to give Linux users a reliable way to take exams without needing a specific OS.
 </div>
 
-## Overview
+## What is this?
 
-This project provides a native Linux client focused on:
+We're trying to make SEB work great on Linux. This client handles all the important stuff like `.seb` files and special links (`seb://`), so you can just focus on your exam.
 
-- Reliable startup and kiosk-like exam runtime behavior
-- Linux desktop integration (file associations and protocol handling)
-- Packaging and distribution for common Linux ecosystems
+### Running Everywhere
+One cool thing we did is make the browser engine flexible. 
+- Most people will use **Qt WebEngine** (it's fast and integrated).
+- If your system doesn't support it, we automatically try to use **WebKitGTK** as a backup. 
 
-It supports:
+This means SEB should "just work" on pretty much any Linux device you throw at it.
 
-- Opening `.seb` configuration files
-- Handling `seb://` and `sebs://` links
-- Running as an installed Linux desktop application
+## Getting Started
 
-> [!IMPORTANT]
-> This repository is an independent Linux implementation and is **not** an official Safe Exam Browser release.
+### Prerequisites
+You'll need the usual Qt 6 development tools. If you're on something like RISC-V where Qt WebEngine isn't around, make sure you've got `libwebkit2gtk-4.1-dev` and `libgtk-3-dev` installed so we can use the fallback engine.
 
-## Prerequisites
-
-Make sure your environment has the dependencies required for a Qt 6 + Qt WebEngine desktop build.
-
-## Build
-
+### How to Build
+It's pretty simple:
 ```bash
 ./scripts/build.sh
 ```
+You'll find the binary at `build/bin/safe-exam-browser`.
 
-Compiled binary output:
-
+### Running an Exam
+Just point it at your `.seb` file:
 ```bash
-build/bin/safe-exam-browser
+./build/bin/safe-exam-browser /path/to/my-exam.seb
+```
+Or use a link:
+```bash
+./build/bin/safe-exam-browser sebs://exam-link.seb
 ```
 
-## Run
+## Troubleshooting & Support
 
-Start with default behavior:
+If you run the app and see a message saying **"Safe Exam Browser is not supported on your device"**, it means we couldn't find a compatible browser engine on your system. 
 
-```bash
-./build/bin/safe-exam-browser
-```
-
-Open a local exam file:
-
-```bash
-./build/bin/safe-exam-browser /path/to/exam.seb
-```
-
-Open a remote exam link:
-
-```bash
-./build/bin/safe-exam-browser sebs://demo.safeexambrowser.org/exams/DemoExamGeneral.seb
-```
-
-Run with a JSON config file:
-
-```bash
-./build/bin/safe-exam-browser --config ./examples/minimal-config.json
-```
-
-## Create Release Artifacts
-
-```bash
-./scripts/build-release.sh 0.1.0
-```
-
-Release files are written to `dist/`.
-
-Prebuilt binaries are available from the GitHub Releases page.
-
-## Installation
-
-### Debian/Ubuntu
-
-```bash
-sudo apt install ./dist/safe-exam-browser_0.1.0_amd64.deb
-```
-
-### Arch Linux
-
-```bash
-cd packaging/arch
-makepkg -si
-```
-
-## Contributing
-
-Please review these files before opening a PR:
-
-- [CONTRIBUTING.md](./CONTRIBUTING.md)
-- [CODE_OF_CONDUCT.md](./CODE_OF_CONDUCT.md)
-- [SECURITY.md](./SECURITY.md)
-
-Quick copy/open helper:
-
-```bash
-cat CONTRIBUTING.md CODE_OF_CONDUCT.md SECURITY.md
-```
+We want to fix that! please [open an issue here](https://github.com/Jvr2022/seb-linux/issues) with some details about your system and what version of Linux you're using.
 
 ## License
 
-Licensed under the terms in `LICENSE`.
+This is an open-source project licensed under the `MPL2`. Check the `LICENSE` file for the legalese.
