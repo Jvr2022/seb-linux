@@ -1,5 +1,7 @@
 #include "webengine_environment.h"
 
+#include "webengine_compat.h"
+
 #include <QStringList>
 
 namespace seb::browser {
@@ -38,6 +40,10 @@ QString buildProxyServerValue(const seb::ProxySettings &proxySettings)
 
 void applyWebEngineEnvironment(const seb::SebSettings &settings)
 {
+#if !SEB_HAS_QTWEBENGINE
+    Q_UNUSED(settings);
+    return;
+#else
     if (settings.browser.proxy.policy != seb::ProxyPolicy::Custom) {
         return;
     }
@@ -61,6 +67,7 @@ void applyWebEngineEnvironment(const seb::SebSettings &settings)
 
     flags.removeDuplicates();
     qputenv("QTWEBENGINE_CHROMIUM_FLAGS", flags.join(' ').toUtf8());
+#endif
 }
 
 }  // namespace seb::browser

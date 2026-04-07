@@ -1,10 +1,13 @@
 #include "request_interceptor.h"
 
+#if SEB_HAS_QTWEBENGINE
 #include <QUrl>
 #include <QWebEngineUrlRequestInfo>
+#endif
 
 namespace seb::browser {
 
+#if SEB_HAS_QTWEBENGINE
 RequestInterceptor::RequestInterceptor(const seb::SebSettings &settings, QObject *parent)
     : QWebEngineUrlRequestInterceptor(parent)
     , settings_(settings)
@@ -71,5 +74,12 @@ QUrl RequestInterceptor::replaceSebScheme(const QUrl &url)
     }
     return replaced;
 }
+#else
+RequestInterceptor::RequestInterceptor(const seb::SebSettings &settings, QObject *parent)
+    : QObject(parent)
+{
+    Q_UNUSED(settings);
+}
+#endif
 
 }  // namespace seb::browser

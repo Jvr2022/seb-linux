@@ -1,4 +1,27 @@
-QT += core gui widgets network xml webenginecore webenginewidgets
+QT += core gui widgets network xml
+
+SEB_TARGET_TRIPLE = $$lower($$system($$QMAKE_CXX -dumpmachine))
+SEB_DISABLE_QTWEBENGINE = 0
+
+contains(SEB_TARGET_TRIPLE, riscv64) {
+    SEB_DISABLE_QTWEBENGINE = 1
+}
+
+!qtHaveModule(webenginecore) {
+    SEB_DISABLE_QTWEBENGINE = 1
+}
+
+!qtHaveModule(webenginewidgets) {
+    SEB_DISABLE_QTWEBENGINE = 1
+}
+
+equals(SEB_DISABLE_QTWEBENGINE, 0) {
+    QT += webenginecore webenginewidgets
+    DEFINES += SEB_HAS_QTWEBENGINE=1
+} else {
+    DEFINES += SEB_HAS_QTWEBENGINE=0
+    message("Building Safe Exam Browser without QtWebEngine support.")
+}
 
 CONFIG += c++20 console warn_on object_parallel_to_source
 TEMPLATE = app

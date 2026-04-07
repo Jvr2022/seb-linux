@@ -1,5 +1,7 @@
 #pragma once
 
+#include "webengine_compat.h"
+
 #include <QObject>
 #include <QString>
 

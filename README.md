@@ -3,7 +3,7 @@
 
   # Safe Exam Browser for Linux
 
-  **A native Linux implementation of Safe Exam Browser, built with Qt 6 and Qt WebEngine.**
+  **A native Linux implementation of Safe Exam Browser, built with Qt 6 and using Qt WebEngine where available.**
 </div>
 
 ## Overview
@@ -25,7 +25,9 @@ It supports:
 
 ## Prerequisites
 
-Make sure your environment has the dependencies required for a Qt 6 + Qt WebEngine desktop build.
+Make sure your environment has the dependencies required for a Qt 6 desktop build.
+
+On platforms where Qt WebEngine is unavailable or intentionally disabled, such as current `riscv64` builds, the app now compiles in a compatibility mode. That mode still loads SEB configuration files and starts the Linux shell/session UI, but it does not render exam pages.
 
 ## Build
 

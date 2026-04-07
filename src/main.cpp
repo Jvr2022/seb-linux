@@ -1,4 +1,5 @@
 #include "app_controller.h"
+#include "browser/webengine_compat.h"
 #include "browser/webengine_environment.h"
 #include "seb_settings.h"
 
@@ -223,7 +224,9 @@ void applyEarlyEnvironment(int argc, char *argv[])
             qputenv("QT_QPA_PLATFORM", "linuxfb");
             qputenv("QT_QUICK_BACKEND", "software");
         }
+#if SEB_HAS_QTWEBENGINE
         qputenv("QTWEBENGINE_CHROMIUM_FLAGS", "--no-sandbox");
+#endif
     }
 
     seb::browser::applyWebEngineEnvironment(settings);
@@ -337,6 +340,12 @@ int main(int argc, char *argv[])
 
     seb::SebSettings settings = seb::defaultSettings();
     QTextStream err(stderr);
+
+#if !SEB_HAS_QTWEBENGINE
+    err << "warning: This build was compiled without QtWebEngine support. "
+           "Safe Exam Browser will start in compatibility mode and cannot render exam pages."
+        << Qt::endl;
+#endif
 
     const QString resource = parser.isSet("config")
         ? parser.value("config")

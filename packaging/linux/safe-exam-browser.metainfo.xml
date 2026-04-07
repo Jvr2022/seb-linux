@@ -10,7 +10,7 @@
   </developer>
   <launchable type="desktop-id">safe-exam-browser.desktop</launchable>
   <description>
-    <p>Safe Exam Browser for Linux with `.seb` file loading, `seb://` and `sebs://` protocol handling, remote configuration loading, and a Qt WebEngine runtime.</p>
+    <p>Safe Exam Browser for Linux with `.seb` file loading, `seb://` and `sebs://` protocol handling, remote configuration loading, and a Qt WebEngine runtime when that browser engine is available.</p>
   </description>
   <categories>
     <category>Education</category>

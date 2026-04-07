@@ -5,26 +5,33 @@
 
 #include <QAction>
 #include <QApplication>
+#if SEB_HAS_QTWEBENGINE
 #include <QAuthenticator>
+#endif
 #include <QCloseEvent>
 #include <QEvent>
 #include <QFocusEvent>
+#include <QFrame>
 #include <QGuiApplication>
 #include <QInputDialog>
 #include <QKeyEvent>
 #include <QLineEdit>
 #include <QMessageBox>
 #include <QScreen>
+#include <QTextBrowser>
 #include <QTimer>
 #include <QToolBar>
 #include <QUrl>
 #include <QVBoxLayout>
+#if SEB_HAS_QTWEBENGINE
 #include <QWebEngineNewWindowRequest>
 #include <QWebEnginePage>
 #include <QWebEngineProfile>
 #include <QWebEngineSettings>
 #include <QWebEngineView>
+#endif
 
+#if SEB_HAS_QTWEBENGINE
 BrowserPage::BrowserPage(SebSession &session, BrowserWindow *window)
     : QWebEnginePage(session.profile(), window)
     , session_(session)
@@ -50,6 +57,7 @@ QStringList BrowserPage::chooseFiles(
     }
     return QWebEnginePage::chooseFiles(mode, oldFiles, acceptedMimeTypes);
 }
+#endif
 
 BrowserWindow::BrowserWindow(
     SebSession &session,
@@ -67,10 +75,15 @@ BrowserWindow::BrowserWindow(
     contentLayout->setContentsMargins(0, 0, 0, 0);
     contentLayout->setSpacing(0);
 
+#if SEB_HAS_QTWEBENGINE
     view_ = new QWebEngineView(contentContainer_);
     page_ = new BrowserPage(session_, this);
     view_->setPage(page_);
     contentLayout->addWidget(view_, 1);
+#else
+    configureFallbackView(initialUrl);
+    contentLayout->addWidget(fallbackView_, 1);
+#endif
 
     if (isMainWindow_ && session_.settings().taskbar.enableTaskbar) {
         taskbar_ = new SebTaskbar(session_, session_.settings(), contentContainer_);
@@ -78,8 +91,12 @@ BrowserWindow::BrowserWindow(
     }
     setCentralWidget(contentContainer_);
 
+#if SEB_HAS_QTWEBENGINE
     view_->settings()->setAttribute(QWebEngineSettings::FullScreenSupportEnabled, false);
     view_->settings()->setAttribute(QWebEngineSettings::JavascriptCanOpenWindows, true);
+#else
+    setWindowTitle(QStringLiteral("Safe Exam Browser Compatibility Mode"));
+#endif
 
     if (!isMainWindow_) {
         configureToolbar();
@@ -87,6 +104,7 @@ BrowserWindow::BrowserWindow(
     configureShortcuts();
     applyWindowGeometry();
 
+#if SEB_HAS_QTWEBENGINE
     connect(view_, &QWebEngineView::urlChanged, this, &BrowserWindow::updateAddressBar);
     connect(view_, &QWebEngineView::titleChanged, this, [this](const QString &title) {
         const QString resolvedTitle = title.trimmed().isEmpty() ? QStringLiteral("SEB Linux") : title;
@@ -104,6 +122,10 @@ BrowserWindow::BrowserWindow(
         [this](const QUrl &, QAuthenticator *authenticator, const QString &proxyHost) {
             session_.applyProxyAuthentication(proxyHost, authenticator);
         });
+#else
+    updateAddressBar(fallbackUrl_);
+#endif
+
     if (taskbar_) {
         connect(taskbar_, &SebTaskbar::quitRequested, this, [this] {
             if (isMainWindow_ &&
@@ -115,9 +137,11 @@ BrowserWindow::BrowserWindow(
         });
     }
 
+#if SEB_HAS_QTWEBENGINE
     if (initialUrl.isValid()) {
         view_->setUrl(initialUrl);
     }
+#endif
 
     session_.registerBrowserWindow(this);
     notifyTaskbarStateChanged();
@@ -128,9 +152,20 @@ BrowserWindow::~BrowserWindow()
     session_.unregisterBrowserWindow(this);
 }
 
+#if SEB_HAS_QTWEBENGINE
 QWebEnginePage *BrowserWindow::page() const
 {
     return page_;
+}
+#endif
+
+QUrl BrowserWindow::currentUrl() const
+{
+#if SEB_HAS_QTWEBENGINE
+    return view_ ? view_->url() : QUrl();
+#else
+    return fallbackUrl_;
+#endif
 }
 
 bool BrowserWindow::isMainWindow() const
@@ -140,6 +175,10 @@ bool BrowserWindow::isMainWindow() const
 
 bool BrowserWindow::shouldAllowNavigation(const QUrl &url)
 {
+#if !SEB_HAS_QTWEBENGINE
+    Q_UNUSED(url);
+    return false;
+#else
     if (!url.isValid()) {
         return true;
     }
@@ -173,6 +212,7 @@ bool BrowserWindow::shouldAllowNavigation(const QUrl &url)
     }
 
     return true;
+#endif
 }
 
 QString BrowserWindow::taskbarIconPath() const
@@ -350,6 +390,9 @@ void BrowserWindow::applyWindowGeometry()
 
 void BrowserWindow::configureToolbar()
 {
+#if !SEB_HAS_QTWEBENGINE
+    return;
+#else
     const bool showToolbar =
         windowSettings_.showToolbar ||
         windowSettings_.allowAddressBar ||
@@ -399,10 +442,48 @@ void BrowserWindow::configureToolbar()
             view_->setUrl(QUrl::fromUserInput(addressBar_->text().trimmed()));
         });
     }
+#endif
+}
+
+void BrowserWindow::configureFallbackView(const QUrl &initialUrl)
+{
+#if SEB_HAS_QTWEBENGINE
+    Q_UNUSED(initialUrl);
+#else
+    fallbackUrl_ = initialUrl;
+    if (!fallbackView_) {
+        fallbackView_ = new QTextBrowser(contentContainer_);
+        fallbackView_->setFrameShape(QFrame::NoFrame);
+        fallbackView_->setOpenLinks(false);
+        fallbackView_->setOpenExternalLinks(false);
+        fallbackView_->setReadOnly(true);
+        fallbackView_->setTextInteractionFlags(Qt::TextSelectableByKeyboard | Qt::TextSelectableByMouse);
+    }
+
+    const QString targetUrl = fallbackUrl_.isValid()
+        ? fallbackUrl_.toDisplayString()
+        : QStringLiteral("Not configured");
+    const QString homeUrl = session_.homeUrl().isValid()
+        ? session_.homeUrl().toDisplayString()
+        : QStringLiteral("Not configured");
+
+    fallbackView_->setHtml(QStringLiteral(
+        "<h2>Qt WebEngine Is Unavailable</h2>"
+        "<p>This build can still load SEB configuration, start the protected shell, and exercise the Linux UI, "
+        "but it cannot render exam pages because Qt WebEngine is disabled for this target.</p>"
+        "<p><b>Current target URL:</b> <code>%1</code><br/>"
+        "<b>Configured home URL:</b> <code>%2</code></p>"
+        "<p>This compatibility mode is intended for architectures such as riscv64 until a supported "
+        "embedded browser engine becomes available.</p>")
+            .arg(targetUrl.toHtmlEscaped(), homeUrl.toHtmlEscaped()));
+#endif
 }
 
 void BrowserWindow::configureShortcuts()
 {
+#if !SEB_HAS_QTWEBENGINE
+    return;
+#else
     auto *reloadAction = new QAction(this);
     reloadAction->setShortcut(QKeySequence::Refresh);
     addAction(reloadAction);
@@ -450,10 +531,14 @@ void BrowserWindow::configureShortcuts()
             addressBar_->selectAll();
         });
     }
+#endif
 }
 
 void BrowserWindow::findInPage()
 {
+#if !SEB_HAS_QTWEBENGINE
+    return;
+#else
     if (!session_.settings().browser.allowFind) {
         return;
     }
@@ -472,6 +557,7 @@ void BrowserWindow::findInPage()
 
     page_->findText(QString());
     page_->findText(text);
+#endif
 }
 
 void BrowserWindow::navigateHome()
@@ -485,11 +571,19 @@ void BrowserWindow::navigateHome()
         return;
     }
 
+#if SEB_HAS_QTWEBENGINE
     view_->setUrl(home);
+#else
+    configureFallbackView(home);
+    updateAddressBar(home);
+#endif
 }
 
 void BrowserWindow::openDevTools()
 {
+#if !SEB_HAS_QTWEBENGINE
+    return;
+#else
     if (!windowSettings_.allowDeveloperConsole) {
         return;
     }
@@ -501,8 +595,10 @@ void BrowserWindow::openDevTools()
     devTools->setAttribute(Qt::WA_DeleteOnClose);
     devTools->resize(1100, 700);
     devTools->show();
+#endif
 }
 
+#if SEB_HAS_QTWEBENGINE
 void BrowserWindow::handleNewWindowRequest(QWebEngineNewWindowRequest &request)
 {
     bool openInSameWindow = false;
@@ -529,9 +625,13 @@ void BrowserWindow::handleNewWindowRequest(QWebEngineNewWindowRequest &request)
     window->show();
     request.openIn(window->page());
 }
+#endif
 
 void BrowserWindow::reloadPage()
 {
+#if !SEB_HAS_QTWEBENGINE
+    return;
+#else
     if (!windowSettings_.allowReloading) {
         return;
     }
@@ -541,6 +641,7 @@ void BrowserWindow::reloadPage()
     }
 
     view_->reload();
+#endif
 }
 
 void BrowserWindow::updateAddressBar(const QUrl &url)

@@ -33,6 +33,19 @@ RequestFilter::RequestFilter(const seb::FilterSettings &settings)
     }
 }
 
+QRegularExpression RequestFilter::compileRule(const seb::FilterRuleSettings &rule)
+{
+    switch (rule.type) {
+    case seb::FilterRuleType::Regex:
+        return QRegularExpression(rule.expression, QRegularExpression::CaseInsensitiveOption);
+    case seb::FilterRuleType::Simplified:
+        return QRegularExpression(wildcardToRegexPattern(rule.expression), QRegularExpression::CaseInsensitiveOption);
+    }
+
+    return {};
+}
+
+#if SEB_HAS_QTWEBENGINE
 FilterDecision RequestFilter::evaluate(const QUrl &url, QWebEngineUrlRequestInfo::ResourceType resourceType) const
 {
     const bool mainRequest = isMainRequest(resourceType);
@@ -55,23 +68,11 @@ FilterDecision RequestFilter::evaluate(const QUrl &url, QWebEngineUrlRequestInfo
 
     return FilterDecision::Block;
 }
-
-QRegularExpression RequestFilter::compileRule(const seb::FilterRuleSettings &rule)
-{
-    switch (rule.type) {
-    case seb::FilterRuleType::Regex:
-        return QRegularExpression(rule.expression, QRegularExpression::CaseInsensitiveOption);
-    case seb::FilterRuleType::Simplified:
-        return QRegularExpression(wildcardToRegexPattern(rule.expression), QRegularExpression::CaseInsensitiveOption);
-    }
-
-    return {};
-}
-
 bool RequestFilter::isMainRequest(QWebEngineUrlRequestInfo::ResourceType resourceType)
 {
     return resourceType == QWebEngineUrlRequestInfo::ResourceTypeMainFrame ||
            resourceType == QWebEngineUrlRequestInfo::ResourceTypeNavigationPreloadMainFrame;
 }
+#endif
 
 }  // namespace seb::browser

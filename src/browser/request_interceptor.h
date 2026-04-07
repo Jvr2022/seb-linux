@@ -1,13 +1,19 @@
 #pragma once
 
+#include "webengine_compat.h"
 #include "../seb_settings.h"
 #include "key_generator.h"
 #include "request_filter.h"
 
+#if SEB_HAS_QTWEBENGINE
 #include <QWebEngineUrlRequestInterceptor>
+#else
+#include <QObject>
+#endif
 
 namespace seb::browser {
 
+#if SEB_HAS_QTWEBENGINE
 class RequestInterceptor : public QWebEngineUrlRequestInterceptor
 {
 public:
@@ -24,5 +30,12 @@ private:
     RequestFilter filter_;
     KeyGenerator keyGenerator_;
 };
+#else
+class RequestInterceptor : public QObject
+{
+public:
+    explicit RequestInterceptor(const seb::SebSettings &settings, QObject *parent = nullptr);
+};
+#endif
 
 }  // namespace seb::browser

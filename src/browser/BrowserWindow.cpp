@@ -43,7 +43,7 @@ bool BrowserWindowPort::isMainWindow() const
 
 QString BrowserWindowPort::url() const
 {
-    return window_ && window_->page() ? window_->page()->url().toString() : QString();
+    return window_ ? window_->currentUrl().toString() : QString();
 }
 
 BrowserWindowContext BrowserWindowPort::context() const
@@ -53,7 +53,7 @@ BrowserWindowContext BrowserWindowPort::context() const
         context.id = static_cast<int>(reinterpret_cast<quintptr>(window_) & 0x7fffffff);
         context.isMainWindow = window_->isMainWindow();
         context.title = window_->taskbarTitle();
-        context.url = window_->page() ? window_->page()->url().toString() : QString();
+        context.url = window_->currentUrl().toString();
     }
     return context;
 }

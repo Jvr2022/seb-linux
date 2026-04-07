@@ -23,10 +23,12 @@
 #include <QStandardPaths>
 #include <QTemporaryDir>
 #include <QUrl>
+#if SEB_HAS_QTWEBENGINE
 #include <QWebEngineCookieStore>
 #include <QWebEngineDownloadRequest>
 #include <QWebEngineProfile>
 #include <QWebEngineSettings>
+#endif
 #include <QTimer>
 
 namespace {
@@ -85,6 +87,7 @@ SebSession::SebSession(const seb::SebSettings &settings, ResourceOpener opener, 
         settings_.browser.deleteCookiesOnShutdown ||
         settings_.browser.deleteCookiesOnStartup;
 
+#if SEB_HAS_QTWEBENGINE
     profile_.reset(new QWebEngineProfile(this));
 
     if (useTemporaryProfile) {
@@ -114,8 +117,13 @@ SebSession::SebSession(const seb::SebSettings &settings, ResourceOpener opener, 
     profile_->setSpellCheckEnabled(settings_.browser.allowSpellChecking);
     profile_->setSpellCheckLanguages(QStringList{QLocale::system().bcp47Name()});
     profile_->setHttpUserAgent(buildUserAgent());
+#else
+    Q_UNUSED(useTemporaryProfile);
+#endif
 
     interceptor_.reset(new seb::browser::RequestInterceptor(settings_, this));
+
+#if SEB_HAS_QTWEBENGINE
     profile_->setUrlRequestInterceptor(interceptor_.data());
 
     connect(profile_.data(), &QWebEngineProfile::downloadRequested, this, &SebSession::handleDownloadRequested);
@@ -123,6 +131,7 @@ SebSession::SebSession(const seb::SebSettings &settings, ResourceOpener opener, 
     if (settings_.browser.deleteCookiesOnStartup) {
         profile_->cookieStore()->deleteAllCookies();
     }
+#endif
 
     applicationManager_ = std::make_unique<seb::applications::ApplicationManager>(settings_.applications, this);
     connect(applicationManager_.get(), &seb::applications::ApplicationManager::applicationsChanged, this, &SebSession::externalApplicationsChanged);
@@ -269,10 +278,12 @@ const seb::SebSettings &SebSession::settings() const
     return settings_;
 }
 
+#if SEB_HAS_QTWEBENGINE
 QWebEngineProfile *SebSession::profile() const
 {
     return profile_.data();
 }
+#endif
 
 QUrl SebSession::homeUrl() const
 {
@@ -364,6 +375,7 @@ void SebSession::activateWindow(BrowserWindow *window)
     window->activateWindow();
 }
 
+#if SEB_HAS_QTWEBENGINE
 void SebSession::handleDownloadRequested(QWebEngineDownloadRequest *download)
 {
     if (!download) {
@@ -412,6 +424,7 @@ void SebSession::handleDownloadRequested(QWebEngineDownloadRequest *download)
     download->setDownloadFileName(info.fileName());
     download->accept();
 }
+#endif
 
 QString SebSession::buildUserAgent() const
 {
@@ -420,11 +433,14 @@ QString SebSession::buildUserAgent() const
     if (settings_.browser.useCustomUserAgent && !settings_.browser.customUserAgent.isEmpty()) {
         agent = settings_.browser.customUserAgent.trimmed();
     } else {
+#if SEB_HAS_QTWEBENGINE
         QString defaultAgent = profile_->httpUserAgent();
         QRegularExpression regex(QStringLiteral("Chrome/([0-9.]+)"));
         QRegularExpressionMatch match = regex.match(defaultAgent);
         QString chromeVersion = match.hasMatch() ? match.captured(1) : QStringLiteral("110.0.0.0");
-        
+#else
+        const QString chromeVersion = QStringLiteral("110.0.0.0");
+#endif
         agent = QStringLiteral("Mozilla/5.0 (Windows NT 10.0) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/") + chromeVersion;
     }
 
