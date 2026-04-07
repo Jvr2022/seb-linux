@@ -1,0 +1,22 @@
+CompileFlags:
+  Add:
+    - -I/usr/include/qt6
+    - -I/usr/include/qt6/QtCore
+    - -I/usr/include/qt6/QtGui
+    - -I/usr/include/qt6/QtWidgets
+    - -I/usr/include/qt6/QtWebEngineCore
+    - -I/usr/include/qt6/QtWebEngineWidgets
+    - -I/usr/include/qt6/QtNetwork
+    - -I/usr/include/qt6/QtXml
+    - -I/usr/include/qt6/QtPrintSupport
+    - -I/usr/include/qt6/QtWebChannel
+    - -I/usr/include/qt6/QtQml
+    - -I/usr/include/qt6/QtQmlIntegration
+    - -I/usr/include/qt6/QtPositioning
+    - -I/home/joshuavr/Documenten/GitHub/seb-linux/src
+    - -DSEB_HAS_QTWEBENGINE=1
+    - -DSEB_HAS_ANY_ENGINE=1
+    - -DSEB_DEV_BYPASS_DEFAULT=1
+    - -x
+    - c++
+    - -std=c++20

@@ -1,12 +1,11 @@
 #pragma once
 
-#include "browser/webengine_compat.h"
 #include "seb_settings.h"
 
 #include <QMainWindow>
-#if SEB_HAS_QTWEBENGINE
-#include <QWebEnginePage>
-#endif
+
+
+#include <memory>
 
 QT_BEGIN_NAMESPACE
 #if SEB_HAS_QTWEBENGINE
@@ -27,29 +26,15 @@ class QWebEngineView;
 #endif
 QT_END_NAMESPACE
 
+namespace seb::browser::contracts {
+class IWebView;
+}
+
 class SebSession;
 class SebTaskbar;
 
 class BrowserWindow;
 
-#if SEB_HAS_QTWEBENGINE
-class BrowserPage : public QWebEnginePage
-{
-public:
-    BrowserPage(SebSession &session, BrowserWindow *window);
-
-protected:
-    bool acceptNavigationRequest(const QUrl &url, QWebEnginePage::NavigationType type, bool isMainFrame) override;
-    QStringList chooseFiles(
-        QWebEnginePage::FileSelectionMode mode,
-        const QStringList &oldFiles,
-        const QStringList &acceptedMimeTypes) override;
-
-private:
-    SebSession &session_;
-    BrowserWindow *window_;
-};
-#endif
 
 class BrowserWindow : public QMainWindow
 {
@@ -63,9 +48,7 @@ public:
         bool isMainWindow);
     ~BrowserWindow() override;
 
-#if SEB_HAS_QTWEBENGINE
-    QWebEnginePage *page() const;
-#endif
+
     QUrl currentUrl() const;
     bool isMainWindow() const;
     bool shouldAllowNavigation(const QUrl &url);
@@ -77,6 +60,8 @@ protected:
     void closeEvent(QCloseEvent *event) override;
     void keyPressEvent(QKeyEvent *event) override;
     void focusInEvent(QFocusEvent *event) override;
+    void focusOutEvent(QFocusEvent *event) override;
+    bool eventFilter(QObject *watched, QEvent *event) override;
 
 private:
     void applyWindowFlags();
@@ -86,23 +71,14 @@ private:
     void configureShortcuts();
     void findInPage();
     void navigateHome();
-    void openDevTools();
-#if SEB_HAS_QTWEBENGINE
-    void handleNewWindowRequest(QWebEngineNewWindowRequest &request);
-#endif
+    void handleNewWindowRequest(const QUrl &url, bool &handled);
     void reloadPage();
     void updateAddressBar(const QUrl &url);
     void notifyTaskbarStateChanged();
 
     SebSession &session_;
     seb::WindowSettings windowSettings_;
-#if SEB_HAS_QTWEBENGINE
-    QWebEngineView *view_ = nullptr;
-    BrowserPage *page_ = nullptr;
-#else
-    QTextBrowser *fallbackView_ = nullptr;
-    QUrl fallbackUrl_;
-#endif
+    std::unique_ptr<seb::browser::contracts::IWebView> view_;
     QWidget *contentContainer_ = nullptr;
     QToolBar *toolbar_ = nullptr;
     QLineEdit *addressBar_ = nullptr;

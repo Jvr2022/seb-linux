@@ -19,14 +19,15 @@ make INSTALL_ROOT="${STAGE_DIR}" install
 popd >/dev/null
 
 mkdir -p "${ARTIFACT_DIR}/debian/DEBIAN"
+DP_ARCH=$(dpkg --print-architecture 2>/dev/null || echo "amd64")
 cat > "${ARTIFACT_DIR}/debian/DEBIAN/control" <<EOF
 Package: ${PACKAGE_NAME}
 Version: ${VERSION}
 Section: education
 Priority: optional
-Architecture: amd64
+Architecture: ${DP_ARCH}
 Maintainer: SEB Linux contributors
-Depends: libqt6core6, libqt6gui6, libqt6network6, libqt6webenginecore6, libqt6webenginewidgets6, shared-mime-info, pkexec
+Depends: libqt6core6, libqt6gui6, libqt6network6, libqt6webenginecore6, libqt6webenginewidgets6, libwebkit2gtk-4.1-0, libgtk-3-0, shared-mime-info, pkexec
 Description: Safe Exam Browser Linux Qt port
  Qt-based Safe Exam Browser launcher for Linux with .seb file and sebs:// support.
 EOF

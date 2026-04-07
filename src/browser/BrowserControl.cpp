@@ -1,17 +1,14 @@
 #include "BrowserControl.h"
-
-#if SEB_HAS_QTWEBENGINE
-#include <QWebEngineHistory>
-#include <QWebEngineView>
-#endif
+#include "contracts/i_webview.h"
 
 namespace seb::browser {
 
-BrowserControl::BrowserControl(QWebEngineView *view, QObject *parent)
+BrowserControl::BrowserControl(contracts::IWebView *view, QObject *parent)
     : QObject(parent)
     , view_(view)
 {
 }
+
 
 QString BrowserControl::address() const
 {
@@ -24,20 +21,12 @@ QString BrowserControl::address() const
 
 bool BrowserControl::canNavigateBackwards() const
 {
-#if SEB_HAS_QTWEBENGINE
-    return view_ && view_->history()->canGoBack();
-#else
-    return false;
-#endif
+    return view_ && view_->canGoBack();
 }
 
 bool BrowserControl::canNavigateForwards() const
 {
-#if SEB_HAS_QTWEBENGINE
-    return view_ && view_->history()->canGoForward();
-#else
-    return false;
-#endif
+    return view_ && view_->canGoForward();
 }
 
 void BrowserControl::navigateTo(const QString &address)
@@ -53,29 +42,23 @@ void BrowserControl::navigateTo(const QString &address)
 
 void BrowserControl::navigateBackwards()
 {
-#if SEB_HAS_QTWEBENGINE
     if (view_) {
         view_->back();
     }
-#endif
 }
 
 void BrowserControl::navigateForwards()
 {
-#if SEB_HAS_QTWEBENGINE
     if (view_) {
         view_->forward();
     }
-#endif
 }
 
 void BrowserControl::reload()
 {
-#if SEB_HAS_QTWEBENGINE
     if (view_) {
         view_->reload();
     }
-#endif
 }
 
 }  // namespace seb::browser

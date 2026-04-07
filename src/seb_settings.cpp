@@ -147,4 +147,42 @@ ResourceLoadResult loadSettingsFromResource(
     return settingsinternal::loadSettingsFromNetworkResource(url, passwordProvider);
 }
 
+void applyDevBypassOverrides(SebSettings &settings)
+{
+    settings.devBypass = true;
+    
+    auto overrideWindow = [](WindowSettings &ws) {
+        ws.fullScreenMode = false;
+        ws.alwaysOnTop = false;
+        ws.allowAddressBar = true;
+        ws.allowBackwardNavigation = true;
+        ws.allowForwardNavigation = true;
+        ws.allowDeveloperConsole = true;
+        ws.allowMinimize = true;
+        ws.allowReloading = true;
+        ws.showHomeButton = true;
+        ws.showReloadButton = true;
+        ws.showToolbar = true;
+        ws.frameless = false;
+    };
+
+    overrideWindow(settings.browser.mainWindow);
+    overrideWindow(settings.browser.additionalWindow);
+
+    settings.browser.allowDownloads = true;
+    settings.browser.allowUploads = true;
+    settings.browser.allowPageZoom = true;
+    settings.browser.allowFind = true;
+    settings.browser.allowPrint = true;
+    settings.browser.allowSpellChecking = true;
+    settings.browser.confirmQuitUrl = false;
+    settings.browser.homeNavigationRequiresPassword = false;
+    
+    settings.security.allowTermination = true;
+    settings.security.quitPasswordHash.clear();
+
+    settings.taskbar.enableTaskbar = true;
+    settings.taskbar.showNetwork = true;
+}
+
 }  // namespace seb

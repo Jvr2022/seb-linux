@@ -45,13 +45,15 @@ ResourceLoadResult loadSettingsFromNetworkResource(
     const QByteArray contentType = reply->header(QNetworkRequest::ContentTypeHeader).toByteArray();
     const QByteArray body = reply->readAll();
 
+    const bool isSebExtension = url.path().endsWith(QStringLiteral(".seb"), Qt::CaseInsensitive);
+
     if (reply->error() != QNetworkReply::NoError && httpStatus == 0) {
         result.error = QStringLiteral("Failed to download '%1': %2").arg(url.toString(), reply->errorString());
         reply->deleteLater();
         return result;
     }
 
-    if (httpStatus == 401 || contentType.startsWith("text/html") || looksLikeHtml(body)) {
+    if (!isSebExtension && (httpStatus == 401 || contentType.startsWith("text/html") || looksLikeHtml(body))) {
         result.settings = browserFallbackSettings(url);
         result.browserUrl = url;
         result.ok = true;

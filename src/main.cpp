@@ -1,5 +1,5 @@
 #include "app_controller.h"
-#include "browser/webengine_compat.h"
+#include "security/security_service.h"
 #include "browser/webengine_environment.h"
 #include "seb_settings.h"
 
@@ -15,6 +15,8 @@
 #include <QProcess>
 #include <QProcessEnvironment>
 #include <QFileInfo>
+#include <QDebug>
+#include <cstdio>
 
 #include <fcntl.h>
 #include <unistd.h>
@@ -138,13 +140,12 @@ bool hasArgument(int argc, char *argv[], const QString &value)
     return false;
 }
 
-void appendPkexecEnvironmentVariable(QStringList &pkexecArgs, const char *name)
+static void appendPkexecEnvironmentVariable(QStringList &args, const char *name)
 {
-    if (!qEnvironmentVariableIsSet(name)) {
-        return;
+    const QByteArray value = qgetenv(name);
+    if (!value.isEmpty()) {
+        args << (QString(name) + QLatin1Char('=') + QString::fromLocal8Bit(value));
     }
-
-    pkexecArgs << QStringLiteral("%1=%2").arg(QString::fromLatin1(name), QString::fromLocal8Bit(qgetenv(name)));
 }
 
 void applyProtectedWindowSettings(seb::WindowSettings &settings, bool fullScreen)
@@ -278,6 +279,10 @@ void applyCommandLineOverrides(const QCommandLineParser &parser, seb::SebSetting
     if (parser.isSet("disable-quit")) {
         settings.security.allowTermination = false;
     }
+
+    if (parser.isSet("dev-bypass")) {
+        settings.devBypass = true;
+    }
 }
 
 }  // namespace
@@ -330,11 +335,14 @@ int main(int argc, char *argv[])
         QStringLiteral("disable-quit"),
         QStringLiteral("Disable manual termination even if the configuration allows it.")));
     parser.addOption(QCommandLineOption(
-        QStringLiteral("anti-cheat"),
+        QStringList{QStringLiteral("anti-cheat")},
         QStringLiteral("Enable anticheat mode.")));
     parser.addOption(QCommandLineOption(
-        QStringLiteral("menu-lockdown"),
+        QStringList{QStringLiteral("menu-lockdown")},
         QStringLiteral("Enable the protected start-menu lockdown mode.")));
+    parser.addOption(QCommandLineOption(
+        QStringList{QStringLiteral("dev-bypass")},
+        QStringLiteral("Skip strict lockdowns for development purposes.")));
 
     parser.process(app);
 
@@ -393,8 +401,12 @@ int main(int argc, char *argv[])
     const bool launchedWithoutExam = resource.isEmpty();
     const bool menuLockdown = parser.isSet("menu-lockdown");
     const bool examAntiCheat = parser.isSet("anti-cheat");
-
-    if (!parser.isSet("anti-cheat") && !menuLockdown) {
+    bool devBypass = settings.devBypass || parser.isSet("dev-bypass");
+#ifdef SEB_DEV_BYPASS_DEFAULT
+    devBypass = true;
+#endif
+    
+    if (!devBypass && !parser.isSet("anti-cheat") && !menuLockdown) {
         if (launchedWithoutExam) {
             const auto answer = QMessageBox::question(
                 nullptr,
@@ -484,16 +496,19 @@ int main(int argc, char *argv[])
         }
     }
 
-    if (menuLockdown && launchedWithoutExam) {
+    if (menuLockdown && launchedWithoutExam && !devBypass) {
         applyProtectedSessionSettings(settings, false, false, true);
-    } else if (examAntiCheat) {
+    } else if (examAntiCheat && !devBypass) {
         applyProtectedSessionSettings(settings, true, true, false);
     } else if (!launchedWithoutExam &&
                settings.browser.mainWindow.fullScreenMode &&
-               settings.browser.mainWindow.alwaysOnTop) {
-        // Re-assert secure settings after command-line parsing so weakening flags
-        // like --windowed/--allow-devtools cannot downgrade a protected exam launch.
+               settings.browser.mainWindow.alwaysOnTop &&
+               !devBypass) {
         applyProtectedSessionSettings(settings, true, true, false);
+    }
+
+    if (devBypass) {
+        seb::applyDevBypassOverrides(settings);
     }
 
     AppController controller;
@@ -501,6 +516,26 @@ int main(int argc, char *argv[])
     if (!controller.launchResolved(settings, warnings, &launchError)) {
         err << launchError << Qt::endl;
         return 1;
+    }
+
+    seb::security::SecurityService security;
+    if (!devBypass) {
+        if (security.isVirtualMachine()) {
+            err << "Error: Running in a virtual machine is not allowed." << Qt::endl;
+            return 1;
+        }
+        if (security.isDebuggerAttached()) {
+            err << "Error: A debugger is attached." << Qt::endl;
+            return 1;
+        }
+        
+        QObject::connect(&security, &seb::security::SecurityService::secureViolationDetected, [&app](const QString &reason) {
+            qCritical() << "Security Violation:" << reason;
+            app.quit();
+        });
+        security.startMonitoring();
+    } else {
+        qDebug() << "Developer bypass active; security monitoring disabled.";
     }
 
     return app.exec();

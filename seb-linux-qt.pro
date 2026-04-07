@@ -1,26 +1,31 @@
 QT += core gui widgets network xml
 
-SEB_TARGET_TRIPLE = $$lower($$system($$QMAKE_CXX -dumpmachine))
-SEB_DISABLE_QTWEBENGINE = 0
-
-contains(SEB_TARGET_TRIPLE, riscv64) {
-    SEB_DISABLE_QTWEBENGINE = 1
-}
-
-!qtHaveModule(webenginecore) {
-    SEB_DISABLE_QTWEBENGINE = 1
-}
-
-!qtHaveModule(webenginewidgets) {
-    SEB_DISABLE_QTWEBENGINE = 1
-}
-
-equals(SEB_DISABLE_QTWEBENGINE, 0) {
+# Safe Exam Browser for Linux: Browser Engine Detection
+# We support Qt WebEngine (primary) and WebKitGTK (fallback for RISC-V/Older systems).
+equals(QT_MAJOR_VERSION, 6):qtHaveModule(webenginecore):qtHaveModule(webenginewidgets) {
     QT += webenginecore webenginewidgets
     DEFINES += SEB_HAS_QTWEBENGINE=1
+    DEFINES += SEB_HAS_ANY_ENGINE=1
 } else {
     DEFINES += SEB_HAS_QTWEBENGINE=0
-    message("Building Safe Exam Browser without QtWebEngine support.")
+    # Check for WebKitGTK using pkg-config
+    CONFIG += link_pkgconfig
+    packagesExist(webkit2gtk-4.1 gtk+-3.0) {
+        DEFINES += SEB_HAS_WEBKITGTK=1
+        DEFINES += SEB_HAS_ANY_ENGINE=1
+        PKGCONFIG += webkit2gtk-4.1 gtk+-3.0
+        message("Building with WebKitGTK fallback (QtWebEngine not found or unsupported).")
+    } else {
+        DEFINES += SEB_HAS_ANY_ENGINE=0
+        warning("No supported browser engine found (QtWebEngine/WebKitGTK missing). The app will show an error on startup.")
+    }
+}
+
+# Dev Bypass Build Option
+# Usage: qmake CONFIG+=dev_bypass
+dev_bypass {
+    DEFINES += SEB_DEV_BYPASS_DEFAULT=1
+    message("Building with PERSISTENT developer bypass enabled.")
 }
 
 CONFIG += c++20 console warn_on object_parallel_to_source
@@ -106,14 +111,16 @@ SOURCES += \
     src/browser/BrowserControl.cpp \
     src/browser/BrowserWindow.cpp \
     src/browser/Clipboard.cpp \
-    src/browser/content/ContentLoader.cpp \
-    src/browser/filters/RequestFilter.cpp \
-    src/browser/filters/RuleFactory.cpp \
-    src/browser/filters/rules/RegexRule.cpp \
-    src/browser/filters/rules/SimplifiedRule.cpp \
+    src/browser/engines/qtwebengine/qt_webengine_profile.cpp \
+    src/browser/engines/qtwebengine/qt_webengine_provider.cpp \
+    src/browser/engines/qtwebengine/qt_webengine_view.cpp \
+    src/browser/engines/webkitgtk/webkitgtk_profile.cpp \
+    src/browser/engines/webkitgtk/webkitgtk_provider.cpp \
+    src/browser/engines/webkitgtk/webkitgtk_view.cpp \
     src/browser/key_generator.cpp \
     src/browser/request_filter.cpp \
     src/browser/request_interceptor.cpp \
+    src/browser/engines/engine_factory.cpp \
     src/browser/webengine_environment.cpp \
     src/app_controller.cpp \
     src/main.cpp \
@@ -145,14 +152,13 @@ SOURCES += \
     src/ui/seb_taskbar.cpp \
     src/seb_settings.cpp \
     src/seb_session.cpp \
+    src/security/security_service.cpp \
     src/browser_window.cpp
-
 HEADERS += \
     src/app_controller.h \
     src/applications/application_factory.h \
     src/applications/application_manager.h \
     src/applications/application_window.h \
-    src/applications/contracts/Properties/AssemblyInfo.h \
     src/applications/contracts/application.h \
     src/applications/contracts/application_factory.h \
     src/applications/contracts/application_window.h \
@@ -179,8 +185,6 @@ HEADERS += \
     src/client/responsibilities/client_responsibility.h \
     src/client/responsibilities/client_task.h \
     src/client/responsibilities/shell_responsibility.h \
-    src/communication/Properties/AssemblyInfo.h \
-    src/communication/contracts/Properties/AssemblyInfo.h \
     src/communication/contracts/data/authentication_response.h \
     src/communication/contracts/data/configuration_response.h \
     src/communication/contracts/data/connection_response.h \
@@ -308,128 +312,25 @@ HEADERS += \
     src/browser/BrowserApplication.h \
     src/browser/BrowserApplicationContext.h \
     src/browser/BrowserControl.h \
-    src/browser/BrowserIconResource.h \
     src/browser/BrowserWindow.h \
     src/browser/BrowserWindowContext.h \
     src/browser/Clipboard.h \
-    src/browser/Properties/AssemblyInfo.h \
     src/browser/contracts/IBrowserApplication.h \
     src/browser/contracts/IBrowserWindow.h \
-    src/browser/contracts/Properties/AssemblyInfo.h \
-    src/browser/contracts/events/download_event_args.h \
-    src/browser/contracts/events/download_finished_callback.h \
-    src/browser/contracts/events/download_requested_event_handler.h \
-    src/browser/contracts/events/lose_focus_requested_event_handler.h \
-    src/browser/contracts/events/tab_pressed_event_handler.h \
-    src/browser/contracts/events/termination_requested_event_handler.h \
-    src/browser/contracts/events/user_identifier_detected_event_handler.h \
-    src/browser/contracts/filters/IRequestFilter.h \
-    src/browser/contracts/filters/IRule.h \
-    src/browser/contracts/filters/IRuleFactory.h \
-    src/browser/contracts/filters/request.h \
-    src/browser/content/ContentLoader.h \
-    src/browser/events/clipboard_changed_event_handler.h \
-    src/browser/events/dialog_requested_event_args.h \
-    src/browser/events/dialog_requested_event_handler.h \
-    src/browser/events/download_aborted_event_handler.h \
-    src/browser/events/download_updated_event_handler.h \
-    src/browser/events/favicon_changed_event_handler.h \
-    src/browser/events/javascript_dialog_requested_event_args.h \
-    src/browser/events/javascript_dialog_requested_event_handler.h \
-    src/browser/events/javascript_dialog_type.h \
-    src/browser/events/popup_requested_event_args.h \
-    src/browser/events/popup_requested_event_handler.h \
-    src/browser/events/progress_changed_event_handler.h \
-    src/browser/events/reset_requested_event_handler.h \
-    src/browser/events/url_event_handler.h \
-    src/browser/events/window_closed_event_handler.h \
-    src/browser/filters/RequestFilter.h \
-    src/browser/filters/RuleFactory.h \
-    src/browser/filters/rules/RegexRule.h \
-    src/browser/filters/rules/SimplifiedRule.h \
-    src/browser/handlers/ContextMenuHandler.h \
-    src/browser/handlers/CookieVisitor.h \
-    src/browser/handlers/DialogHandler.h \
-    src/browser/handlers/DisplayHandler.h \
-    src/browser/handlers/DownloadHandler.h \
-    src/browser/handlers/DragHandler.h \
-    src/browser/handlers/FocusHandler.h \
-    src/browser/handlers/JavaScriptDialogHandler.h \
-    src/browser/handlers/KeyboardHandler.h \
-    src/browser/handlers/RenderProcessMessageHandler.h \
-    src/browser/handlers/RequestHandler.h \
-    src/browser/handlers/ResourceHandler.h \
-    src/browser/integrations/EdxIntegration.h \
-    src/browser/integrations/GenericIntegration.h \
-    src/browser/integrations/Integration.h \
-    src/browser/integrations/MoodleIntegration.h \
+    src/browser/contracts/i_engine_provider.h \
+    src/browser/contracts/i_webprofile.h \
+    src/browser/contracts/i_webview.h \
+    src/browser/engines/qtwebengine/qt_webengine_profile.h \
+    src/browser/engines/qtwebengine/qt_webengine_provider.h \
+    src/browser/engines/qtwebengine/qt_webengine_view.h \
+    src/browser/engines/webkitgtk/webkitgtk_profile.h \
+    src/browser/engines/webkitgtk/webkitgtk_provider.h \
+    src/browser/engines/webkitgtk/webkitgtk_view.h \
     src/browser/key_generator.h \
     src/browser/request_filter.h \
     src/browser/request_interceptor.h \
-    src/browser/responsibilities/BrowserTask.h \
-    src/browser/responsibilities/WindowTask.h \
-    src/browser/responsibilities/browser/BrowserResponsibility.h \
-    src/browser/responsibilities/browser/CacheResponsibility.h \
-    src/browser/responsibilities/browser/ConfigurationResponsibility.h \
-    src/browser/responsibilities/browser/FileSystemResponsibility.h \
-    src/browser/responsibilities/browser/IntegrityResponsibility.h \
-    src/browser/responsibilities/browser/WindowHandlingResponsibility.h \
-    src/browser/responsibilities/window/ControlResponsibility.h \
-    src/browser/responsibilities/window/CookieResponsibility.h \
-    src/browser/responsibilities/window/DialogResponsibility.h \
-    src/browser/responsibilities/window/DisplayResponsibility.h \
-    src/browser/responsibilities/window/DownloadResponsibility.h \
-    src/browser/responsibilities/window/KeyboardResponsibility.h \
-    src/browser/responsibilities/window/LifeSpanResponsibility.h \
-    src/browser/responsibilities/window/RequestResponsibility.h \
-    src/browser/responsibilities/window/WindowResponsibility.h \
-    src/browser/responsibilities/window/ZoomResponsibility.h \
+    src/browser/engines/engine_factory.h \
     src/browser/webengine_environment.h \
-    src/browser/wrapper/CefSharpBrowserControl.h \
-    src/browser/wrapper/CefSharpPopupControl.h \
-    src/browser/wrapper/Extensions.h \
-    src/browser/wrapper/ICefSharpControl.h \
-    src/browser/wrapper/events/AuthCredentialsEventHandler.h \
-    src/browser/wrapper/events/BeforeBrowseEventHandler.h \
-    src/browser/wrapper/events/BeforeContextMenuEventHandler.h \
-    src/browser/wrapper/events/BeforeDownloadEventHandler.h \
-    src/browser/wrapper/events/BeforeUnloadDialogEventHandler.h \
-    src/browser/wrapper/events/CanDownloadEventHandler.h \
-    src/browser/wrapper/events/ContextCreatedEventHandler.h \
-    src/browser/wrapper/events/ContextMenuCommandEventHandler.h \
-    src/browser/wrapper/events/ContextMenuDismissedEventHandler.h \
-    src/browser/wrapper/events/ContextReleasedEventHandler.h \
-    src/browser/wrapper/events/DialogClosedEventHandler.h \
-    src/browser/wrapper/events/DownloadUpdatedEventHandler.h \
-    src/browser/wrapper/events/DragEnterEventHandler.h \
-    src/browser/wrapper/events/DraggableRegionsChangedEventHandler.h \
-    src/browser/wrapper/events/FaviconUrlChangedEventHandler.h \
-    src/browser/wrapper/events/FileDialogRequestedEventHandler.h \
-    src/browser/wrapper/events/FocusedNodeChangedEventHandler.h \
-    src/browser/wrapper/events/GenericEventArgs.h \
-    src/browser/wrapper/events/GotFocusEventHandler.h \
-    src/browser/wrapper/events/JavaScriptDialogEventHandler.h \
-    src/browser/wrapper/events/KeyEventHandler.h \
-    src/browser/wrapper/events/LoadingProgressChangedEventHandler.h \
-    src/browser/wrapper/events/OpenUrlFromTabEventHandler.h \
-    src/browser/wrapper/events/PreKeyEventHandler.h \
-    src/browser/wrapper/events/ResetDialogStateEventHandler.h \
-    src/browser/wrapper/events/ResourceRequestEventArgs.h \
-    src/browser/wrapper/events/ResourceRequestEventHandler.h \
-    src/browser/wrapper/events/RunContextMenuEventHandler.h \
-    src/browser/wrapper/events/SetFocusEventHandler.h \
-    src/browser/wrapper/events/TakeFocusEventHandler.h \
-    src/browser/wrapper/events/UncaughtExceptionEventHandler.h \
-    src/browser/wrapper/handlers/ContextMenuHandlerSwitch.h \
-    src/browser/wrapper/handlers/DialogHandlerSwitch.h \
-    src/browser/wrapper/handlers/DisplayHandlerSwitch.h \
-    src/browser/wrapper/handlers/DownloadHandlerSwitch.h \
-    src/browser/wrapper/handlers/DragHandlerSwitch.h \
-    src/browser/wrapper/handlers/FocusHandlerSwitch.h \
-    src/browser/wrapper/handlers/JavaScriptDialogHandlerSwitch.h \
-    src/browser/wrapper/handlers/KeyboardHandlerSwitch.h \
-    src/browser/wrapper/handlers/RenderProcessMessageHandlerSwitch.h \
-    src/browser/wrapper/handlers/RequestHandlerSwitch.h \
     src/settings/password_container.h \
     src/settings/resource_loader.h \
     src/settings/settings_defaults.h \
@@ -456,72 +357,12 @@ HEADERS += \
     src/ui/taskbar/controls/raise_hand_control.h \
     src/ui/taskbar/controls/window_list_popup.h \
     src/ui/taskbar/taskbar_widget.h \
-    src/userinterface/contracts/Properties/AssemblyInfo.h \
-    src/userinterface/contracts/browser/data/download_item_state.h \
-    src/userinterface/contracts/browser/data/javascript_result.h \
-    src/userinterface/contracts/browser/events/address_changed_event_handler.h \
-    src/userinterface/contracts/browser/events/find_requested_event_handler.h \
-    src/userinterface/contracts/browser/events/load_failed_event_handler.h \
-    src/userinterface/contracts/browser/events/loading_state_changed_event_handler.h \
-    src/userinterface/contracts/browser/events/title_changed_event_handler.h \
-    src/userinterface/contracts/browser/i_browser_control.h \
-    src/userinterface/contracts/browser/i_browser_window.h \
-    src/userinterface/contracts/events/action_requested_event_handler.h \
-    src/userinterface/contracts/file_system_dialog/file_system_dialog_result.h \
-    src/userinterface/contracts/file_system_dialog/file_system_element.h \
-    src/userinterface/contracts/file_system_dialog/file_system_operation.h \
-    src/userinterface/contracts/file_system_dialog/i_file_system_dialog.h \
-    src/userinterface/contracts/i_progress_indicator.h \
-    src/userinterface/contracts/i_user_interface_factory.h \
-    src/userinterface/contracts/i_window_guard.h \
-    src/userinterface/contracts/message_box/i_message_box.h \
-    src/userinterface/contracts/message_box/message_box_action.h \
-    src/userinterface/contracts/message_box/message_box_icon.h \
-    src/userinterface/contracts/message_box/message_box_result.h \
-    src/userinterface/contracts/proctoring/events/cancellation_requested_event_handler.h \
-    src/userinterface/contracts/proctoring/events/full_screen_changed_event_handler.h \
-    src/userinterface/contracts/proctoring/i_proctoring_control.h \
-    src/userinterface/contracts/proctoring/i_proctoring_finalization_dialog.h \
-    src/userinterface/contracts/proctoring/i_proctoring_window.h \
-    src/userinterface/contracts/shell/events/activator_event_handler.h \
-    src/userinterface/contracts/shell/events/quit_button_clicked_event_handler.h \
-    src/userinterface/contracts/shell/i_action_center.h \
-    src/userinterface/contracts/shell/i_action_center_activator.h \
-    src/userinterface/contracts/shell/i_activator.h \
-    src/userinterface/contracts/shell/i_application_control.h \
-    src/userinterface/contracts/shell/i_notification_control.h \
-    src/userinterface/contracts/shell/i_system_control.h \
-    src/userinterface/contracts/shell/i_taskbar.h \
-    src/userinterface/contracts/shell/i_taskbar_activator.h \
-    src/userinterface/contracts/shell/i_taskview.h \
-    src/userinterface/contracts/shell/i_taskview_activator.h \
-    src/userinterface/contracts/shell/i_termination_activator.h \
-    src/userinterface/contracts/shell/i_verificator_activator.h \
-    src/userinterface/contracts/shell/location.h \
-    src/userinterface/contracts/windows/data/credentials_dialog_purpose.h \
-    src/userinterface/contracts/windows/data/credentials_dialog_result.h \
-    src/userinterface/contracts/windows/data/exam_selection_dialog_result.h \
-    src/userinterface/contracts/windows/data/lock_screen_option.h \
-    src/userinterface/contracts/windows/data/lock_screen_result.h \
-    src/userinterface/contracts/windows/data/password_dialog_result.h \
-    src/userinterface/contracts/windows/data/server_failure_dialog_result.h \
-    src/userinterface/contracts/windows/events/window_closed_event_handler.h \
-    src/userinterface/contracts/windows/events/window_closing_event_handler.h \
-    src/userinterface/contracts/windows/i_credentials_dialog.h \
-    src/userinterface/contracts/windows/i_exam_selection_dialog.h \
-    src/userinterface/contracts/windows/i_lock_screen.h \
-    src/userinterface/contracts/windows/i_password_dialog.h \
-    src/userinterface/contracts/windows/i_runtime_window.h \
-    src/userinterface/contracts/windows/i_server_failure_dialog.h \
-    src/userinterface/contracts/windows/i_splash_screen.h \
-    src/userinterface/contracts/windows/i_verificator_overlay.h \
-    src/userinterface/contracts/windows/i_window.h \
     src/ui/runtime_window.h \
     src/ui/seb_taskbar.h \
     src/seb_settings.h \
     src/seb_session.h \
+    src/security/security_service.h \
     src/browser_window.h
-
 RESOURCES += resources.qrc
 
 target.path = /usr/bin

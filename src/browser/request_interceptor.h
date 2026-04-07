@@ -1,28 +1,22 @@
 #pragma once
 
-#include "webengine_compat.h"
 #include "../seb_settings.h"
 #include "key_generator.h"
 #include "request_filter.h"
 
-#if SEB_HAS_QTWEBENGINE
-#include <QWebEngineUrlRequestInterceptor>
-#else
-#include <QObject>
-#endif
+#include "contracts/i_request_interceptor.h"
 
 namespace seb::browser {
 
-#if SEB_HAS_QTWEBENGINE
-class RequestInterceptor : public QWebEngineUrlRequestInterceptor
+class RequestInterceptor : public contracts::IRequestInterceptor
 {
 public:
-    explicit RequestInterceptor(const seb::SebSettings &settings, QObject *parent = nullptr);
+    explicit RequestInterceptor(const seb::SebSettings &settings);
 
-    void interceptRequest(QWebEngineUrlRequestInfo &info) override;
+    void interceptRequest(contracts::IRequest &request) override;
 
 private:
-    bool shouldAppendHeaders(const QWebEngineUrlRequestInfo &info) const;
+    bool shouldAppendHeaders(const contracts::IRequest &request) const;
     static bool sameHost(const QUrl &lhs, const QUrl &rhs);
     static QUrl replaceSebScheme(const QUrl &url);
 
@@ -30,12 +24,5 @@ private:
     RequestFilter filter_;
     KeyGenerator keyGenerator_;
 };
-#else
-class RequestInterceptor : public QObject
-{
-public:
-    explicit RequestInterceptor(const seb::SebSettings &settings, QObject *parent = nullptr);
-};
-#endif
 
 }  // namespace seb::browser

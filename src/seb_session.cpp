@@ -1,5 +1,5 @@
 #include "seb_session.h"
-
+#include "browser/engines/engine_factory.h"
 #include "browser/request_interceptor.h"
 #include "applications/application_manager.h"
 #include "browser_window.h"
@@ -14,22 +14,22 @@
 #include <QInputDialog>
 #include <QJsonDocument>
 #include <QJsonObject>
-#include <QLocale>
 #include <QMessageBox>
-#include <QNetworkAccessManager>
-#include <QNetworkReply>
-#include <QNetworkRequest>
-#include <QRegularExpression>
-#include <QStandardPaths>
+#include <QPushButton>
+#include <QDesktopServices>
+#include <QCoreApplication>
 #include <QTemporaryDir>
-#include <QUrl>
-#if SEB_HAS_QTWEBENGINE
-#include <QWebEngineCookieStore>
-#include <QWebEngineDownloadRequest>
-#include <QWebEngineProfile>
-#include <QWebEngineSettings>
-#endif
 #include <QTimer>
+#include <QUrl>
+#include <QStandardPaths>
+#include <QNetworkAccessManager>
+#include <QNetworkRequest>
+#include <QNetworkReply>
+#include <QLocale>
+#include <QRegularExpression>
+
+#include "browser/contracts/i_engine_provider.h"
+#include "browser/contracts/i_webprofile.h"
 
 namespace {
 
@@ -87,8 +87,24 @@ SebSession::SebSession(const seb::SebSettings &settings, ResourceOpener opener, 
         settings_.browser.deleteCookiesOnShutdown ||
         settings_.browser.deleteCookiesOnStartup;
 
-#if SEB_HAS_QTWEBENGINE
-    profile_.reset(new QWebEngineProfile(this));
+    engineProvider_ = seb::browser::createEngineProvider();
+    if (!engineProvider_) {
+        QMessageBox msgBox;
+        msgBox.setIcon(QMessageBox::Critical);
+        msgBox.setWindowTitle(tr("Unsupported Device"));
+        msgBox.setText(tr("Safe Exam Browser is not supported on your device."));
+        msgBox.setInformativeText(tr("If you want support please open a GitHub issue with details about your system configuration."));
+        QPushButton *issueButton = msgBox.addButton(tr("Open GitHub Issue"), QMessageBox::ActionRole);
+        msgBox.addButton(QMessageBox::Close);
+        msgBox.exec();
+
+        if (msgBox.clickedButton() == issueButton) {
+            QDesktopServices::openUrl(QUrl(QStringLiteral("https://github.com/Jvr2022/seb-linux/issues")));
+        }
+        QCoreApplication::exit(1);
+        return;
+    }
+    profile_ = engineProvider_->createProfile(this);
 
     if (useTemporaryProfile) {
         profileDirectory_ = std::make_unique<QTemporaryDir>(
@@ -109,29 +125,21 @@ SebSession::SebSession(const seb::SebSettings &settings, ResourceOpener opener, 
         profile_->setDownloadPath(defaultDownloadDirectory());
     }
 
-    profile_->settings()->setAttribute(QWebEngineSettings::JavascriptCanOpenWindows, true);
-    profile_->settings()->setAttribute(QWebEngineSettings::PdfViewerEnabled, settings_.browser.allowPdfReader);
-    profile_->settings()->setAttribute(QWebEngineSettings::FullScreenSupportEnabled, false);
-    profile_->settings()->setAttribute(QWebEngineSettings::HyperlinkAuditingEnabled, false);
-    profile_->settings()->setAttribute(QWebEngineSettings::ErrorPageEnabled, true);
+    profile_->setPdfViewerEnabled(settings_.browser.allowPdfReader);
     profile_->setSpellCheckEnabled(settings_.browser.allowSpellChecking);
     profile_->setSpellCheckLanguages(QStringList{QLocale::system().bcp47Name()});
     profile_->setHttpUserAgent(buildUserAgent());
-#else
-    Q_UNUSED(useTemporaryProfile);
-#endif
+    profile_->setDevBypass(settings_.devBypass);
 
-    interceptor_.reset(new seb::browser::RequestInterceptor(settings_, this));
+    interceptor_.reset(new seb::browser::RequestInterceptor(settings_));
+    profile_->setUrlRequestInterceptor(interceptor_.get());
 
-#if SEB_HAS_QTWEBENGINE
-    profile_->setUrlRequestInterceptor(interceptor_.data());
-
-    connect(profile_.data(), &QWebEngineProfile::downloadRequested, this, &SebSession::handleDownloadRequested);
+    connect(profile_.get(), &seb::browser::contracts::IWebProfile::downloadRequested,
+            this, &SebSession::handleDownloadRequested);
 
     if (settings_.browser.deleteCookiesOnStartup) {
-        profile_->cookieStore()->deleteAllCookies();
+        profile_->deleteAllCookies();
     }
-#endif
 
     applicationManager_ = std::make_unique<seb::applications::ApplicationManager>(settings_.applications, this);
     connect(applicationManager_.get(), &seb::applications::ApplicationManager::applicationsChanged, this, &SebSession::externalApplicationsChanged);
@@ -278,12 +286,15 @@ const seb::SebSettings &SebSession::settings() const
     return settings_;
 }
 
-#if SEB_HAS_QTWEBENGINE
-QWebEngineProfile *SebSession::profile() const
+seb::browser::contracts::IWebProfile *SebSession::profile() const
 {
-    return profile_.data();
+    return profile_.get();
 }
-#endif
+
+seb::browser::contracts::IEngineProvider *SebSession::engineProvider() const
+{
+    return engineProvider_.get();
+}
 
 QUrl SebSession::homeUrl() const
 {
@@ -375,31 +386,25 @@ void SebSession::activateWindow(BrowserWindow *window)
     window->activateWindow();
 }
 
-#if SEB_HAS_QTWEBENGINE
-void SebSession::handleDownloadRequested(QWebEngineDownloadRequest *download)
+void SebSession::handleDownloadRequested(const QUrl &url, const QString &suggestedFilename, bool &accepted, QString &downloadDirectory)
 {
-    if (!download) {
-        return;
-    }
-
-    const QString fileName = download->downloadFileName().isEmpty()
+    const QString fileName = suggestedFilename.isEmpty()
         ? QStringLiteral("download")
-        : download->downloadFileName();
+        : suggestedFilename;
     const bool sebConfig = fileName.endsWith(QStringLiteral(".seb"), Qt::CaseInsensitive);
 
     if (!settings_.browser.allowDownloads && !(sebConfig && settings_.browser.allowConfigurationDownloads)) {
-        download->cancel();
+        accepted = false;
         return;
     }
 
     if (sebConfig && !settings_.browser.allowConfigurationDownloads) {
-        download->cancel();
+        accepted = false;
         return;
     }
 
     if (sebConfig) {
-        const QUrl url = download->url();
-        download->cancel();
+        accepted = false;
         openSebResource(url, QApplication::activeWindow());
         return;
     }
@@ -412,7 +417,7 @@ void SebSession::handleDownloadRequested(QWebEngineDownloadRequest *download)
             destination);
 
         if (selected.isEmpty()) {
-            download->cancel();
+            accepted = false;
             return;
         }
 
@@ -420,11 +425,9 @@ void SebSession::handleDownloadRequested(QWebEngineDownloadRequest *download)
     }
 
     const QFileInfo info(destination);
-    download->setDownloadDirectory(info.dir().path());
-    download->setDownloadFileName(info.fileName());
-    download->accept();
+    downloadDirectory = info.dir().path();
+    accepted = true;
 }
-#endif
 
 QString SebSession::buildUserAgent() const
 {
@@ -433,14 +436,7 @@ QString SebSession::buildUserAgent() const
     if (settings_.browser.useCustomUserAgent && !settings_.browser.customUserAgent.isEmpty()) {
         agent = settings_.browser.customUserAgent.trimmed();
     } else {
-#if SEB_HAS_QTWEBENGINE
-        QString defaultAgent = profile_->httpUserAgent();
-        QRegularExpression regex(QStringLiteral("Chrome/([0-9.]+)"));
-        QRegularExpressionMatch match = regex.match(defaultAgent);
-        QString chromeVersion = match.hasMatch() ? match.captured(1) : QStringLiteral("110.0.0.0");
-#else
         const QString chromeVersion = QStringLiteral("110.0.0.0");
-#endif
         agent = QStringLiteral("Mozilla/5.0 (Windows NT 10.0) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/") + chromeVersion;
     }
 

@@ -45,8 +45,7 @@ QRegularExpression RequestFilter::compileRule(const seb::FilterRuleSettings &rul
     return {};
 }
 
-#if SEB_HAS_QTWEBENGINE
-FilterDecision RequestFilter::evaluate(const QUrl &url, QWebEngineUrlRequestInfo::ResourceType resourceType) const
+FilterDecision RequestFilter::evaluate(const QUrl &url, contracts::ResourceType resourceType) const
 {
     const bool mainRequest = isMainRequest(resourceType);
     if ((mainRequest && !settings_.processMainRequests) || (!mainRequest && !settings_.processContentRequests)) {
@@ -68,11 +67,10 @@ FilterDecision RequestFilter::evaluate(const QUrl &url, QWebEngineUrlRequestInfo
 
     return FilterDecision::Block;
 }
-bool RequestFilter::isMainRequest(QWebEngineUrlRequestInfo::ResourceType resourceType)
+bool RequestFilter::isMainRequest(contracts::ResourceType resourceType)
 {
-    return resourceType == QWebEngineUrlRequestInfo::ResourceTypeMainFrame ||
-           resourceType == QWebEngineUrlRequestInfo::ResourceTypeNavigationPreloadMainFrame;
+    return resourceType == contracts::ResourceType::MainFrame ||
+           resourceType == contracts::ResourceType::NavigationPreloadMainFrame;
 }
-#endif
 
 }  // namespace seb::browser
