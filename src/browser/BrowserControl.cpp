@@ -3,8 +3,6 @@
 #if SEB_HAS_QTWEBENGINE
 #include <QWebEngineHistory>
 #include <QWebEngineView>
-#else
-#include <QUrl>
 #endif
 
 namespace seb::browser {
