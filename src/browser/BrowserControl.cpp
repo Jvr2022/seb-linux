@@ -12,11 +12,7 @@ BrowserControl::BrowserControl(contracts::IWebView *view, QObject *parent)
 
 QString BrowserControl::address() const
 {
-#if SEB_HAS_QTWEBENGINE
     return view_ ? view_->url().toString() : QString();
-#else
-    return {};
-#endif
 }
 
 bool BrowserControl::canNavigateBackwards() const
@@ -31,13 +27,9 @@ bool BrowserControl::canNavigateForwards() const
 
 void BrowserControl::navigateTo(const QString &address)
 {
-#if SEB_HAS_QTWEBENGINE
     if (view_) {
         view_->setUrl(QUrl::fromUserInput(address));
     }
-#else
-    Q_UNUSED(address);
-#endif
 }
 
 void BrowserControl::navigateBackwards()

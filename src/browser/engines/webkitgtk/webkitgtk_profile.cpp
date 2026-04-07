@@ -49,15 +49,17 @@ void WebKitGtkProfile::setPdfViewerEnabled(bool enabled)
 
 void WebKitGtkProfile::setSpellCheckEnabled(bool enabled)
 {
-    WebKitWebContext *context = webkit_web_context_get_default();
-    webkit_web_context_set_spell_checking_enabled(context, enabled);
+    if (d->context) {
+        webkit_web_context_set_spell_checking_enabled(d->context, enabled);
+    }
 }
 
 void WebKitGtkProfile::setSpellCheckLanguages(const QStringList &languages)
 {
-    WebKitWebContext *context = webkit_web_context_get_default();
-    QString langStr = languages.join(QStringLiteral(","));
-    webkit_web_context_set_spell_checking_languages(context, langStr.toUtf8().constData());
+    if (d->context) {
+        QString langStr = languages.join(QStringLiteral(","));
+        webkit_web_context_set_spell_checking_languages(d->context, langStr.toUtf8().constData());
+    }
 }
 
 void WebKitGtkProfile::setHttpUserAgent(const QString &userAgent)

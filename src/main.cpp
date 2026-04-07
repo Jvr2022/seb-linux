@@ -340,9 +340,11 @@ int main(int argc, char *argv[])
     parser.addOption(QCommandLineOption(
         QStringList{QStringLiteral("menu-lockdown")},
         QStringLiteral("Enable the protected start-menu lockdown mode.")));
+#if defined(QT_DEBUG) || defined(SEB_DEV_BYPASS_OPTION)
     parser.addOption(QCommandLineOption(
         QStringList{QStringLiteral("dev-bypass")},
         QStringLiteral("Skip strict lockdowns for development purposes.")));
+#endif
 
     parser.process(app);
 

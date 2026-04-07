@@ -8,6 +8,7 @@
 #include <QDebug>
 #include <QGuiApplication>
 #include <QScreen>
+#include <QFileInfo>
 
 #include <sys/ptrace.h>
 #include <unistd.h>
@@ -50,13 +51,7 @@ bool SecurityService::isVirtualMachine() const
 
 bool SecurityService::isDebuggerAttached() const
 {
-    // Try to ptrace ourselves - if it fails, someone else is likely tracing us
-    if (ptrace(PTRACE_TRACEME, 0, 1, 0) < 0) {
-        return true;
-    }
-    ptrace(PTRACE_DETACH, 0, 1, 0);
-
-    // Also check TracerPid in /proc/self/status
+    // Check TracerPid in /proc/self/status
     QFile status("/proc/self/status");
     if (status.open(QIODevice::ReadOnly | QIODevice::Text)) {
         QTextStream in(&status);
@@ -77,26 +72,34 @@ bool SecurityService::isDebuggerAttached() const
 
 QStringList SecurityService::detectProhibitedProcesses() const
 {
-    QStringList prohibited = {
-        "discord", "slack", "teamviewer", "anydesk", "obs", "simplescreenrecorder",
-        "wireshark", "tcpdump", "gdb", "strace"
+    static const QStringList prohibited = {
+        QStringLiteral("discord"), QStringLiteral("slack"), QStringLiteral("teamviewer"), 
+        QStringLiteral("anydesk"), QStringLiteral("obs"), QStringLiteral("simplescreenrecorder"),
+        QStringLiteral("wireshark"), QStringLiteral("tcpdump"), QStringLiteral("gdb"), 
+        QStringLiteral("strace")
     };
 
     QStringList detected;
-    QDir proc("/proc");
-    QStringList pids = proc.entryList(QDir::Dirs | QDir::NoDotAndDotDot);
+    QDir proc(QStringLiteral("/proc"));
+    const QStringList pids = proc.entryList(QDir::Dirs | QDir::NoDotAndDotDot);
 
     for (const QString &pid : pids) {
         bool ok;
         pid.toInt(&ok);
         if (!ok) continue;
 
-        QFile cmdline(QString("/proc/%1/cmdline").arg(pid));
+        QFile cmdline(QStringLiteral("/proc/%1/cmdline").arg(pid));
         if (cmdline.open(QIODevice::ReadOnly)) {
-            QString name = QString::fromLocal8Bit(cmdline.readAll()).section('\0', 0, 0);
+            const QByteArray data = cmdline.readAll();
+            if (data.isEmpty()) continue;
+
+            const QString name = QString::fromLocal8Bit(data.constData()).section(QLatin1Char('\0'), 0, 0);
+            const QString baseName = QFileInfo(name).fileName().toLower();
+            
             for (const QString &p : prohibited) {
-                if (name.contains(p, Qt::CaseInsensitive)) {
+                if (baseName.contains(p)) {
                     detected << name;
+                    break; // Move to next process immediately
                 }
             }
         }

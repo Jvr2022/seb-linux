@@ -13,6 +13,8 @@
 #include "browser/contracts/i_webprofile.h"
 #include <QCloseEvent>
 #include <QEvent>
+#include <QInputDialog>
+#include <QLineEdit>
 #include <QFocusEvent>
 #include <QFrame>
 #include <QGuiApplication>
@@ -297,23 +299,11 @@ void BrowserWindow::focusInEvent(QFocusEvent *event)
 
 void BrowserWindow::focusOutEvent(QFocusEvent *event)
 {
-    if (session_.settings().devBypass) {
-        event->accept();
-        return;
-    }
     QMainWindow::focusOutEvent(event);
 }
 
 bool BrowserWindow::eventFilter(QObject *watched, QEvent *event)
 {
-    if (session_.settings().devBypass && view_ && watched == view_->widget()) {
-        if (event->type() == QEvent::FocusOut || 
-            event->type() == QEvent::WindowDeactivate || 
-            event->type() == QEvent::Leave) {
-            // Stealth mode: prevent browser from knowing we left or lost focus
-            return true;
-        }
-    }
     return QMainWindow::eventFilter(watched, event);
 }
 
@@ -524,7 +514,28 @@ void BrowserWindow::configureShortcuts()
 
 void BrowserWindow::findInPage()
 {
-    // TODO: Abstract and implement findInPage through IWebView
+    if (!session_.settings().browser.allowFind) {
+        return;
+    }
+
+    bool accepted = false;
+    const QString text = QInputDialog::getText(
+        this,
+        tr("Find in Page"),
+        tr("Search text:"),
+        QLineEdit::Normal,
+        QString(),
+        &accepted);
+    
+    if (!accepted || text.isEmpty()) {
+        return;
+    }
+
+    if (view_) {
+        // First clear selection then search
+        view_->findText(QString());
+        view_->findText(text);
+    }
 }
 
 void BrowserWindow::navigateHome()

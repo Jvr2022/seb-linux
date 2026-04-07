@@ -7,6 +7,7 @@
 #include <QWebEngineNewWindowRequest>
 #include <QWebEngineScript>
 #include <QWebEngineScriptCollection>
+#include <QAuthenticator>
 
 namespace seb::browser {
 
@@ -36,6 +37,7 @@ QtWebEngineWebView::QtWebEngineWebView(QtWebEngineProfile *profile, QWidget *par
     auto *page = new InterceptingPage(profile->nativeProfile(), this, view_);
     view_->setPage(page);
 
+#if defined(QT_DEBUG) || defined(SEB_DEV_BYPASS_OPTION)
     if (profile->devBypass()) {
         QWebEngineScript script;
         script.setName(QStringLiteral("seb-stealth"));
@@ -60,6 +62,7 @@ QtWebEngineWebView::QtWebEngineWebView(QtWebEngineProfile *profile, QWidget *par
         script.setRunsOnSubFrames(true);
         profile->nativeProfile()->scripts()->insert(script);
     }
+#endif
 
     connect(view_, &QWebEngineView::urlChanged, this, &QtWebEngineWebView::urlChanged);
     connect(view_, &QWebEngineView::titleChanged, this, &QtWebEngineWebView::titleChanged);

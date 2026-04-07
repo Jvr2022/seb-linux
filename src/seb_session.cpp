@@ -1,4 +1,5 @@
 #include "seb_session.h"
+#include <cstdlib>
 #include "browser/engines/engine_factory.h"
 #include "browser/request_interceptor.h"
 #include "applications/application_manager.h"
@@ -101,8 +102,7 @@ SebSession::SebSession(const seb::SebSettings &settings, ResourceOpener opener, 
         if (msgBox.clickedButton() == issueButton) {
             QDesktopServices::openUrl(QUrl(QStringLiteral("https://github.com/Jvr2022/seb-linux/issues")));
         }
-        QCoreApplication::exit(1);
-        return;
+        std::exit(1);
     }
     profile_ = engineProvider_->createProfile(this);
 
