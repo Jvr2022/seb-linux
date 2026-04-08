@@ -25,7 +25,7 @@ jobs:
             zlib1g-dev
 
       - name: Build Qt WebEngine backend
-        run: ./scripts/build.sh
+        run: ./scripts/build.sh CONFIG+=force_qtwebengine
 
       - name: Upload Qt WebEngine binary
         uses: actions/upload-artifact@v7
@@ -52,7 +52,7 @@ jobs:
             zlib1g-dev
 
       - name: Build WebKitGTK fallback backend
-        run: ./scripts/build.sh
+        run: ./scripts/build.sh CONFIG+=force_webkitgtk
 
       - name: Upload WebKitGTK binary
         uses: actions/upload-artifact@v7
@@ -96,6 +96,8 @@ jobs:
           QT_QPA_PLATFORM: offscreen
         run: |
           chmod +x artifacts/qtwebengine/safe-exam-browser
+          ldd artifacts/qtwebengine/safe-exam-browser | grep -q 'libQt6WebEngine'
+          ! ldd artifacts/qtwebengine/safe-exam-browser | grep -q 'libwebkit2gtk-4.1'
           artifacts/qtwebengine/safe-exam-browser --version
 
       - name: Verify WebKitGTK runtime
@@ -103,4 +105,6 @@ jobs:
           QT_QPA_PLATFORM: offscreen
         run: |
           chmod +x artifacts/webkitgtk/safe-exam-browser
+          ldd artifacts/webkitgtk/safe-exam-browser | grep -q 'libwebkit2gtk-4.1'
+          ! ldd artifacts/webkitgtk/safe-exam-browser | grep -q 'libQt6WebEngine'
           artifacts/webkitgtk/safe-exam-browser --version
