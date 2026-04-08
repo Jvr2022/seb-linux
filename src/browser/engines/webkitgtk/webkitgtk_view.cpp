@@ -2,8 +2,17 @@
 
 #if !SEB_HAS_QTWEBENGINE && SEB_HAS_WEBKITGTK
 
+#ifdef signals
+#pragma push_macro("signals")
+#undef signals
+#define SEB_WEBKITGTK_RESTORE_SIGNALS_MACRO
+#endif
 #include <gtk/gtk.h>
 #include <webkit2/webkit2.h>
+#ifdef SEB_WEBKITGTK_RESTORE_SIGNALS_MACRO
+#pragma pop_macro("signals")
+#undef SEB_WEBKITGTK_RESTORE_SIGNALS_MACRO
+#endif
 
 #include <QVBoxLayout>
 #include <QWidget>

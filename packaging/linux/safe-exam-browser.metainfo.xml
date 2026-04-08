@@ -2,15 +2,17 @@
 <component type="desktop-application">
   <id>safe-exam-browser.desktop</id>
   <name>Safe Exam Browser</name>
-  <summary>Qt-based Linux port of Safe Exam Browser</summary>
+  <summary>Community-driven Linux edition of Safe Exam Browser</summary>
   <metadata_license>CC0-1.0</metadata_license>
   <project_license>MPL-2.0</project_license>
   <developer id="org.safeexambrowser">
     <name>SEB Linux contributors</name>
   </developer>
   <launchable type="desktop-id">safe-exam-browser.desktop</launchable>
+  <url type="homepage">https://github.com/Jvr2022/seb-linux</url>
+  <url type="bugtracker">https://github.com/Jvr2022/seb-linux/issues</url>
   <description>
-    <p>Safe Exam Browser for Linux with `.seb` file loading, `seb://` and `sebs://` protocol handling, remote configuration loading, and a Qt WebEngine runtime when that browser engine is available.</p>
+    <p>Safe Exam Browser for Linux opens .seb exam configuration files, handles seb:// and sebs:// links, and runs secured exam sessions with either Qt WebEngine or the WebKitGTK fallback backend.</p>
   </description>
   <categories>
     <category>Education</category>

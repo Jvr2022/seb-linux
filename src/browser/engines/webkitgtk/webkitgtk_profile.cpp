@@ -2,7 +2,19 @@
 
 #if !SEB_HAS_QTWEBENGINE && SEB_HAS_WEBKITGTK
 
+#ifdef signals
+#pragma push_macro("signals")
+#undef signals
+#define SEB_WEBKITGTK_RESTORE_SIGNALS_MACRO
+#endif
 #include <webkit2/webkit2.h>
+#ifdef SEB_WEBKITGTK_RESTORE_SIGNALS_MACRO
+#pragma pop_macro("signals")
+#undef SEB_WEBKITGTK_RESTORE_SIGNALS_MACRO
+#endif
+
+#include <QByteArray>
+#include <QVector>
 
 namespace seb::browser {
 
@@ -56,10 +68,31 @@ void WebKitGtkProfile::setSpellCheckEnabled(bool enabled)
 
 void WebKitGtkProfile::setSpellCheckLanguages(const QStringList &languages)
 {
-    if (d->context) {
-        QString langStr = languages.join(QStringLiteral(","));
-        webkit_web_context_set_spell_checking_languages(d->context, langStr.toUtf8().constData());
+    if (!d->context) {
+        return;
     }
+
+    QVector<QByteArray> encodedLanguages;
+    encodedLanguages.reserve(languages.size());
+
+    QVector<const gchar *> spellCheckingLanguages;
+    spellCheckingLanguages.reserve(languages.size() + 1);
+
+    for (const QString &language : languages) {
+        const QString trimmedLanguage = language.trimmed();
+        if (trimmedLanguage.isEmpty()) {
+            continue;
+        }
+
+        encodedLanguages.push_back(trimmedLanguage.toUtf8());
+        spellCheckingLanguages.push_back(encodedLanguages.constLast().constData());
+    }
+
+    spellCheckingLanguages.push_back(nullptr);
+
+    webkit_web_context_set_spell_checking_languages(
+        d->context,
+        spellCheckingLanguages.size() > 1 ? spellCheckingLanguages.constData() : nullptr);
 }
 
 void WebKitGtkProfile::setHttpUserAgent(const QString &userAgent)

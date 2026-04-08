@@ -29,7 +29,7 @@ void AboutNotification::activate()
         window_->setWindowTitle(QStringLiteral("About Safe Exam Browser"));
         auto *layout = new QVBoxLayout(window_);
         layout->addWidget(new QLabel(QStringLiteral("Safe Exam Browser"), window_));
-        layout->addWidget(new QLabel(QStringLiteral("Linux client port"), window_));
+        layout->addWidget(new QLabel(QStringLiteral("Community-driven Linux edition"), window_));
         connect(window_, &QWidget::destroyed, this, [this] { window_ = nullptr; });
         window_->resize(320, 180);
     }

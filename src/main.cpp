@@ -301,7 +301,7 @@ int main(int argc, char *argv[])
 
     QCommandLineParser parser;
     parser.setApplicationDescription(QStringLiteral(
-        "Expanded Linux port of Safe Exam Browser focused on portable browser and session features."));
+        "Safe Exam Browser for Linux with .seb file support, exam link handling, and Qt WebEngine or WebKitGTK browser backends."));
     parser.addHelpOption();
     parser.addVersionOption();
 

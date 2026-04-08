@@ -2,8 +2,8 @@
 Version=1.0
 Type=Application
 Name=Safe Exam Browser
-GenericName=Secure exam browser
-Comment=Open Safe Exam Browser sessions and .seb exam configuration files
+GenericName=Secure exam browser for Linux
+Comment=Launch secure exams, open .seb files, and handle seb:// links
 Exec=safe-exam-browser %u
 Icon=safe-exam-browser
 Terminal=false
