@@ -13,7 +13,7 @@ jobs:
     steps:
       - uses: actions/checkout@v6
 
-      - name: Install dependencies
+      - name: Install Qt WebEngine build dependencies
         run: |
           sudo apt-get update
           sudo apt-get install -y \
@@ -22,19 +22,24 @@ jobs:
             qt6-base-dev \
             qt6-tools-dev-tools \
             qt6-webengine-dev \
-            libwebkit2gtk-4.1-dev \
-            libgtk-3-dev \
             zlib1g-dev
 
       - name: Build Qt WebEngine backend
-        run: ./scripts/build.sh CONFIG+=force_qtwebengine
+        run: ./scripts/build.sh
+
+      - name: Upload Qt WebEngine binary
+        uses: actions/upload-artifact@v7
+        with:
+          name: safe-exam-browser-qtwebengine
+          path: build/bin/safe-exam-browser
+          if-no-files-found: error
 
   build-webkitgtk-fallback:
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v6
 
-      - name: Install dependencies
+      - name: Install WebKitGTK fallback build dependencies
         run: |
           sudo apt-get update
           sudo apt-get install -y \
@@ -42,13 +47,19 @@ jobs:
             libqt6svg6-dev \
             qt6-base-dev \
             qt6-tools-dev-tools \
-            qt6-webengine-dev \
             libwebkit2gtk-4.1-dev \
             libgtk-3-dev \
             zlib1g-dev
 
       - name: Build WebKitGTK fallback backend
-        run: ./scripts/build.sh CONFIG+=force_webkitgtk
+        run: ./scripts/build.sh
+
+      - name: Upload WebKitGTK binary
+        uses: actions/upload-artifact@v7
+        with:
+          name: safe-exam-browser-webkitgtk
+          path: build/bin/safe-exam-browser
+          if-no-files-found: error
 
   runtime-smoke:
     needs:
@@ -56,13 +67,10 @@ jobs:
       - build-webkitgtk-fallback
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v6
-
-      - name: Install dependencies
+      - name: Install runtime dependencies
         run: |
           sudo apt-get update
           sudo apt-get install -y \
-            build-essential \
             libqt6svg6-dev \
             qt6-base-dev \
             qt6-tools-dev-tools \
@@ -71,16 +79,28 @@ jobs:
             libgtk-3-dev \
             zlib1g-dev
 
+      - name: Download Qt WebEngine binary
+        uses: actions/download-artifact@v8
+        with:
+          name: safe-exam-browser-qtwebengine
+          path: artifacts/qtwebengine
+
+      - name: Download WebKitGTK binary
+        uses: actions/download-artifact@v8
+        with:
+          name: safe-exam-browser-webkitgtk
+          path: artifacts/webkitgtk
+
       - name: Verify Qt WebEngine runtime
         env:
           QT_QPA_PLATFORM: offscreen
         run: |
-          ./scripts/build.sh CONFIG+=force_qtwebengine
-          ./build/bin/safe-exam-browser --version
+          chmod +x artifacts/qtwebengine/safe-exam-browser
+          artifacts/qtwebengine/safe-exam-browser --version
 
       - name: Verify WebKitGTK runtime
         env:
           QT_QPA_PLATFORM: offscreen
         run: |
-          ./scripts/build.sh CONFIG+=force_webkitgtk
-          ./build/bin/safe-exam-browser --version
+          chmod +x artifacts/webkitgtk/safe-exam-browser
+          artifacts/webkitgtk/safe-exam-browser --version
