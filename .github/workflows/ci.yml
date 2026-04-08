@@ -74,6 +74,7 @@ jobs:
             libqt6webenginewidgets6 \
             libqt6webenginecore6-bin \
             libqt6webengine6-data \
+            libqt6xml6t64 \
             qt6-qpa-plugins \
             libwebkit2gtk-4.1-0 \
             libgtk-3-0t64 \
