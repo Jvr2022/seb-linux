@@ -2,8 +2,6 @@ QT += core gui widgets network xml
 
 # Safe Exam Browser for Linux: Browser Engine Detection
 # We support Qt WebEngine (primary) and WebKitGTK (fallback for RISC-V/Older systems).
-CONFIG += link_pkgconfig
-
 force_qtwebengine:force_webkitgtk {
     error("CONFIG+=force_qtwebengine and CONFIG+=force_webkitgtk cannot be used together.")
 }
@@ -14,8 +12,16 @@ equals(QT_MAJOR_VERSION, 6):qtHaveModule(webenginecore):qtHaveModule(webenginewi
 }
 
 webkitgtk_available = false
-packagesExist(webkit2gtk-4.1 gtk+-3.0) {
-    webkitgtk_available = true
+force_webkitgtk {
+    CONFIG += link_pkgconfig
+    packagesExist(webkit2gtk-4.1 gtk+-3.0) {
+        webkitgtk_available = true
+    }
+} else:!equals(qtwebengine_available, true) {
+    CONFIG += link_pkgconfig
+    packagesExist(webkit2gtk-4.1 gtk+-3.0) {
+        webkitgtk_available = true
+    }
 }
 
 seb_has_qtwebengine = 0
