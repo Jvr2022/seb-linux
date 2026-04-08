@@ -420,40 +420,6 @@ void BrowserWindow::configureToolbar()
     }
 }
 
-void BrowserWindow::configureFallbackView(const QUrl &initialUrl)
-{
-#if SEB_HAS_QTWEBENGINE
-    Q_UNUSED(initialUrl);
-#else
-    fallbackUrl_ = initialUrl;
-    if (!fallbackView_) {
-        fallbackView_ = new QTextBrowser(contentContainer_);
-        fallbackView_->setFrameShape(QFrame::NoFrame);
-        fallbackView_->setOpenLinks(false);
-        fallbackView_->setOpenExternalLinks(false);
-        fallbackView_->setReadOnly(true);
-        fallbackView_->setTextInteractionFlags(Qt::TextSelectableByKeyboard | Qt::TextSelectableByMouse);
-    }
-
-    const QString targetUrl = fallbackUrl_.isValid()
-        ? fallbackUrl_.toDisplayString()
-        : QStringLiteral("Not configured");
-    const QString homeUrl = session_.homeUrl().isValid()
-        ? session_.homeUrl().toDisplayString()
-        : QStringLiteral("Not configured");
-
-    fallbackView_->setHtml(QStringLiteral(
-        "<h2>Qt WebEngine Is Unavailable</h2>"
-        "<p>This build can still load SEB configuration, start the protected shell, and exercise the Linux UI, "
-        "but it cannot render exam pages because Qt WebEngine is disabled for this target.</p>"
-        "<p><b>Current target URL:</b> <code>%1</code><br/>"
-        "<b>Configured home URL:</b> <code>%2</code></p>"
-        "<p>This compatibility mode is intended for architectures such as riscv64 until a supported "
-        "embedded browser engine becomes available.</p>")
-            .arg(targetUrl.toHtmlEscaped(), homeUrl.toHtmlEscaped()));
-#endif
-}
-
 void BrowserWindow::configureShortcuts()
 {
     auto *reloadAction = new QAction(this);

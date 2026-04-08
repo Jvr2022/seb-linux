@@ -67,7 +67,6 @@ private:
     void applyWindowFlags();
     void applyWindowGeometry();
     void configureToolbar();
-    void configureFallbackView(const QUrl &initialUrl);
     void configureShortcuts();
     void findInPage();
     void navigateHome();

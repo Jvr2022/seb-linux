@@ -2,24 +2,67 @@ QT += core gui widgets network xml
 
 # Safe Exam Browser for Linux: Browser Engine Detection
 # We support Qt WebEngine (primary) and WebKitGTK (fallback for RISC-V/Older systems).
+force_qtwebengine:force_webkitgtk {
+    error("CONFIG+=force_qtwebengine and CONFIG+=force_webkitgtk cannot be used together.")
+}
+
+qtwebengine_available = false
 equals(QT_MAJOR_VERSION, 6):qtHaveModule(webenginecore):qtHaveModule(webenginewidgets) {
-    QT += webenginecore webenginewidgets
-    DEFINES += SEB_HAS_QTWEBENGINE=1
-    DEFINES += SEB_HAS_ANY_ENGINE=1
-} else {
-    DEFINES += SEB_HAS_QTWEBENGINE=0
-    # Check for WebKitGTK using pkg-config
+    qtwebengine_available = true
+}
+
+webkitgtk_available = false
+force_webkitgtk {
     CONFIG += link_pkgconfig
     packagesExist(webkit2gtk-4.1 gtk+-3.0) {
-        DEFINES += SEB_HAS_WEBKITGTK=1
-        DEFINES += SEB_HAS_ANY_ENGINE=1
-        PKGCONFIG += webkit2gtk-4.1 gtk+-3.0
-        message("Building with WebKitGTK fallback (QtWebEngine not found or unsupported).")
-    } else {
-        DEFINES += SEB_HAS_ANY_ENGINE=0
-        warning("No supported browser engine found (QtWebEngine/WebKitGTK missing). The app will show an error on startup.")
+        webkitgtk_available = true
+    }
+} else:!equals(qtwebengine_available, true) {
+    CONFIG += link_pkgconfig
+    packagesExist(webkit2gtk-4.1 gtk+-3.0) {
+        webkitgtk_available = true
     }
 }
+
+seb_has_qtwebengine = 0
+seb_has_webkitgtk = 0
+seb_has_any_engine = 0
+
+force_qtwebengine {
+    equals(qtwebengine_available, false) {
+        error("CONFIG+=force_qtwebengine was requested, but Qt WebEngine modules are unavailable.")
+    }
+
+    QT += webenginecore webenginewidgets
+    seb_has_qtwebengine = 1
+    seb_has_any_engine = 1
+    message("Building with Qt WebEngine (forced via CONFIG+=force_qtwebengine).")
+} else:force_webkitgtk {
+    equals(webkitgtk_available, false) {
+        error("CONFIG+=force_webkitgtk was requested, but pkg-config could not find webkit2gtk-4.1 and gtk+-3.0.")
+    }
+
+    PKGCONFIG += webkit2gtk-4.1 gtk+-3.0
+    seb_has_webkitgtk = 1
+    seb_has_any_engine = 1
+    message("Building with WebKitGTK fallback (forced via CONFIG+=force_webkitgtk).")
+} else:equals(qtwebengine_available, true) {
+    QT += webenginecore webenginewidgets
+    seb_has_qtwebengine = 1
+    seb_has_any_engine = 1
+    message("Building with Qt WebEngine (auto-detected).")
+} else:equals(webkitgtk_available, true) {
+    PKGCONFIG += webkit2gtk-4.1 gtk+-3.0
+    seb_has_webkitgtk = 1
+    seb_has_any_engine = 1
+    message("Building with WebKitGTK fallback (Qt WebEngine unavailable; auto-detected).")
+} else {
+    warning("No supported browser engine found (QtWebEngine/WebKitGTK missing). The app will show an error on startup.")
+}
+
+DEFINES += SEB_HAS_QTWEBENGINE=$$seb_has_qtwebengine
+DEFINES += SEB_HAS_WEBKITGTK=$$seb_has_webkitgtk
+DEFINES += SEB_HAS_ANY_ENGINE=$$seb_has_any_engine
 
 # Dev Bypass Build Option
 # Usage: qmake CONFIG+=dev_bypass
