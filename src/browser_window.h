@@ -8,9 +8,7 @@
 #include <memory>
 
 QT_BEGIN_NAMESPACE
-#if SEB_HAS_QTWEBENGINE
 class QAuthenticator;
-#endif
 class QCloseEvent;
 class QEvent;
 class QFocusEvent;

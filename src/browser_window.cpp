@@ -5,8 +5,8 @@
 
 #include <QAction>
 #include <QApplication>
-#if SEB_HAS_QTWEBENGINE
 #include <QAuthenticator>
+#if SEB_HAS_QTWEBENGINE
 #include <QWebEngineView>
 #endif
 #include "browser/contracts/i_webview.h"
