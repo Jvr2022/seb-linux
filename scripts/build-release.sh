@@ -44,26 +44,26 @@ rm ./Makefile
 # rm ./Makefile
 
 # Build for debian (outdated)
-mkdir -p "${ARTIFACT_DIR}/debian/DEBIAN"
-DP_ARCH=$(dpkg --print-architecture 2>/dev/null || echo "amd64")
-cat > "${ARTIFACT_DIR}/debian/DEBIAN/control" <<EOF
-Package: ${PACKAGE_NAME}
-Version: ${VERSION}
-Section: education
-Priority: optional
-Architecture: ${DP_ARCH}
-Maintainer: SEB Linux contributors
-Depends: libqt6core6, libqt6gui6, libqt6network6, libqt6webenginecore6 | libwebkit2gtk-4.1-0, libqt6webenginewidgets6 | libwebkit2gtk-4.1-0, libgtk-3-0, shared-mime-info, pkexec
-Description: Safe Exam Browser Linux Qt port
- Qt-based Safe Exam Browser launcher for Linux with .seb file and sebs:// support.
-EOF
+# mkdir -p "${ARTIFACT_DIR}/debian/DEBIAN"
+# DP_ARCH=$(dpkg --print-architecture 2>/dev/null || echo "amd64")
+# cat > "${ARTIFACT_DIR}/debian/DEBIAN/control" <<EOF
+# Package: ${PACKAGE_NAME}
+# Version: ${VERSION}
+# Section: education
+# Priority: optional
+# Architecture: ${DP_ARCH}
+# Maintainer: SEB Linux contributors
+# Depends: libqt6core6, libqt6gui6, libqt6network6, libqt6webenginecore6 | libwebkit2gtk-4.1-0, libqt6webenginewidgets6 | libwebkit2gtk-4.1-0, libgtk-3-0, shared-mime-info, pkexec
+# Description: Safe Exam Browser Linux Qt port
+#  Qt-based Safe Exam Browser launcher for Linux with .seb file and sebs:// support.
+# EOF
 
-cp -a "${STAGE_DIR}/usr" "${ARTIFACT_DIR}/debian/"
-if command -v dpkg-deb >/dev/null 2>&1; then
-  dpkg-deb --build "${ARTIFACT_DIR}/debian" "${ARTIFACT_DIR}/${PACKAGE_NAME}_${VERSION}_amd64.deb"
-else
-  echo "warning: dpkg-deb not found; skipping .deb package build" >&2
-fi
+# cp -a "${STAGE_DIR}/usr" "${ARTIFACT_DIR}/debian/"
+# if command -v dpkg-deb >/dev/null 2>&1; then
+#   dpkg-deb --build "${ARTIFACT_DIR}/debian" "${ARTIFACT_DIR}/${PACKAGE_NAME}_${VERSION}_amd64.deb"
+# else
+#   echo "warning: dpkg-deb not found; skipping .deb package build" >&2
+# fi
 
 tar \
   --exclude='./dist' \
