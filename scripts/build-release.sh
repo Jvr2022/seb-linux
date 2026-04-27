@@ -27,7 +27,7 @@ mv ./Safe_Exam_Browser-x86_64.AppImage ${ARTIFACT_DIR}/${PACKAGE_NAME}-qt_x86_64
 # Cleanup
 rm -rf ./AppDir
 rm -rf ./bin/safe-exam-browser
-rm ./makefile
+rm ./Makefile
 
 make6 CONFIG+=force_webkitgtk INSTALL_ROOT=AppDir
 make -j$(nproc)
@@ -40,6 +40,7 @@ mv ./Safe_Exam_Browser-x86_64.AppImage ${ARTIFACT_DIR}/${PACKAGE_NAME}-gtk_x86_6
 # Cleanup
 rm -rf ./AppDir
 rm -rf ./bin/safe-exam-browser
+rm ./Makefile
 
 # Build for debian (outdated)
 mkdir -p "${ARTIFACT_DIR}/debian/DEBIAN"
