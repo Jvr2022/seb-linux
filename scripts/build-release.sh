@@ -30,18 +30,18 @@ rm -rf ./AppDir
 rm -rf ./bin/safe-exam-browser
 rm ./Makefile
 
-qmake6 CONFIG+=force_webkitgtk INSTALL_ROOT=AppDir
-LD_DEBUG=all make -j$(nproc)
-LD_DEBUG=all make install INSTALL_ROOT=AppDir
-./linuxdeploy-x86_64.AppImage --appdir AppDir --output appimage --plugin qt
+# qmake6 CONFIG+=force_webkitgtk INSTALL_ROOT=AppDir
+# LD_DEBUG=all make -j$(nproc)
+# LD_DEBUG=all make install INSTALL_ROOT=AppDir
+# ./linuxdeploy-x86_64.AppImage --appdir AppDir --output appimage --plugin qt
 
-# Move built package
-mv ./Safe_Exam_Browser-x86_64.AppImage ${ARTIFACT_DIR}/${PACKAGE_NAME}-gtk_x86_64.AppImage
+# # Move built package
+# mv ./Safe_Exam_Browser-x86_64.AppImage ${ARTIFACT_DIR}/${PACKAGE_NAME}-gtk_x86_64.AppImage
 
-# Cleanup
-rm -rf ./AppDir
-rm -rf ./bin/safe-exam-browser
-rm ./Makefile
+# # Cleanup
+# rm -rf ./AppDir
+# rm -rf ./bin/safe-exam-browser
+# rm ./Makefile
 
 # Build for debian (outdated)
 mkdir -p "${ARTIFACT_DIR}/debian/DEBIAN"
