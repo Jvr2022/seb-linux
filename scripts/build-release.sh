@@ -29,7 +29,7 @@ rm -rf ./AppDir
 rm -rf ./bin/safe-exam-browser
 rm ./Makefile
 
-make6 CONFIG+=force_webkitgtk INSTALL_ROOT=AppDir
+qmake6 CONFIG+=force_webkitgtk INSTALL_ROOT=AppDir
 make -j$(nproc)
 make install INSTALL_ROOT=AppDir
 export QMAKE=/usr/bin/qmake6
