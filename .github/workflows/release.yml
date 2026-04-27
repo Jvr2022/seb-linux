@@ -57,6 +57,7 @@ jobs:
         with:
           name: safe-exam-browser-linux
           path: |
+            dist/*.AppImage
             dist/*.deb
             dist/*.tar.gz
 
@@ -72,5 +73,6 @@ jobs:
 
             GitHub generated release notes below include the commit summary and new contributors automatically.
           files: |
+            dist/*.AppImage
             dist/*.deb
             dist/*.tar.gz

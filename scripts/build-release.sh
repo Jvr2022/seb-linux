@@ -12,12 +12,37 @@ PACKAGE_NAME="safe-exam-browser"
 mkdir -p "${BUILD_DIR}" "${STAGE_DIR}" "${ARTIFACT_DIR}"
 rm -rf "${BUILD_DIR:?}/"* "${STAGE_DIR:?}/"*
 
-pushd "${BUILD_DIR}" >/dev/null
-qmake6 ../seb-linux-qt.pro
-make -j"$(nproc)"
-make INSTALL_ROOT="${STAGE_DIR}" install
-popd >/dev/null
+# Build AppImages:
+qmake6 CONFIG+=force_qtwebengine INSTALL_ROOT=AppDir
+make -j$(nproc)
+make install INSTALL_ROOT=AppDir
+wget https://github.com/linuxdeploy/linuxdeploy/releases/download/continuous/linuxdeploy-x86_64.AppImage
+wget https://github.com/linuxdeploy/linuxdeploy-plugin-qt/releases/download/continuous/linuxdeploy-plugin-qt-x86_64.AppImage
+chmod +x linuxdeploy*.AppImage
+export QMAKE=$(which qmake6)
+./linuxdeploy-x86_64.AppImage --appdir AppDir --output appimage --plugin qt
 
+# Move built package
+mv ./Safe_Exam_Browser-x86_64.AppImage ${ARTIFACT_DIR}/${PACKAGE_NAME}-qt_x86_64.AppImage
+# Cleanup
+rm -rf ./AppDir
+rm -rf ./bin/safe-exam-browser
+rm ./makefile
+
+make6 CONFIG+=force_webkitgtk INSTALL_ROOT=AppDir
+make -j$(nproc)
+make install INSTALL_ROOT=AppDir
+export QMAKE=/usr/bin/qmake6
+./linuxdeploy-x86_64.AppImage --appdir AppDir --output appimage --plugin qt
+
+# Move built package
+mv ./Safe_Exam_Browser-x86_64.AppImage ${ARTIFACT_DIR}/${PACKAGE_NAME}-gtk_x86_64.AppImage
+# Cleanup
+rm -rf ./AppDir
+rm -rf ./bin/safe-exam-browser
+rm ./makefile
+
+# Build for debian (outdated)
 mkdir -p "${ARTIFACT_DIR}/debian/DEBIAN"
 DP_ARCH=$(dpkg --print-architecture 2>/dev/null || echo "amd64")
 cat > "${ARTIFACT_DIR}/debian/DEBIAN/control" <<EOF
