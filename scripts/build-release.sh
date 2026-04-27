@@ -30,9 +30,9 @@ rm -rf ./bin/safe-exam-browser
 rm ./Makefile
 
 qmake6 CONFIG+=force_webkitgtk INSTALL_ROOT=AppDir
-make -j$(nproc)
-make install INSTALL_ROOT=AppDir
-export QMAKE=/usr/bin/qmake6
+LD_DEBUG=all make -j$(nproc)
+LD_DEBUG=all make install INSTALL_ROOT=AppDir
+export QMAKE=$(which qmake6)
 ./linuxdeploy-x86_64.AppImage --appdir AppDir --output appimage --plugin qt
 
 # Move built package
