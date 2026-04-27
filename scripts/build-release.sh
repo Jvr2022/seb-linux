@@ -40,7 +40,6 @@ mv ./Safe_Exam_Browser-x86_64.AppImage ${ARTIFACT_DIR}/${PACKAGE_NAME}-gtk_x86_6
 # Cleanup
 rm -rf ./AppDir
 rm -rf ./bin/safe-exam-browser
-rm ./makefile
 
 # Build for debian (outdated)
 mkdir -p "${ARTIFACT_DIR}/debian/DEBIAN"
