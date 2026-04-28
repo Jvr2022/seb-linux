@@ -9,7 +9,7 @@ STAGE_DIR="${PROJECT_DIR}/dist/stage"
 ARTIFACT_DIR="${PROJECT_DIR}/dist"
 PACKAGE_NAME="safe-exam-browser"
 
-mkdir -p "${BUILD_DIR}" "${STAGE_DIR}" "${ARTIFACT_DIR}"
+mkdir -p "${BUILD_DIR}" "${STAGE_DIR}" "${ARTIFACT_DIR}" "${PROJECT_DIR}/build-tools"
 rm -rf "${BUILD_DIR:?}/"* "${STAGE_DIR:?}/"*
 
 # TODO: Consistency
@@ -19,7 +19,7 @@ qmake6 CONFIG+=force_qtwebengine INSTALL_ROOT=${STAGE_DIR}/AppDir
 make -j$(nproc)
 make install INSTALL_ROOT=${STAGE_DIR}/AppDir
 wget https://github.com/linuxdeploy/linuxdeploy/releases/download/continuous/linuxdeploy-x86_64.AppImage -O ${PROJECT_DIR}/build-tools/linuxdeploy-x86_64.AppImage
-wget https://github.com/linuxdeploy/linuxdeploy-plugin-qt/releases/download/continuous/linuxdeploy-plugin-qt-x86_64.AppImage -O ${PROJECT_DIR}/build-tool/linuxdeploy-plugin-qt-x86_64.AppImage
+wget https://github.com/linuxdeploy/linuxdeploy-plugin-qt/releases/download/continuous/linuxdeploy-plugin-qt-x86_64.AppImage -O ${PROJECT_DIR}/build-tools/linuxdeploy-plugin-qt-x86_64.AppImage
 chmod +x ${PROJECT_DIR}/build-tools/*.AppImage
 export QMAKE=$(which qmake6)
 LDAP_OUTPUT=${ARTIFACT_DIR}/${PACKAGE_NAME}-qt-x86_64.AppImage ${PROJECT_DIR}/build-tools/linuxdeploy-x86_64.AppImage --appdir ${STAGE_DIR}/AppDir -e "$PROJECT_DIR"/assets/icons/safe-exam-browser.png -d "$PROJECT_DIR"/packaging/linux/safe-exam-browser.desktop --output appimage --plugin qt
