@@ -29,7 +29,15 @@ mv ${PROJECT_DIR}/Safe_Exam_Browser-x86_64.AppImage ${ARTIFACT_DIR}/${PACKAGE_NA
 # Cleanup
 rm -rf ${STAGE_DIR}/AppDir
 rm -rf ${PROJECT_DIR}/bin/safe-exam-browser
+rm -rf ${PROJECT_DIR}/.qmake.stash
 rm ${PROJECT_DIR}/Makefile
+
+qmake6 CONFIG+=force_webkitgtk INSTALL_ROOT=${STAGE_DIR}/AppDir
+make -j$(nproc)
+make install INSTALL_ROOT=${STAGE_DIR}/AppDir
+${PROJECT_DIR}/build-tools/linuxdeploy-x86_64.AppImage --appdir ${STAGE_DIR}/AppDir -i "$PROJECT_DIR"/assets/icons/safe-exam-browser.png -d "$PROJECT_DIR"/packaging/linux/safe-exam-browser.desktop --output appimage --plugin qt
+
+mv ${PROJECT_DIR}/Safe_Exam_Browser-x86_64.AppImage ${ARTIFACT_DIR}/${PACKAGE_NAME}-gtk-x86_64.AppImage
 
 # Build for debian (outdated)
 # mkdir -p "${ARTIFACT_DIR}/debian/DEBIAN"
