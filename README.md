@@ -62,7 +62,7 @@ If you run the app and see a message saying
 it means we couldn't find a compatible browser engine on your system.
 
 We want to fix that! 
-please [open an issue here](https://github.com/Jvr2022/seb-linux/issues)
+Please [open an issue here](https://github.com/Jvr2022/seb-linux/issues)
 with some details about your system and what version of Linux you're using.
 
 ## License
