@@ -16,7 +16,7 @@ so you can just focus on your exam.
 
 ### Running Everywhere
 
-Safe exam browser has options for QtWebEngine and webkitgtk.
+Safe Exam Browser has options for QtWebEngine and webkitGTK.
 We've also packaged all of the dependencies inside AppImage files so
 Safe Exam Browser for Linux really can run anywhere.
 
