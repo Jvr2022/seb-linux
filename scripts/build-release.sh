@@ -12,23 +12,27 @@ PACKAGE_NAME="safe-exam-browser"
 mkdir -p "${BUILD_DIR}" "${STAGE_DIR}" "${ARTIFACT_DIR}"
 rm -rf "${BUILD_DIR:?}/"* "${STAGE_DIR:?}/"*
 
-# Build AppImages:
-qmake6 CONFIG+=force_qtwebengine INSTALL_ROOT=AppDir
-make -j$(nproc)
-make install INSTALL_ROOT=AppDir
-wget https://github.com/linuxdeploy/linuxdeploy/releases/download/continuous/linuxdeploy-x86_64.AppImage
-wget https://github.com/linuxdeploy/linuxdeploy-plugin-qt/releases/download/continuous/linuxdeploy-plugin-qt-x86_64.AppImage
-chmod +x linuxdeploy*.AppImage
-export QMAKE=$(which qmake6)
-./linuxdeploy-x86_64.AppImage --appdir AppDir --output appimage --plugin qt
+# TODO: Consistency
+# TODO: Move appdir to build-stage, edit all paths
 
+# Build AppImages:
+qmake6 CONFIG+=force_qtwebengine INSTALL_ROOT=${PROJECT_DIR}/AppDir
+make -j$(nproc)
+make install INSTALL_ROOT=${PROJECT_DIR}/AppDir
+wget https://github.com/linuxdeploy/linuxdeploy/releases/download/continuous/linuxdeploy-x86_64.AppImage -O ${PROJECT_DIR}/build-tools/linuxdeploy-x86_64.AppImage
+wget https://github.com/linuxdeploy/linuxdeploy-plugin-qt/releases/download/continuous/linuxdeploy-plugin-qt-x86_64.AppImage -O ${PROJECT_DIR}/build-tool/linuxdeploy-plugin-qt-x86_64.AppImage
+chmod +x ${PROJECT_DIR}/build-tools/*.AppImage
+export QMAKE=$(which qmake6)
+${PROJECT_DIR}/build-tools/linuxdeploy-x86_64.AppImage --appdir ${PROJECT_DIR}/AppDir -e "$PROJECT_DIR"/assets/icons/safe-exam-browser.png -d "$PROJECT_DIR"/packaging/linux/safe-exam-browser.desktop --output appimage --plugin qt
+
+# TODO: Figure out dynamic name of the built package --> LDAI_OUTPUT=filename
 # Move built package
-mv ./Safe_Exam_Browser-x86_64.AppImage ${ARTIFACT_DIR}/${PACKAGE_NAME}-qt_x86_64.AppImage
+mv ${PROJECT_DIR}/Safe_Exam_Browser-x86_64.AppImage ${ARTIFACT_DIR}/${PACKAGE_NAME}-qt-x86_64.AppImage
 
 # Cleanup
-rm -rf ./AppDir
-rm -rf ./bin/safe-exam-browser
-rm ./Makefile
+rm -rf ${PROJECT_DIR}/AppDir
+rm -rf ${PROJECT_DIR}/bin/safe-exam-browser
+rm ${PROJECT_DIR}/Makefile
 
 # qmake6 CONFIG+=force_webkitgtk INSTALL_ROOT=AppDir
 # LD_DEBUG=all make -j$(nproc)
@@ -36,7 +40,7 @@ rm ./Makefile
 # ./linuxdeploy-x86_64.AppImage --appdir AppDir --output appimage --plugin qt
 
 # # Move built package
-# mv ./Safe_Exam_Browser-x86_64.AppImage ${ARTIFACT_DIR}/${PACKAGE_NAME}-gtk_x86_64.AppImage
+# mv ./Safe_Exam_Browser-x86_64.AppImage ${ARTIFACT_DIR}/${PACKAGE_NAME}-gtk-x86_64.AppImage
 
 # # Cleanup
 # rm -rf ./AppDir
@@ -64,6 +68,8 @@ rm ./Makefile
 # else
 #   echo "warning: dpkg-deb not found; skipping .deb package build" >&2
 # fi
+
+# TODO: Change this accordingly
 
 tar \
   --exclude='./dist' \
