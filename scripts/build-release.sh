@@ -29,7 +29,11 @@ mv ${PROJECT_DIR}/Safe_Exam_Browser-x86_64.AppImage ${ARTIFACT_DIR}/${PACKAGE_NA
 # Cleanup
 rm -rf ${STAGE_DIR}/AppDir
 rm -rf ${PROJECT_DIR}/bin/safe-exam-browser
-rm -rf ${PROJECT_DIR}/.qmake.stash
+rm -rf ${PROJECT_DIR}/dist/stage
+rm -rf ${PROJECT_DIR}/.moc
+rm -rf ${PROJECT_DIR}/.obj
+rm -rf ${PROJECT_DIR}/.rcc
+rm ${PROJECT_DIR}/.qmake.stash
 rm ${PROJECT_DIR}/Makefile
 
 qmake6 CONFIG+=force_webkitgtk INSTALL_ROOT=${STAGE_DIR}/AppDir
