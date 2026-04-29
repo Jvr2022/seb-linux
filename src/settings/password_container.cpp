@@ -73,7 +73,7 @@ constexpr int kSebRncryptorSaltLength = 8;
 constexpr int kSebRncryptorIvLength = 16;
 constexpr int kSebRncryptorKeyLength = 32;
 constexpr int kSebRncryptorIterations = 10000;
-constexpr int kSebRncryptorVersion = 0x2;
+constexpr int kSebRncryptorVersion = 0x3;
 constexpr int kSebRncryptorOptions = 0x1;
 
 const QByteArray kPrefixPublicKey = "pkhs";
