@@ -60,8 +60,6 @@ jobs:
           name: safe-exam-browser-linux
           path: |
             dist/*.AppImage
-            dist/*.deb
-            dist/*.tar.gz
 
       - name: Create GitHub release
         uses: softprops/action-gh-release@v3
@@ -76,5 +74,3 @@ jobs:
             GitHub generated release notes below include the commit summary and new contributors automatically.
           files: |
             dist/*.AppImage
-            dist/*.deb
-            dist/*.tar.gz
