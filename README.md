@@ -1,14 +1,20 @@
 <div align="center">
   <img src="assets/icons/safe-exam-browser.png" alt="Safe Exam Browser for Linux logo" width="120" />
-
-  # Safe Exam Browser for Linux
-
-  Hey there! This is a community-driven, native Linux version of 
-  Safe Exam Browser. We built it with Qt 6 to give Linux users
-  a reliable way to take exams without needing a specific OS.
 </div>
 
+# Safe Exam Browser for Linux
+
+Hey there! This is a community-driven, native Linux version of
+Safe Exam Browser. We built it with Qt 6 to give Linux users
+a reliable way to take exams without needing a specific OS.
+
 ## What is this?
+
+> [!IMPORTANT]  
+> Opening encrypted sebs:// files is currently not working. Safe Exam Browser for
+> Linux is configured to be able to open sebs:// files but currently cannot
+> decrypt them. Support for decryption is planned and might be implemented
+> very soon.
 
 We're trying to make SEB work great on Linux. This client handles all
 the important stuff like `.seb` files and special links (`seb://`),
@@ -26,6 +32,8 @@ Safe Exam Browser for Linux really can run anywhere.
 
 > [!NOTE]  
 > RISC-V or ARM AppImages are not (yet) available.
+> Feel free to build them yourself or contribute to the
+> building workflow.
 
 You'll need the usual Qt 6 development tools. If you're on something like RISC-V
 where Qt WebEngine isn't around, make sure you've got `libwebkit2gtk-4.1-dev`
@@ -33,7 +41,31 @@ and `libgtk-3-dev` installed so we can use the fallback engine.
 
 ### How to Build
 
-It's pretty simple:
+Note: This is for binary builds, for AppImage builds you can use
+prebuilt images or utilize `./scripts/build-release.sh`, make sure
+to install the dependencies before you do that.
+
+#### Installing the dependencies
+
+```bash
+sudo apt-get update
+sudo apt-get install \
+   build-essential \
+   desktop-file-utils \
+   dpkg-dev \
+   libqt6svg6-dev \
+   qt6-base-dev \
+   qt6-tools-dev-tools \
+   qt6-webengine-dev \
+   libwebkit2gtk-4.1-dev \
+   libgtk-3-dev \
+   shared-mime-info \
+   zlib1g-dev \
+   libssl-dev \
+   file
+```
+
+For binary builds, it's pretty simple:
 
 ```bash
 ./scripts/build.sh
@@ -46,13 +78,13 @@ You'll find the binary at `build/bin/safe-exam-browser`.
 Just point it at your `.seb` file:
 
 ```bash
-./build/bin/safe-exam-browser /path/to/my-exam.seb
+./safe-exam-browser-qt-x86_64.AppImage /path/to/my-exam.seb
 ```
 
 Or use a link:
 
 ```bash
-./build/bin/safe-exam-browser sebs://exam-link.seb
+./safe-exam-browser-qt-x86_64.AppImage seb://exam-link.seb
 ```
 
 ## Troubleshooting & Support
@@ -61,7 +93,7 @@ If you run the app and see a message saying
 **"Safe Exam Browser is not supported on your device"**,
 it means we couldn't find a compatible browser engine on your system.
 
-We want to fix that! 
+We want to fix that!
 Please [open an issue here](https://github.com/Jvr2022/seb-linux/issues)
 with some details about your system and what version of Linux you're using.
 
