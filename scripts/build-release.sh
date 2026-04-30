@@ -1,6 +1,28 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+if command -v apt >/dev/null; then
+    echo "Installing dependencies"
+    sudo apt-get update
+    sudo apt-get install -y \
+    build-essential \
+    desktop-file-utils \
+    dpkg-dev \
+    libqt6svg6-dev \
+    qt6-base-dev \
+    qt6-tools-dev-tools \
+    qt6-webengine-dev \
+    libwebkit2gtk-4.1-dev \
+    libgtk-3-dev \
+    shared-mime-info \
+    zlib1g-dev \
+    libssl-dev \
+    file
+else
+    echo "Detected non-debian system, skipping dependency install"
+fi
+
+
 unset QMAKE
 unset EXTRA_QT_MODULES
 export QMAKE=$(which qmake6)

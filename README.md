@@ -42,28 +42,9 @@ and `libgtk-3-dev` installed so we can use the fallback engine.
 ### How to Build
 
 Note: This is for binary builds, for AppImage builds you can use
-prebuilt images or utilize `./scripts/build-release.sh`, make sure
-to install the dependencies before you do that.
-
-#### Installing the dependencies
-
-```bash
-sudo apt-get update
-sudo apt-get install \
-   build-essential \
-   desktop-file-utils \
-   dpkg-dev \
-   libqt6svg6-dev \
-   qt6-base-dev \
-   qt6-tools-dev-tools \
-   qt6-webengine-dev \
-   libwebkit2gtk-4.1-dev \
-   libgtk-3-dev \
-   shared-mime-info \
-   zlib1g-dev \
-   libssl-dev \
-   file
-```
+prebuilt images or utilize `./scripts/build-release.sh`, the dependencies should
+be installed automatically on debian systems. It is recommended to build inside
+of a debian system or a debian container.
 
 For binary builds, it's pretty simple:
 
