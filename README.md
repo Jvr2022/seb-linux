@@ -10,14 +10,12 @@ a reliable way to take exams without needing a specific OS.
 
 ## What is this?
 
-> [!IMPORTANT]  
-> Opening encrypted sebs:// files is currently not working. Safe Exam Browser for
-> Linux is configured to be able to open sebs:// files but currently cannot
-> decrypt them. Support for decryption is planned and might be implemented
-> very soon.
+> [!info]  
+> Opening v3 sebs:// urls is now supported!
+> This means password login exams will work again!
 
 We're trying to make SEB work great on Linux. This client handles all
-the important stuff like `.seb` files and special links (`seb://`),
+the important stuff like `.seb` files and special links (`seb://`, `sebs://`),
 so you can just focus on your exam.
 
 ### Running Everywhere
@@ -65,7 +63,7 @@ Just point it at your `.seb` file:
 Or use a link:
 
 ```bash
-./safe-exam-browser-qt-x86_64.AppImage seb://exam-link.seb
+./safe-exam-browser-qt-x86_64.AppImage sebs://exam-link.seb
 ```
 
 ## Troubleshooting & Support
