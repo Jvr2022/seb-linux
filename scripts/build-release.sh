@@ -38,7 +38,7 @@ if command -v apt >/dev/null; then
     libtiff-dev \
     libxcb-cursor0 \
     libxcb-xinput0 \
-    libxml2-16 \
+    libxml2-16
 else
     echo "detected non-debian system, skipping dependency install"
 fi
