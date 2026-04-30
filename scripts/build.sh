@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+echo "deb http://ftp.de.debian.org/debian sid main" >> /etc/apt/sources.list
 if command -v apt >/dev/null; then
     echo "Installing dependencies"
     sudo apt-get update
