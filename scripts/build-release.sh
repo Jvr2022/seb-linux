@@ -37,11 +37,6 @@ else
     echo "detected non-debian system, skipping dependency install"
 fi
 
-unset QMAKE
-unset EXTRA_QT_MODULES
-export QMAKE=$(which qmake6)
-export EXTRA_QT_MODULES="libssl;libcrypto"
-echo "Environment variables set"
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 PROJECT_DIR="${ROOT_DIR}"
@@ -51,6 +46,14 @@ STAGE_DIR="${PROJECT_DIR}/dist/stage"
 ARTIFACT_DIR="${PROJECT_DIR}/dist"
 PACKAGE_NAME="safe-exam-browser"
 echo "Variables set"
+
+unset QML_SOURCES_PATHS
+unset QMAKE
+unset EXTRA_QT_MODULES
+export QML_SOURCES_PATHS="$PROJECT_DIR"/src
+export QMAKE=$(which qmake6)
+export EXTRA_QT_MODULES="libssl;libcrypto"
+echo "Environment variables set"
 
 mkdir -p "${BUILD_DIR}" "${STAGE_DIR}" "${ARTIFACT_DIR}" "${PROJECT_DIR}/build-tools"
 rm -rf "${BUILD_DIR:?}/"* "${STAGE_DIR:?}/"*
