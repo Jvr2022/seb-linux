@@ -1,11 +1,10 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-sudo echo "deb http://ftp.de.debian.org/debian sid main" >> /etc/apt/sources.list
 if command -v apt >/dev/null; then
-    echo "Installing dependencies"
+    echo "installing dependencies"
     sudo apt-get update
-    sudo apt-get install -y \
+    sudo apt-get install -m -y \
     build-essential \
     desktop-file-utils \
     dpkg-dev \
@@ -41,8 +40,9 @@ if command -v apt >/dev/null; then
     libxcb-xinput0 \
     libxml2-16 \
 else
-    echo "Detected non-debian system, skipping dependency install"
+    echo "detected non-debian system, skipping dependency install"
 fi
+
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 BUILD_DIR="${ROOT_DIR}/build"

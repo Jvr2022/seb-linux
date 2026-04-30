@@ -2,9 +2,9 @@
 set -euo pipefail
 
 if command -v apt >/dev/null; then
-    echo "Installing dependencies"
+    echo "installing dependencies"
     sudo apt-get update
-    sudo apt-get install -y \
+    sudo apt-get install -m -y \
     build-essential \
     desktop-file-utils \
     dpkg-dev \
@@ -17,11 +17,31 @@ if command -v apt >/dev/null; then
     shared-mime-info \
     zlib1g-dev \
     libssl-dev \
-    file
+    file \
+    libatomic1 \
+    libdeflate0 \
+    libicu78 \
+    libjbig0 \
+    libjpeg62-turbo \
+    liblerc4 \
+    libnghttp3-3 \
+    libngtcp2-dev \
+    libngtcp2-crypto-gnutls-dev \
+    libngtcp2-crypto-gnutls8 \
+    libngtcp2-16 \
+    libqt6pdf6 \
+    libqt6qmlmeta6 \
+    libqt6qmlworkerscript6 \
+    libnss3 \
+    libssh2-1 \
+    libssl3 \
+    libtiff-dev \
+    libxcb-cursor0 \
+    libxcb-xinput0 \
+    libxml2-16 \
 else
-    echo "Detected non-debian system, skipping dependency install"
+    echo "detected non-debian system, skipping dependency install"
 fi
-
 
 unset QMAKE
 unset EXTRA_QT_MODULES
