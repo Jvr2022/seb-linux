@@ -20,17 +20,12 @@ if command -v apt >/dev/null; then
     file \
     libatomic1 \
     libdeflate0 \
-    libicu78 \
     libjbig0 \
-    libjpeg62-turbo \
     liblerc4 \
     libnghttp3-3 \
     libngtcp2-dev \
     libngtcp2-crypto-gnutls-dev \
-    libngtcp2-crypto-gnutls8 \
-    libngtcp2-16 \
     libqt6pdf6 \
-    libqt6qmlmeta6 \
     libqt6qmlworkerscript6 \
     libnss3 \
     libssh2-1 \
@@ -38,7 +33,6 @@ if command -v apt >/dev/null; then
     libtiff-dev \
     libxcb-cursor0 \
     libxcb-xinput0 \
-    libxml2-16
 else
     echo "detected non-debian system, skipping dependency install"
 fi
