@@ -11,6 +11,7 @@ PACKAGE_NAME="safe-exam-browser"
 
 mkdir -p "${BUILD_DIR}" "${STAGE_DIR}" "${ARTIFACT_DIR}" "${PROJECT_DIR}/build-tools"
 rm -rf "${BUILD_DIR:?}/"* "${STAGE_DIR:?}/"*
+cd "${PROJECT_DIR}"
 
 qmake6 CONFIG+=force_qtwebengine INSTALL_ROOT=${STAGE_DIR}/AppDir
 make -j$(nproc)
