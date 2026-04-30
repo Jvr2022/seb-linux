@@ -18,6 +18,7 @@ make install INSTALL_ROOT=${STAGE_DIR}/AppDir
 wget https://github.com/linuxdeploy/linuxdeploy/releases/download/continuous/linuxdeploy-x86_64.AppImage -O ${PROJECT_DIR}/build-tools/linuxdeploy-x86_64.AppImage
 wget https://github.com/linuxdeploy/linuxdeploy-plugin-qt/releases/download/continuous/linuxdeploy-plugin-qt-x86_64.AppImage -O ${PROJECT_DIR}/build-tools/linuxdeploy-plugin-qt-x86_64.AppImage
 chmod +x ${PROJECT_DIR}/build-tools/*.AppImage
+export EXTRA_QT_MODULES="libssl;libcrypto"
 export QMAKE=$(which qmake6)
 ${PROJECT_DIR}/build-tools/linuxdeploy-x86_64.AppImage --appdir ${STAGE_DIR}/AppDir -i ${PROJECT_DIR}/assets/icons/safe-exam-browser.png -d ${PROJECT_DIR}/packaging/linux/safe-exam-browser.desktop --output appimage --plugin qt
 mv ${PROJECT_DIR}/*.AppImage ${ARTIFACT_DIR}/${PACKAGE_NAME}-qt-x86_64.AppImage
@@ -28,8 +29,8 @@ rm -rf ${PROJECT_DIR}/dist/stage
 rm -rf ${PROJECT_DIR}/.moc
 rm -rf ${PROJECT_DIR}/.obj
 rm -rf ${PROJECT_DIR}/.rcc
-rm ${PROJECT_DIR}/.qmake.stash
-rm ${PROJECT_DIR}/Makefile
+rm -f ${PROJECT_DIR}/.qmake.stash
+rm -f ${PROJECT_DIR}/Makefile
 
 qmake6 CONFIG+=force_webkitgtk INSTALL_ROOT=${STAGE_DIR}/AppDir
 make -j$(nproc)
