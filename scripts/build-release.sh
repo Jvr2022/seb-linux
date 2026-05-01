@@ -8,7 +8,8 @@ BUILD_DIR="${PROJECT_DIR}/build"
 STAGE_DIR="${PROJECT_DIR}/dist/stage"
 ARTIFACT_DIR="${PROJECT_DIR}/dist"
 PACKAGE_NAME="safe-exam-browser"
-LINUXBUILD_EXTRA_ARGS="-l /usr/lib/x86_64-linux-gnu/libssl.so.3 -l /usr/lib/x86_64-linux-gnu/libsoftokn3.so -l /usr/lib/x86_64-linux-gnu/libatomic.so.1 -l /usr/lib/x86_64-linux-gnu/libdeflate.so.0 -l /usr/lib/x86_64-linux-gnu/libjbig.so.0 -l /usr/lib/x86_64-linux-gnu/libjpeg.so.62 -l /usr/lib/x86_64-linux-gnu/libLerc.so.4 -l /usr/lib/x86_64-linux-gnu/libnghttp3.so.9 -l /usr/lib/x86_64-linux-gnu/libngtcp2.so.16 -l /usr/lib/x86_64-linux-gnu/libngtcp2_crypto_gnutls.so.8 -l /usr/lib/x86_64-linux-gnu/libQt6Pdf.so.6 -l /usr/lib/x86_64-linux-gnu/libQt6QmlMeta.so.6 -l /usr/lib/x86_64-linux-gnu/libQt6QmlWorkerScript.so.6 -l /usr/lib/x86_64-linux-gnu/libsmime3.so -l /usr/lib/x86_64-linux-gnu/libssh2.so.1 -l /usr/lib/x86_64-linux-gnu/libtiff.so.6 -l /usr/lib/x86_64-linux-gnu/libxcb-cursor.so.0 -l /usr/lib/x86_64-linux-gnu/libxcb-xinput.so.0 -l /usr/lib/x86_64-linux-gnu/libxml2.so.16"
+LINUXBUILD_EXTRA_ARGS="-l /usr/lib/x86_64-linux-gnu/libssl.so.3 -l /usr/lib/x86_64-linux-gnu/libsoftokn3.so -l /usr/lib/x86_64-linux-gnu/libatomic.so.1 -l /usr/lib/x86_64-linux-gnu/libdeflate.so.0 -l /usr/lib/x86_64-linux-gnu/libjbig.so.0 -l /usr/lib/x86_64-linux-gnu/libjpeg.so.62 -l /usr/lib/x86_64-linux-gnu/libLerc.so.4 -l /usr/lib/x86_64-linux-gnu/libngtcp2.so.16 -l /usr/lib/x86_64-linux-gnu/libngtcp2_crypto_gnutls.so.8 -l /usr/lib/x86_64-linux-gnu/libQt6Pdf.so.6 -l /usr/lib/x86_64-linux-gnu/libQt6QmlMeta.so.6 -l /usr/lib/x86_64-linux-gnu/libQt6QmlWorkerScript.so.6 -l /usr/lib/x86_64-linux-gnu/libsmime3.so -l /usr/lib/x86_64-linux-gnu/libssh2.so.1 -l /usr/lib/x86_64-linux-gnu/libtiff.so.6 -l /usr/lib/x86_64-linux-gnu/libxcb-cursor.so.0 -l /usr/lib/x86_64-linux-gnu/libxcb-xinput.so.0 -l /usr/lib/x86_64-linux-gnu/libxml2.so.16"
+# -l /usr/lib/x86_64-linux-gnu/libnghttp3.so.9
 echo "Variables set"
 
 echo "Installing dependencies"
