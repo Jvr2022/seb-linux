@@ -12,6 +12,7 @@
 /ui_*
 /qrc_*
 /build/
+/build-tools/
 /dist/
 /windows/
 /compile_commands.json
