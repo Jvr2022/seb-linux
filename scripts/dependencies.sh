@@ -31,8 +31,7 @@ if command -v apt >/dev/null; then
     libtiff-dev \
     libxcb-cursor0 \
     libxcb-xinput0 \
-    libjpeg62 \
-    libqt6qmlmeta6
+    libjpeg62
 else
     echo "detected non-debian system, skipping dependency install"
 fi
