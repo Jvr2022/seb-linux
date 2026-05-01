@@ -7,9 +7,6 @@ BUILD_CONFIG_STAMP="${BUILD_DIR}/.last-qmake-args"
 QMAKE_ARGS=("$@")
 QMAKE_ARGS_FINGERPRINT="$(printf '%s\0' "${QMAKE_ARGS[@]}" | sha256sum | awk '{print $1}')"
 
-echo "Installing dependencies"
-${ROOT_DIR}/scripts/dependencies.sh
-
 mkdir -p "${BUILD_DIR}"
 pushd "${BUILD_DIR}" >/dev/null
 

@@ -2,6 +2,12 @@
 
 ## Development
 
+Install dependencies on Debian-based systems:
+
+```bash
+./scripts/dependencies.sh
+```
+
 Build locally:
 
 ```bash
