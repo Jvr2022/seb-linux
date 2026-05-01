@@ -3,7 +3,7 @@
 if command -v apt >/dev/null; then
     echo "installing dependencies"
     sudo apt-get update
-    sudo apt-get install -m -y \
+    sudo apt-get install -y \
     build-essential \
     desktop-file-utils \
     dpkg-dev \
