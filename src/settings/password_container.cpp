@@ -12,6 +12,7 @@
 #include <QVariant>
 #include <cstring>
 #include <openssl/evp.h>
+#include <vector>
 #include <zlib.h>
 
 using namespace seb::configuration::cryptography;
@@ -73,7 +74,8 @@ constexpr int kSebRncryptorSaltLength = 8;
 constexpr int kSebRncryptorIvLength = 16;
 constexpr int kSebRncryptorKeyLength = 32;
 constexpr int kSebRncryptorIterations = 10000;
-constexpr int kSebRncryptorVersion = 0x2;
+constexpr int kSebRncryptorVersion2 = 0x2;
+constexpr int kSebRncryptorVersion3 = 0x3;
 constexpr int kSebRncryptorOptions = 0x1;
 
 const QByteArray kPrefixPublicKey = "pkhs";
@@ -88,8 +90,23 @@ QByteArray readPrefix(const QByteArray &data) {
   return data.left(kSebPrefixLength);
 }
 
-QByteArray deriveKey(const QString &password, const QByteArray &salt) {
+std::vector<QByteArray> rncryptorPasswordByteCandidates(
+    const QString &password, unsigned char version) {
   const QByteArray passwordBytes = password.toUtf8();
+  std::vector<QByteArray> candidates;
+
+  if (version == kSebRncryptorVersion2 &&
+      passwordBytes.size() > password.size()) {
+    // RNCryptor v2 accidentally used the character count as the byte count
+    // when deriving keys. For ASCII passwords this is identical to v3.
+    candidates.push_back(passwordBytes.left(password.size()));
+  }
+
+  candidates.push_back(passwordBytes);
+  return candidates;
+}
+
+QByteArray deriveKey(const QByteArray &passwordBytes, const QByteArray &salt) {
   QByteArray key(kSebRncryptorKeyLength, Qt::Uninitialized);
   PKCS5_PBKDF2_HMAC_SHA1(
       passwordBytes.constData(), passwordBytes.size(),
@@ -97,6 +114,12 @@ QByteArray deriveKey(const QString &password, const QByteArray &salt) {
       kSebRncryptorIterations, kSebRncryptorKeyLength,
       reinterpret_cast<unsigned char *>(key.data()));
   return key;
+}
+
+bool isSupportedRncryptorHeader(unsigned char version, unsigned char options) {
+  return (version == kSebRncryptorVersion2 ||
+          version == kSebRncryptorVersion3) &&
+         options == kSebRncryptorOptions;
 }
 
 bool decryptPasswordBlock(const QByteArray &data, const QString &password,
@@ -111,7 +134,7 @@ bool decryptPasswordBlock(const QByteArray &data, const QString &password,
 
   const unsigned char version = static_cast<unsigned char>(data.at(0));
   const unsigned char options = static_cast<unsigned char>(data.at(1));
-  if (version != kSebRncryptorVersion || options != kSebRncryptorOptions) {
+  if (!isSupportedRncryptorHeader(version, options)) {
     if (error) {
       *error = QStringLiteral("Unsupported encrypted SEB format version.");
     }
@@ -132,13 +155,24 @@ bool decryptPasswordBlock(const QByteArray &data, const QString &password,
       data.mid(offset, data.size() - offset - hmacLength);
   const QByteArray originalHmac = data.right(hmacLength);
 
-  const QByteArray authenticationKey = deriveKey(password, authenticationSalt);
-  const QByteArray encryptionKey = deriveKey(password, encryptionSalt);
-  const QByteArray computedHmac = QMessageAuthenticationCode::hash(
-      data.left(data.size() - hmacLength), authenticationKey,
-      QCryptographicHash::Sha256);
+  QByteArray encryptionKey;
+  bool authenticated = false;
+  for (const QByteArray &passwordBytes :
+       rncryptorPasswordByteCandidates(password, version)) {
+    const QByteArray authenticationKey =
+        deriveKey(passwordBytes, authenticationSalt);
+    const QByteArray computedHmac = QMessageAuthenticationCode::hash(
+        data.left(data.size() - hmacLength), authenticationKey,
+        QCryptographicHash::Sha256);
 
-  if (computedHmac != originalHmac) {
+    if (computedHmac == originalHmac) {
+      encryptionKey = deriveKey(passwordBytes, encryptionSalt);
+      authenticated = true;
+      break;
+    }
+  }
+
+  if (!authenticated) {
     if (error) {
       *error =
           QStringLiteral("Invalid password or corrupted encrypted SEB data.");

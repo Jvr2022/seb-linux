@@ -1,11 +1,8 @@
 ## Summary
-
 - 
 
 ## What Changed
-
 - 
 
 ## Verification
-
 - 

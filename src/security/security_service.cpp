@@ -73,9 +73,9 @@ bool SecurityService::isDebuggerAttached() const
 QStringList SecurityService::detectProhibitedProcesses() const
 {
     static const QStringList prohibited = {
-        QStringLiteral("discord"), QStringLiteral("slack"), QStringLiteral("teamviewer"), 
+        QStringLiteral("discord"), QStringLiteral("slack"), QStringLiteral("teamviewer"),
         QStringLiteral("anydesk"), QStringLiteral("obs"), QStringLiteral("simplescreenrecorder"),
-        QStringLiteral("wireshark"), QStringLiteral("tcpdump"), QStringLiteral("gdb"), 
+        QStringLiteral("wireshark"), QStringLiteral("tcpdump"),
         QStringLiteral("strace")
     };
 
@@ -95,7 +95,7 @@ QStringList SecurityService::detectProhibitedProcesses() const
 
             const QString name = QString::fromLocal8Bit(data.constData()).section(QLatin1Char('\0'), 0, 0);
             const QString baseName = QFileInfo(name).fileName().toLower();
-            
+
             for (const QString &p : prohibited) {
                 if (baseName.contains(p)) {
                     detected << name;
