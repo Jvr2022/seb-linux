@@ -10,7 +10,7 @@ a reliable way to take exams without needing a specific OS.
 
 ## What is this?
 
-> [!info]  
+> [!NOTE]  
 > Opening v3 sebs:// urls is now supported!
 > This means password login exams will work again!
 
