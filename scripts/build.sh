@@ -1,48 +1,14 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-if command -v apt >/dev/null; then
-    echo "installing dependencies"
-    sudo apt-get update
-    sudo apt-get install -m -y \
-    build-essential \
-    desktop-file-utils \
-    dpkg-dev \
-    libqt6svg6-dev \
-    qt6-base-dev \
-    qt6-tools-dev-tools \
-    qt6-webengine-dev \
-    libwebkit2gtk-4.1-dev \
-    libgtk-3-dev \
-    shared-mime-info \
-    zlib1g-dev \
-    libssl-dev \
-    file \
-    libatomic1 \
-    libdeflate0 \
-    libjbig0 \
-    liblerc4 \
-    libnghttp3-3 \
-    libngtcp2-dev \
-    libngtcp2-crypto-gnutls-dev \
-    libqt6pdf6 \
-    libqt6qmlworkerscript6 \
-    libnss3 \
-    libssh2-1 \
-    libssl3 \
-    libtiff-dev \
-    libxcb-cursor0 \
-    libxcb-xinput0
-else
-    echo "detected non-debian system, skipping dependency install"
-fi
-
-
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 BUILD_DIR="${ROOT_DIR}/build"
 BUILD_CONFIG_STAMP="${BUILD_DIR}/.last-qmake-args"
 QMAKE_ARGS=("$@")
 QMAKE_ARGS_FINGERPRINT="$(printf '%s\0' "${QMAKE_ARGS[@]}" | sha256sum | awk '{print $1}')"
+
+echo "Installing dependencies"
+${ROOT_DIR}/scripts/dependencies.sh
 
 mkdir -p "${BUILD_DIR}"
 pushd "${BUILD_DIR}" >/dev/null

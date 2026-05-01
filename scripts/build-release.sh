@@ -1,43 +1,6 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-if command -v apt >/dev/null; then
-    echo "installing dependencies"
-    sudo apt-get update
-    sudo apt-get install -m -y \
-    build-essential \
-    desktop-file-utils \
-    dpkg-dev \
-    libqt6svg6-dev \
-    qt6-base-dev \
-    qt6-tools-dev-tools \
-    qt6-webengine-dev \
-    libwebkit2gtk-4.1-dev \
-    libgtk-3-dev \
-    shared-mime-info \
-    zlib1g-dev \
-    libssl-dev \
-    file \
-    libatomic1 \
-    libdeflate0 \
-    libjbig0 \
-    liblerc4 \
-    libnghttp3-3 \
-    libngtcp2-dev \
-    libngtcp2-crypto-gnutls-dev \
-    libqt6pdf6 \
-    libqt6qmlworkerscript6 \
-    libnss3 \
-    libssh2-1 \
-    libssl3 \
-    libtiff-dev \
-    libxcb-cursor0 \
-    libxcb-xinput0
-else
-    echo "detected non-debian system, skipping dependency install"
-fi
-
-
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 PROJECT_DIR="${ROOT_DIR}"
 VERSION="${1:-0.1.0}"
@@ -47,6 +10,9 @@ ARTIFACT_DIR="${PROJECT_DIR}/dist"
 PACKAGE_NAME="safe-exam-browser"
 EXTRA_LIBS="/usr/lib/x86_64-linux-gnu/libssl.so.3 /usr/lib/x86_64-linux-gnu/libsoftokn3.so"
 echo "Variables set"
+
+echo "Installing dependencies"
+${ROOT_DIR}/scripts/dependencies.sh
 
 unset QML_SOURCES_PATHS
 unset QMAKE
@@ -69,7 +35,7 @@ wget https://github.com/linuxdeploy/linuxdeploy/releases/download/continuous/lin
 wget https://github.com/linuxdeploy/linuxdeploy-plugin-qt/releases/download/continuous/linuxdeploy-plugin-qt-x86_64.AppImage -O ${PROJECT_DIR}/build-tools/linuxdeploy-plugin-qt-x86_64.AppImage -q
 chmod +x ${PROJECT_DIR}/build-tools/*.AppImage
 echo "QT: Running Linuxdeploy"
-${PROJECT_DIR}/build-tools/linuxdeploy-x86_64.AppImage --appdir ${STAGE_DIR}/AppDir -i ${PROJECT_DIR}/assets/icons/safe-exam-browser.png -d ${PROJECT_DIR}/packaging/linux/safe-exam-browser.desktop --output appimage --plugin qt --verbosity=3 -l ${EXTRA_LIBS}
+${PROJECT_DIR}/build-tools/linuxdeploy-x86_64.AppImage --appdir ${STAGE_DIR}/AppDir -i ${PROJECT_DIR}/assets/icons/safe-exam-browser.png -d ${PROJECT_DIR}/packaging/linux/safe-exam-browser.desktop --output appimage --plugin qt --verbosity=3 -l "${EXTRA_LIBS}"
 echo "QT: moving binary"
 mv ${PROJECT_DIR}/*.AppImage ${ARTIFACT_DIR}/${PACKAGE_NAME}-qt-x86_64.AppImage
 
@@ -87,7 +53,7 @@ qmake6 CONFIG+=force_webkitgtk INSTALL_ROOT=${STAGE_DIR}/AppDir
 make -j$(nproc) >> /dev/null
 make install INSTALL_ROOT=${STAGE_DIR}/AppDir >> /dev/null
 echo "GTK: running Linuxdeploy"
-${PROJECT_DIR}/build-tools/linuxdeploy-x86_64.AppImage --appdir ${STAGE_DIR}/AppDir -i ${PROJECT_DIR}/assets/icons/safe-exam-browser.png -d ${PROJECT_DIR}/packaging/linux/safe-exam-browser.desktop --output appimage --plugin qt --verbosity=3 -l ${EXTRA_LIBS}
+${PROJECT_DIR}/build-tools/linuxdeploy-x86_64.AppImage --appdir ${STAGE_DIR}/AppDir -i ${PROJECT_DIR}/assets/icons/safe-exam-browser.png -d ${PROJECT_DIR}/packaging/linux/safe-exam-browser.desktop --output appimage --plugin qt --verbosity=3 -l "${EXTRA_LIBS}"
 echo "GTK: moving binary"
 mv ${PROJECT_DIR}/*.AppImage ${ARTIFACT_DIR}/${PACKAGE_NAME}-gtk-x86_64.AppImage
 
