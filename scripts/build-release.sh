@@ -45,6 +45,7 @@ BUILD_DIR="${PROJECT_DIR}/build"
 STAGE_DIR="${PROJECT_DIR}/dist/stage"
 ARTIFACT_DIR="${PROJECT_DIR}/dist"
 PACKAGE_NAME="safe-exam-browser"
+EXTRA_LIBS="/usr/lib/x86_64-linux-gnu/libssl.so.3 /usr/lib/x86_64-linux-gnu/libsoftokn3.so"
 echo "Variables set"
 
 unset QML_SOURCES_PATHS
@@ -68,7 +69,7 @@ wget https://github.com/linuxdeploy/linuxdeploy/releases/download/continuous/lin
 wget https://github.com/linuxdeploy/linuxdeploy-plugin-qt/releases/download/continuous/linuxdeploy-plugin-qt-x86_64.AppImage -O ${PROJECT_DIR}/build-tools/linuxdeploy-plugin-qt-x86_64.AppImage -q
 chmod +x ${PROJECT_DIR}/build-tools/*.AppImage
 echo "QT: Running Linuxdeploy"
-${PROJECT_DIR}/build-tools/linuxdeploy-x86_64.AppImage --appdir ${STAGE_DIR}/AppDir -i ${PROJECT_DIR}/assets/icons/safe-exam-browser.png -d ${PROJECT_DIR}/packaging/linux/safe-exam-browser.desktop --output appimage --plugin qt --verbosity=3 -l /usr/lib/x86_64-linux-gnu/libssl.so.3 -l /usr/lib/x86_64-linux-gnu/libsoftokn3.so
+${PROJECT_DIR}/build-tools/linuxdeploy-x86_64.AppImage --appdir ${STAGE_DIR}/AppDir -i ${PROJECT_DIR}/assets/icons/safe-exam-browser.png -d ${PROJECT_DIR}/packaging/linux/safe-exam-browser.desktop --output appimage --plugin qt --verbosity=3 -l ${EXTRA_LIBS}
 echo "QT: moving binary"
 mv ${PROJECT_DIR}/*.AppImage ${ARTIFACT_DIR}/${PACKAGE_NAME}-qt-x86_64.AppImage
 
@@ -86,7 +87,7 @@ qmake6 CONFIG+=force_webkitgtk INSTALL_ROOT=${STAGE_DIR}/AppDir
 make -j$(nproc) >> /dev/null
 make install INSTALL_ROOT=${STAGE_DIR}/AppDir >> /dev/null
 echo "GTK: running Linuxdeploy"
-${PROJECT_DIR}/build-tools/linuxdeploy-x86_64.AppImage --appdir ${STAGE_DIR}/AppDir -i ${PROJECT_DIR}/assets/icons/safe-exam-browser.png -d ${PROJECT_DIR}/packaging/linux/safe-exam-browser.desktop --output appimage --plugin qt --verbosity=3 -l /usr/lib/x86_64-linux-gnu/libssl.so.3 -l /usr/lib/x86_64-linux-gnu/libsoftokn3.so
+${PROJECT_DIR}/build-tools/linuxdeploy-x86_64.AppImage --appdir ${STAGE_DIR}/AppDir -i ${PROJECT_DIR}/assets/icons/safe-exam-browser.png -d ${PROJECT_DIR}/packaging/linux/safe-exam-browser.desktop --output appimage --plugin qt --verbosity=3 -l ${EXTRA_LIBS}
 echo "GTK: moving binary"
 mv ${PROJECT_DIR}/*.AppImage ${ARTIFACT_DIR}/${PACKAGE_NAME}-gtk-x86_64.AppImage
 
