@@ -8,7 +8,7 @@ BUILD_DIR="${PROJECT_DIR}/build"
 STAGE_DIR="${PROJECT_DIR}/dist/stage"
 ARTIFACT_DIR="${PROJECT_DIR}/dist"
 PACKAGE_NAME="safe-exam-browser"
-EXTRA_LIBS="/usr/lib/x86_64-linux-gnu/libssl.so.3 /usr/lib/x86_64-linux-gnu/libsoftokn3.so"
+EXTRA_LIBS="/usr/lib/x86_64-linux-gnu/libssl.so.3;/usr/lib/x86_64-linux-gnu/libsoftokn3.so"
 echo "Variables set"
 
 echo "Installing dependencies"
