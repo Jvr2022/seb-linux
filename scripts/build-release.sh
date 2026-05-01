@@ -54,7 +54,7 @@ make -j$(nproc) >> /dev/null
 make install INSTALL_ROOT=${STAGE_DIR}/AppDir >> /dev/null
 echo "GTK: running Linuxdeploy"
 ${PROJECT_DIR}/build-tools/linuxdeploy-x86_64.AppImage --appdir ${STAGE_DIR}/AppDir -i ${PROJECT_DIR}/assets/icons/safe-exam-browser.png -d ${PROJECT_DIR}/packaging/linux/safe-exam-browser.desktop --output appimage --plugin qt --verbosity=3 ${LINUXBUILD_EXTRA_ARGS}
-el
+
 echo "GTK: moving binary"
 mv ${PROJECT_DIR}/*.AppImage ${ARTIFACT_DIR}/${PACKAGE_NAME}-gtk-x86_64.AppImage
 
