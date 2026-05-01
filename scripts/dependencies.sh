@@ -30,7 +30,8 @@ if command -v apt >/dev/null; then
     libssl3 \
     libtiff-dev \
     libxcb-cursor0 \
-    libxcb-xinput0
+    libxcb-xinput0 \
+    libnghttp3-9
 else
     echo "detected non-debian system, skipping dependency install"
 fi
