@@ -10,10 +10,6 @@ a reliable way to take exams without needing a specific OS.
 
 ## What is this?
 
-> [!NOTE]  
-> Opening v3 sebs:// urls is now supported!
-> This means password login exams will work again!
-
 We're trying to make SEB work great on Linux. This client handles all
 the important stuff like `.seb` files and special links (`seb://`, `sebs://`),
 so you can just focus on your exam.
