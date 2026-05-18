@@ -38,7 +38,8 @@ void BatteryController::refresh()
                     next.percentage = match.captured(1).toInt();
                 }
             } else if (trimmed.startsWith(QStringLiteral("state:"))) {
-                next.charging = trimmed.contains(QStringLiteral("charging"));
+              next.charging = !trimmed.contains(QStringLiteral("discharging"));
+              // When not charging, it displays discharging, which contains charging, therefore it would always show charging status as charging. This fixes that issue by doing the reverse.
             } else if (trimmed.startsWith(QStringLiteral("time to empty:")) || trimmed.startsWith(QStringLiteral("time to full:"))) {
                 next.timeRemaining = trimmed.section(':', 1).trimmed();
             }
