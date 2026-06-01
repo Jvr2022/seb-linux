@@ -306,9 +306,11 @@ void applyCommandLineOverrides(const QCommandLineParser &parser, seb::SebSetting
         settings.security.allowTermination = false;
     }
 
+#if defined(QT_DEBUG) || defined(SEB_DEV_BYPASS_OPTION)
     if (parser.isSet("dev-bypass")) {
         settings.devBypass = true;
     }
+#endif
 }
 
 }  // namespace
@@ -429,7 +431,11 @@ int main(int argc, char *argv[])
     const bool launchedWithoutExam = resource.isEmpty();
     const bool menuLockdown = parser.isSet("menu-lockdown");
     const bool examAntiCheat = parser.isSet("anti-cheat");
+#if defined(QT_DEBUG) || defined(SEB_DEV_BYPASS_OPTION)
     bool devBypass = settings.devBypass || parser.isSet("dev-bypass");
+#else
+    bool devBypass = settings.devBypass;
+#endif
 #ifdef SEB_DEV_BYPASS_DEFAULT
     devBypass = true;
 #endif
