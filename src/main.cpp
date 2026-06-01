@@ -148,23 +148,30 @@ static void appendPkexecEnvironmentVariable(QStringList &args, const char *name)
     }
 }
 
-static int runNonDetachedPkexecChild( QProcess& child )
+static int runNonDetachedPkexecChild(QProcess &child)
 {
-  // Do not detach. Forward outputs to parent.
-  child.setProcessChannelMode(QProcess::ForwardedChannels);
-  child.start();
-  if (!child.waitForStarted()) {
-    qDebug() << "pkexec child failed to start:" << child.errorString();
-    return 1;
-  }
-  if (child.waitForFinished( -1 /* no timeout */ )) {
+    // Do not detach. Forward outputs to parent.
+    child.setProcessChannelMode(QProcess::ForwardedChannels);
+
+    child.start();
+    if (!child.waitForStarted()) {
+        qWarning() << "pkexec child failed to start:" << child.errorString();
+        return 1;
+    }
+
+    if (!child.waitForFinished(-1 /* no timeout */)) {
+        qWarning() << "pkexec child failed:" << child.errorString();
+        return 1;
+    }
+
+    if (child.exitStatus() != QProcess::NormalExit) {
+        qWarning() << "pkexec child crashed";
+        return 1;
+    }
+
     const int exitCode = child.exitCode();
     qDebug() << "pkexec child finished with exit code" << exitCode;
     return exitCode;
-  } else {
-    qDebug() << "pkexec child failed:" << child.errorString();
-    return 1;
-  }
 }
 
 void applyProtectedWindowSettings(seb::WindowSettings &settings, bool fullScreen)
