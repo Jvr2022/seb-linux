@@ -148,6 +148,20 @@ static void appendPkexecEnvironmentVariable(QStringList &args, const char *name)
     }
 }
 
+static int runNonDetachedPkexecChild( QProcess& child )
+{
+  // Do not detach. Forward outputs to parent.
+  child.setProcessChannelMode(QProcess::ForwardedChannels);
+  child.start();
+  if (child.waitForFinished( -1 /* no timeout */ )) {
+    qDebug() << "pkexec child finished\n";
+    return 0;
+  } else {
+    qDebug() << "pkexec child failed\n";
+    return 1;
+  }
+}
+
 void applyProtectedWindowSettings(seb::WindowSettings &settings, bool fullScreen)
 {
     settings.absoluteHeight = 0;
@@ -443,10 +457,7 @@ int main(int argc, char *argv[])
             pkexecArgs << args;
 
             child.setArguments(pkexecArgs);
-            if (child.startDetached()) {
-                return 0;
-            }
-            return 1;
+            return runNonDetachedPkexecChild( child );
         }
 
         const bool requiresLockedExamShell =
@@ -490,11 +501,7 @@ int main(int argc, char *argv[])
             pkexecArgs << args;
             
             child.setArguments(pkexecArgs);
-            
-            if (child.startDetached()) {
-                return 0;
-            }
-            return 1;
+            return runNonDetachedPkexecChild( child );
         }
     }
 
