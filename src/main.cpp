@@ -153,11 +153,16 @@ static int runNonDetachedPkexecChild( QProcess& child )
   // Do not detach. Forward outputs to parent.
   child.setProcessChannelMode(QProcess::ForwardedChannels);
   child.start();
+  if (!child.waitForStarted()) {
+    qDebug() << "pkexec child failed to start:" << child.errorString();
+    return 1;
+  }
   if (child.waitForFinished( -1 /* no timeout */ )) {
-    qDebug() << "pkexec child finished\n";
-    return 0;
+    const int exitCode = child.exitCode();
+    qDebug() << "pkexec child finished with exit code" << exitCode;
+    return exitCode;
   } else {
-    qDebug() << "pkexec child failed\n";
+    qDebug() << "pkexec child failed:" << child.errorString();
     return 1;
   }
 }
@@ -457,7 +462,7 @@ int main(int argc, char *argv[])
             pkexecArgs << args;
 
             child.setArguments(pkexecArgs);
-            return runNonDetachedPkexecChild( child );
+            return runNonDetachedPkexecChild(child);
         }
 
         const bool requiresLockedExamShell =
@@ -501,7 +506,7 @@ int main(int argc, char *argv[])
             pkexecArgs << args;
             
             child.setArguments(pkexecArgs);
-            return runNonDetachedPkexecChild( child );
+            return runNonDetachedPkexecChild(child);
         }
     }
 
