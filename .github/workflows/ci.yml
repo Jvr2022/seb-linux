@@ -10,14 +10,29 @@ on:
 jobs:
   build-qtwebengine:
     runs-on: ubuntu-24.04
+    env:
+      CCACHE_DIR: ${{ github.workspace }}/.ccache
+      CCACHE_MAXSIZE: 500M
+      CCACHE_SLOPPINESS: pch_defines,time_macros,include_file_mtime,include_file_ctime
     steps:
       - uses: actions/checkout@v6
+
+      - name: Cache ccache
+        uses: actions/cache@v5
+        with:
+          path: ${{ github.workspace }}/.ccache
+          key: ccache-qtwebengine-${{ hashFiles('src/**', 'CMakeLists.txt') }}
+          restore-keys: |
+            ccache-qtwebengine-
 
       - name: Install Qt WebEngine build dependencies
         run: |
           sudo apt-get update
           sudo apt-get install -y \
             build-essential \
+            ccache \
+            cmake \
+            ninja-build \
             libqt6svg6-dev \
             qt6-base-dev \
             qt6-tools-dev-tools \
@@ -25,7 +40,7 @@ jobs:
             zlib1g-dev
 
       - name: Build Qt WebEngine backend
-        run: ./scripts/build.sh CONFIG+=force_qtwebengine
+        run: ./scripts/build.sh -DSEB_FORCE_QTWEBENGINE=ON
 
       - name: Upload Qt WebEngine binary
         uses: actions/upload-artifact@v7
@@ -36,14 +51,29 @@ jobs:
 
   build-webkitgtk-fallback:
     runs-on: ubuntu-24.04
+    env:
+      CCACHE_DIR: ${{ github.workspace }}/.ccache
+      CCACHE_MAXSIZE: 500M
+      CCACHE_SLOPPINESS: pch_defines,time_macros,include_file_mtime,include_file_ctime
     steps:
       - uses: actions/checkout@v6
+
+      - name: Cache ccache
+        uses: actions/cache@v5
+        with:
+          path: ${{ github.workspace }}/.ccache
+          key: ccache-webkitgtk-${{ hashFiles('src/**', 'CMakeLists.txt') }}
+          restore-keys: |
+            ccache-webkitgtk-
 
       - name: Install WebKitGTK fallback build dependencies
         run: |
           sudo apt-get update
           sudo apt-get install -y \
             build-essential \
+            ccache \
+            cmake \
+            ninja-build \
             libqt6svg6-dev \
             qt6-base-dev \
             qt6-tools-dev-tools \
@@ -52,7 +82,7 @@ jobs:
             zlib1g-dev
 
       - name: Build WebKitGTK fallback backend
-        run: ./scripts/build.sh CONFIG+=force_webkitgtk
+        run: ./scripts/build.sh -DSEB_FORCE_WEBKITGTK=ON
 
       - name: Upload WebKitGTK binary
         uses: actions/upload-artifact@v7

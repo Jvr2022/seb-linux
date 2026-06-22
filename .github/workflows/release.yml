@@ -17,8 +17,20 @@ permissions:
 jobs:
   build-linux:
     runs-on: ubuntu-24.04
+    env:
+      CCACHE_DIR: ${{ github.workspace }}/.ccache
+      CCACHE_MAXSIZE: 500M
+      CCACHE_SLOPPINESS: pch_defines,time_macros,include_file_mtime,include_file_ctime
     steps:
       - uses: actions/checkout@v6
+
+      - name: Cache ccache
+        uses: actions/cache@v5
+        with:
+          path: ${{ github.workspace }}/.ccache
+          key: ccache-release-${{ hashFiles('src/**', 'CMakeLists.txt') }}
+          restore-keys: |
+            ccache-release-
 
       - name: Resolve release version
         id: release_meta

@@ -5,6 +5,9 @@ if command -v apt >/dev/null; then
     sudo apt-get update
     sudo apt-get install -y \
     build-essential \
+    ccache \
+    cmake \
+    ninja-build \
     desktop-file-utils \
     dpkg-dev \
     libqt6svg6-dev \

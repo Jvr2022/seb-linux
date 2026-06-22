@@ -6,17 +6,17 @@ arch=('x86_64' 'aarch64' 'riscv64')
 url="https://github.com/Jvr2022/seb-linux"
 license=('MPL2')
 depends=('qt6-base' 'qt6-webengine' 'webkit2gtk-4.1' 'gtk3' 'zlib' 'hicolor-icon-theme' 'shared-mime-info' 'desktop-file-utils' 'polkit')
-makedepends=('qt6-tools' 'gcc' 'make')
+makedepends=('qt6-tools' 'gcc' 'cmake' 'ninja')
 source=("safe-exam-browser-${pkgver}.tar.gz")
 sha256sums=('SKIP')
 
 build() {
   cd "${srcdir}/safe-exam-browser-${pkgver}"
-  qmake6 seb-linux-qt.pro
-  make -j"$(nproc)"
+  cmake -B build -S . -G Ninja -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=/usr
+  cmake --build build
 }
 
 package() {
   cd "${srcdir}/safe-exam-browser-${pkgver}"
-  make INSTALL_ROOT="${pkgdir}" install
+  DESTDIR="${pkgdir}" cmake --install build
 }

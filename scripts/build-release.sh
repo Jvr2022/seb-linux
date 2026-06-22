@@ -5,7 +5,6 @@ ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 PROJECT_DIR="${ROOT_DIR}"
 VERSION="${1:-0.1.0}"
 BUILD_DIR="${PROJECT_DIR}/build"
-PROJECT_FILE="${PROJECT_DIR}/seb-linux-qt.pro"
 ARTIFACT_DIR="${PROJECT_DIR}/dist"
 TOOLS_DIR="${PROJECT_DIR}/build-tools"
 PACKAGE_NAME="safe-exam-browser"
@@ -36,6 +35,11 @@ LINUXBUILD_EXTRA_ARGS=(
 # -l /usr/lib/x86_64-linux-gnu/libQt6QmlMeta.so.6
 # -l /usr/lib/x86_64-linux-gnu/libxml2.so.16
 echo "Variables set"
+
+GENERATOR_ARGS=()
+if command -v ninja >/dev/null 2>&1; then
+    GENERATOR_ARGS=(-G Ninja)
+fi
 
 verify_sha256() {
     local file_path="$1"
@@ -98,9 +102,9 @@ build_appimage() {
     mkdir -p "${build_dir}" "${app_dir}" "${appimage_output_dir}"
 
     pushd "${build_dir}" >/dev/null
-    qmake6 "${PROJECT_FILE}" "CONFIG+=${config}" "INSTALL_ROOT=${app_dir}"
-    run_logged "${build_dir}/make.log" make -j"$(nproc)"
-    run_logged "${build_dir}/make-install.log" make install "INSTALL_ROOT=${app_dir}"
+    cmake -S "${PROJECT_DIR}" -B "${build_dir}" ${GENERATOR_ARGS[@]+"${GENERATOR_ARGS[@]}"} -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=/usr "${config}"
+    run_logged "${build_dir}/make.log" cmake --build "${build_dir}" -j"$(nproc)"
+    run_logged "${build_dir}/make-install.log" env DESTDIR="${app_dir}" cmake --install "${build_dir}"
     popd >/dev/null
 
     rm -f "${output_path}"
@@ -152,13 +156,13 @@ download_verified_tool \
 
 echo "Building for QtWebEngine"
 build_appimage \
-    "force_qtwebengine" \
+    "-DSEB_FORCE_QTWEBENGINE=ON" \
     "${BUILD_DIR}/release-qtwebengine" \
     "${ARTIFACT_DIR}/${PACKAGE_NAME}-qt-x86_64.AppImage"
 
 echo "Building for WebKitGTK"
 build_appimage \
-    "force_webkitgtk" \
+    "-DSEB_FORCE_WEBKITGTK=ON" \
     "${BUILD_DIR}/release-webkitgtk" \
     "${ARTIFACT_DIR}/${PACKAGE_NAME}-gtk-x86_64.AppImage"
 
