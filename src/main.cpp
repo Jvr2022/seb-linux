@@ -148,6 +148,32 @@ static void appendPkexecEnvironmentVariable(QStringList &args, const char *name)
     }
 }
 
+static int runNonDetachedPkexecChild(QProcess &child)
+{
+    // Do not detach. Forward outputs to parent.
+    child.setProcessChannelMode(QProcess::ForwardedChannels);
+
+    child.start();
+    if (!child.waitForStarted()) {
+        qWarning() << "pkexec child failed to start:" << child.errorString();
+        return 1;
+    }
+
+    if (!child.waitForFinished(-1 /* no timeout */)) {
+        qWarning() << "pkexec child failed:" << child.errorString();
+        return 1;
+    }
+
+    if (child.exitStatus() != QProcess::NormalExit) {
+        qWarning() << "pkexec child crashed";
+        return 1;
+    }
+
+    const int exitCode = child.exitCode();
+    qDebug() << "pkexec child finished with exit code" << exitCode;
+    return exitCode;
+}
+
 void applyProtectedWindowSettings(seb::WindowSettings &settings, bool fullScreen)
 {
     settings.absoluteHeight = 0;
@@ -280,9 +306,11 @@ void applyCommandLineOverrides(const QCommandLineParser &parser, seb::SebSetting
         settings.security.allowTermination = false;
     }
 
+#if defined(QT_DEBUG) || defined(SEB_DEV_BYPASS_OPTION)
     if (parser.isSet("dev-bypass")) {
         settings.devBypass = true;
     }
+#endif
 }
 
 }  // namespace
@@ -403,7 +431,11 @@ int main(int argc, char *argv[])
     const bool launchedWithoutExam = resource.isEmpty();
     const bool menuLockdown = parser.isSet("menu-lockdown");
     const bool examAntiCheat = parser.isSet("anti-cheat");
+#if defined(QT_DEBUG) || defined(SEB_DEV_BYPASS_OPTION)
     bool devBypass = settings.devBypass || parser.isSet("dev-bypass");
+#else
+    bool devBypass = settings.devBypass;
+#endif
 #ifdef SEB_DEV_BYPASS_DEFAULT
     devBypass = true;
 #endif
@@ -443,10 +475,7 @@ int main(int argc, char *argv[])
             pkexecArgs << args;
 
             child.setArguments(pkexecArgs);
-            if (child.startDetached()) {
-                return 0;
-            }
-            return 1;
+            return runNonDetachedPkexecChild(child);
         }
 
         const bool requiresLockedExamShell =
@@ -490,11 +519,7 @@ int main(int argc, char *argv[])
             pkexecArgs << args;
             
             child.setArguments(pkexecArgs);
-            
-            if (child.startDetached()) {
-                return 0;
-            }
-            return 1;
+            return runNonDetachedPkexecChild(child);
         }
     }
 
