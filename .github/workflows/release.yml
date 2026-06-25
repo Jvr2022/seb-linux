@@ -22,7 +22,7 @@ jobs:
       CCACHE_MAXSIZE: 500M
       CCACHE_SLOPPINESS: pch_defines,time_macros,include_file_mtime,include_file_ctime
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
 
       - name: Cache ccache
         uses: actions/cache@v5
