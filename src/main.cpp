@@ -1,4 +1,3 @@
-#include <iostream>
 #include "app_controller.h"
 #include "security/security_service.h"
 #include "browser/webengine_environment.h"
