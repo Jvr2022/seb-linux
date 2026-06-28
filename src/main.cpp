@@ -317,6 +317,7 @@ void applyCommandLineOverrides(const QCommandLineParser &parser, seb::SebSetting
 }  // namespace
 
 const QString version = QString::fromStdString(VERSION);
+const QString packagename = QString::fromStdString(PACKAGE_NAME);
 
 int main(int argc, char *argv[])
 {
@@ -327,7 +328,7 @@ int main(int argc, char *argv[])
      const QIcon appIcon(QStringLiteral(":/assets/icons/safe-exam-browser.png"));
     app.setWindowIcon(appIcon);
     // TODO: Dynamic package name.
-    app.setDesktopFileName(QStringLiteral("safe-exam-browser"));
+    app.setDesktopFileName(packagename);
     QCoreApplication::setApplicationName(QStringLiteral("Safe Exam Browser"));
     QCoreApplication::setApplicationVersion(version);
 

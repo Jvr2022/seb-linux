@@ -3,11 +3,11 @@ set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 PROJECT_DIR="${ROOT_DIR}"
-VERSION="${1:-0.1.0}"
+export VERSION="${1:-0.1.0}"
+export PACKAGE_NAME="safe-exam-browser"
 BUILD_DIR="${PROJECT_DIR}/build"
 ARTIFACT_DIR="${PROJECT_DIR}/dist"
 TOOLS_DIR="${PROJECT_DIR}/build-tools"
-PACKAGE_NAME="safe-exam-browser"
 LINUXDEPLOY_VERSION="1-alpha-20251107-1"
 LINUXDEPLOY_PLUGIN_QT_VERSION="1-alpha-20250213-1"
 LINUXDEPLOY_SHA256="c20cd71e3a4e3b80c3483cef793cda3f4e990aca14014d23c544ca3ce1270b4d"
@@ -30,7 +30,6 @@ LINUXBUILD_EXTRA_ARGS=(
     -l /usr/lib/x86_64-linux-gnu/libxcb-cursor.so.0
     -l /usr/lib/x86_64-linux-gnu/libxcb-xinput.so.0
 )
-export VERSION="${1:-0.1.0}"
 echo "Variables set"
 
 GENERATOR_ARGS=()
