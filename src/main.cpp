@@ -326,9 +326,10 @@ int main(int argc, char *argv[])
     
      const QIcon appIcon(QStringLiteral(":/assets/icons/safe-exam-browser.png"));
     app.setWindowIcon(appIcon);
+    // TODO: Dynamic package name.
     app.setDesktopFileName(QStringLiteral("safe-exam-browser"));
     QCoreApplication::setApplicationName(QStringLiteral("Safe Exam Browser"));
-    QCoreApplication::setApplicationVersion(QStringLiteral(version));
+    QCoreApplication::setApplicationVersion(version);
 
     QCommandLineParser parser;
     parser.setApplicationDescription(QStringLiteral(
