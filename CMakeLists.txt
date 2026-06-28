@@ -2,6 +2,7 @@ cmake_minimum_required(VERSION 3.21)
 
 project(safe-exam-browser LANGUAGES C CXX)
 
+set(VERSION "$ENV{VERSION}")
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
@@ -398,6 +399,8 @@ qt_add_executable(safe-exam-browser
     ${SEB_HEADERS}
     resources.qrc
 )
+
+add_compile_definitions(VERSION="${VERSION}")
 
 target_include_directories(safe-exam-browser PRIVATE src)
 target_compile_options(safe-exam-browser PRIVATE -Wall -Wextra -Wpedantic)

@@ -30,10 +30,7 @@ LINUXBUILD_EXTRA_ARGS=(
     -l /usr/lib/x86_64-linux-gnu/libxcb-cursor.so.0
     -l /usr/lib/x86_64-linux-gnu/libxcb-xinput.so.0
 )
-# -l /usr/lib/x86_64-linux-gnu/libnghttp3.so.9
-# -l /usr/lib/x86_64-linux-gnu/libngtcp2.so.16 -l /usr/lib/x86_64-linux-gnu/libngtcp2_crypto_gnutls.so.8
-# -l /usr/lib/x86_64-linux-gnu/libQt6QmlMeta.so.6
-# -l /usr/lib/x86_64-linux-gnu/libxml2.so.16
+export VERSION="${1:-0.1.0}"
 echo "Variables set"
 
 GENERATOR_ARGS=()
