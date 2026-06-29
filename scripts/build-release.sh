@@ -3,14 +3,14 @@ set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 PROJECT_DIR="${ROOT_DIR}"
-VERSION="${1:-0.1.0}"
+export VERSION="${1:-0.1.0}"
+export PACKAGE_NAME="safe-exam-browser"
 BUILD_DIR="${PROJECT_DIR}/build"
 ARTIFACT_DIR="${PROJECT_DIR}/dist"
 TOOLS_DIR="${PROJECT_DIR}/build-tools"
-PACKAGE_NAME="safe-exam-browser"
-LINUXDEPLOY_VERSION="1-alpha-20250213-2"
+LINUXDEPLOY_VERSION="1-alpha-20251107-1"
 LINUXDEPLOY_PLUGIN_QT_VERSION="1-alpha-20250213-1"
-LINUXDEPLOY_SHA256="4648f278ab3ef31f819e67c30d50f462640e5365a77637d7e6f2ad9fd0b4522a"
+LINUXDEPLOY_SHA256="c20cd71e3a4e3b80c3483cef793cda3f4e990aca14014d23c544ca3ce1270b4d"
 LINUXDEPLOY_PLUGIN_QT_SHA256="15106be885c1c48a021198e7e1e9a48ce9d02a86dd0a1848f00bdbf3c1c92724"
 LINUXDEPLOY_URL="https://github.com/linuxdeploy/linuxdeploy/releases/download/${LINUXDEPLOY_VERSION}/linuxdeploy-x86_64.AppImage"
 LINUXDEPLOY_PLUGIN_QT_URL="https://github.com/linuxdeploy/linuxdeploy-plugin-qt/releases/download/${LINUXDEPLOY_PLUGIN_QT_VERSION}/linuxdeploy-plugin-qt-x86_64.AppImage"
@@ -30,10 +30,6 @@ LINUXBUILD_EXTRA_ARGS=(
     -l /usr/lib/x86_64-linux-gnu/libxcb-cursor.so.0
     -l /usr/lib/x86_64-linux-gnu/libxcb-xinput.so.0
 )
-# -l /usr/lib/x86_64-linux-gnu/libnghttp3.so.9
-# -l /usr/lib/x86_64-linux-gnu/libngtcp2.so.16 -l /usr/lib/x86_64-linux-gnu/libngtcp2_crypto_gnutls.so.8
-# -l /usr/lib/x86_64-linux-gnu/libQt6QmlMeta.so.6
-# -l /usr/lib/x86_64-linux-gnu/libxml2.so.16
 echo "Variables set"
 
 GENERATOR_ARGS=()
@@ -133,11 +129,6 @@ build_appimage() {
 echo "Installing dependencies"
 ${ROOT_DIR}/scripts/dependencies.sh
 
-unset QML_SOURCES_PATHS
-unset QMAKE
-unset EXTRA_QT_MODULES
-export QML_SOURCES_PATHS="$PROJECT_DIR"/src
-export QMAKE=$(which qmake6)
 export EXTRA_QT_MODULES="libssl;libcrypto"
 echo "Environment variables set"
 

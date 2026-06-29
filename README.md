@@ -72,6 +72,23 @@ We want to fix that!
 Please [open an issue here](https://github.com/Jvr2022/seb-linux/issues)
 with some details about your system and what version of Linux you're using.
 
+## Known issues
+
+### Unable to spawn a new child process: Failed to spawn child process “/usr/lib/x86_64-linux-gnu/webkit2gtk-4.1/WebKitNetworkProcess”
+
+It is impossible for WebKitGTK-dependent packages to utilize the libraries from
+inside the AppImage, hence you have to have webkit2gtk-4.1 installed,
+and as far as I can tell it only works on Debian-based systems.
+
+The workarounds are:
+
+- Using the Qt build.
+- Installing the package.
+- Running a Debian container.
+
+Although we can't seem to fix this, we might provide other backends
+as an alternative or there may be a fix in the future.
+
 ## License
 
 This is an open-source project licensed under the `MPL2`.

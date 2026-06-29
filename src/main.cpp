@@ -315,6 +315,9 @@ void applyCommandLineOverrides(const QCommandLineParser &parser, seb::SebSetting
 
 }  // namespace
 
+const QString version = QString::fromUtf8(VERSION);
+const QString packagename = QString::fromUtf8(PACKAGE_NAME);
+
 int main(int argc, char *argv[])
 {
     applyEarlyEnvironment(argc, argv);
@@ -323,9 +326,9 @@ int main(int argc, char *argv[])
     
      const QIcon appIcon(QStringLiteral(":/assets/icons/safe-exam-browser.png"));
     app.setWindowIcon(appIcon);
-    app.setDesktopFileName(QStringLiteral("safe-exam-browser"));
+    app.setDesktopFileName(packagename);
     QCoreApplication::setApplicationName(QStringLiteral("Safe Exam Browser"));
-    QCoreApplication::setApplicationVersion(QStringLiteral("0.1.0"));
+    QCoreApplication::setApplicationVersion(version);
 
     QCommandLineParser parser;
     parser.setApplicationDescription(QStringLiteral(
