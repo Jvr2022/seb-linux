@@ -78,13 +78,13 @@ with some details about your system and what version of Linux you're using.
 
 It is impossible for WebKitGTK-dependent packages to utilize the libraries from
 inside the AppImage, hence you have to have webkit2gtk-4.1 installed,
-and as far as I can tell it only works with debian systems.
+and as far as I can tell it only works on Debian-based systems.
 
 The workarounds are:
 
-- Using the QT build.
+- Using the Qt build.
 - Installing the package.
-- Running a debian container.
+- Running a Debian container.
 
 Although we can't seem to fix this, we might provide other backends
 as an alternative or there may be a fix in the future.
