@@ -315,8 +315,8 @@ void applyCommandLineOverrides(const QCommandLineParser &parser, seb::SebSetting
 
 }  // namespace
 
-const QString version = QString::fromStdString(VERSION);
-const QString packagename = QString::fromStdString(PACKAGE_NAME);
+const QString version = QString::fromUtf8(VERSION);
+const QString packagename = QString::fromUtf8(PACKAGE_NAME);
 
 int main(int argc, char *argv[])
 {
