@@ -17,8 +17,11 @@ so you can just focus on your exam.
 ### Running Everywhere
 
 Safe Exam Browser has options for QtWebEngine and WebKitGTK.
-We've also packaged all of the dependencies inside AppImage files so
-Safe Exam Browser for Linux really can run anywhere.
+We've also packaged dependencies inside AppImage files for portable installs.
+
+**Supported AppImage targets (x86_64):** Ubuntu 22.04+, Fedora 39+, and other
+distributions with **glibc ≥ 2.35**. Release AppImages are built on Ubuntu 22.04
+so they stay compatible across those systems.
 
 ## Getting Started
 
@@ -35,10 +38,10 @@ and `libgtk-3-dev` installed so we can use the fallback engine.
 
 ### How to Build
 
-Note: This is for binary builds, for AppImage builds you can use
-prebuilt images or utilize `./scripts/build-release.sh`, the dependencies should
-be installed automatically on debian systems. It is recommended to build inside
-of a debian system or a debian container.
+Note: This is for binary builds. For AppImage builds use prebuilt releases or
+`./scripts/build-release.sh` (dependencies install automatically on Debian/Ubuntu).
+Build AppImages on **Ubuntu 22.04** (or an Ubuntu 22.04 container) so the glibc
+floor stays at 2.35 and the result runs on Ubuntu 22.04+ and Fedora 39+.
 
 For binary builds, it's pretty simple:
 

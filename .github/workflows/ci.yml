@@ -7,6 +7,9 @@ on:
       - master
   pull_request:
 
+env:
+  APPIMAGE_EXTRACT_AND_RUN: "1"
+
 jobs:
   build-qtwebengine:
     runs-on: ubuntu-24.04
@@ -109,3 +112,82 @@ jobs:
           ldd artifacts/webkitgtk/safe-exam-browser | grep -q 'libwebkit2gtk-4.1'
           ! ldd artifacts/webkitgtk/safe-exam-browser | grep -q 'libQt6WebEngine'
           artifacts/webkitgtk/safe-exam-browser --version
+
+  # Portable AppImages are built on Ubuntu 22.04 (glibc 2.35) for Ubuntu 22.04+ / Fedora 39+.
+  # Full AppImage packaging is heavy; run on main/master pushes (not every PR).
+  build-appimage:
+    if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master')
+    runs-on: ubuntu-latest
+    container:
+      image: ubuntu:22.04
+    steps:
+      - name: Bootstrap container packages
+        run: |
+          apt-get update
+          DEBIAN_FRONTEND=noninteractive apt-get install -y \
+            ca-certificates \
+            git \
+            wget \
+            sudo \
+            binutils
+
+      - uses: actions/checkout@v7
+
+      - name: Build AppImage artifacts
+        run: |
+          chmod +x scripts/build-release.sh
+          scripts/build-release.sh "0.0.0-ci"
+
+      - name: Upload AppImage artifacts
+        uses: actions/upload-artifact@v7
+        with:
+          name: safe-exam-browser-appimage
+          path: |
+            dist/*.AppImage
+          if-no-files-found: error
+
+  appimage-smoke-ubuntu:
+    needs:
+      - build-appimage
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Download AppImage artifacts
+        uses: actions/download-artifact@v8
+        with:
+          name: safe-exam-browser-appimage
+          path: dist
+
+      - name: Smoke-test AppImages on Ubuntu
+        env:
+          QT_QPA_PLATFORM: offscreen
+          APPIMAGE_EXTRACT_AND_RUN: "1"
+        run: |
+          chmod +x dist/*.AppImage
+          for appimage in dist/*.AppImage; do
+            echo "Running ${appimage} --version"
+            "${appimage}" --version
+          done
+
+  appimage-smoke-fedora:
+    needs:
+      - build-appimage
+    runs-on: ubuntu-latest
+    container:
+      image: fedora:latest
+    steps:
+      - name: Download AppImage artifacts
+        uses: actions/download-artifact@v8
+        with:
+          name: safe-exam-browser-appimage
+          path: dist
+
+      - name: Smoke-test AppImages on Fedora
+        env:
+          QT_QPA_PLATFORM: offscreen
+          APPIMAGE_EXTRACT_AND_RUN: "1"
+        run: |
+          chmod +x dist/*.AppImage
+          for appimage in dist/*.AppImage; do
+            echo "Running ${appimage} --version"
+            "${appimage}" --version
+          done
