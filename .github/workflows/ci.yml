@@ -154,6 +154,7 @@ jobs:
       - name: Install AppImage host runtime libs
         run: |
           # GL/EGL/OpenGL stay on the host (not bundled). Fonts/GTK bits help the WebKit AppImage.
+          # AppImages only ship the xcb Qt plugin, so smoke under Xvfb.
           sudo apt-get update
           sudo apt-get install -y \
             libegl1 \
@@ -164,7 +165,8 @@ jobs:
             fontconfig \
             libxkbcommon0 \
             libgtk-3-0t64 \
-            libwebkit2gtk-4.1-0
+            libwebkit2gtk-4.1-0 \
+            xvfb
 
       - name: Download AppImage artifacts
         uses: actions/download-artifact@v8
@@ -174,13 +176,13 @@ jobs:
 
       - name: Smoke-test AppImages on Ubuntu
         env:
-          QT_QPA_PLATFORM: offscreen
+          QT_QPA_PLATFORM: xcb
           APPIMAGE_EXTRACT_AND_RUN: "1"
         run: |
           chmod +x dist/*.AppImage
           for appimage in dist/*.AppImage; do
             echo "Running ${appimage} --version"
-            "${appimage}" --version
+            xvfb-run -a "${appimage}" --version
           done
 
   appimage-smoke-fedora:
@@ -202,7 +204,8 @@ jobs:
             fontconfig \
             libxkbcommon \
             gtk3 \
-            webkit2gtk4.1
+            webkit2gtk4.1 \
+            xorg-x11-server-Xvfb
 
       - name: Download AppImage artifacts
         uses: actions/download-artifact@v8
@@ -212,11 +215,11 @@ jobs:
 
       - name: Smoke-test AppImages on Fedora
         env:
-          QT_QPA_PLATFORM: offscreen
+          QT_QPA_PLATFORM: xcb
           APPIMAGE_EXTRACT_AND_RUN: "1"
         run: |
           chmod +x dist/*.AppImage
           for appimage in dist/*.AppImage; do
             echo "Running ${appimage} --version"
-            "${appimage}" --version
+            xvfb-run -a "${appimage}" --version
           done
