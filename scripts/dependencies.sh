@@ -46,14 +46,20 @@ PACKAGES=(
     libnss3
     libssh2-1
     libssl3
-    libtiff-dev
     libxcb-cursor0
     libxcb-xinput0
     libjpeg62
     wget
 )
 
-# Jammy provides liblerc3; Noble+ provides liblerc4. Install at most one.
+# Jammy: libtiff5 / liblerc3; Noble+: libtiff6 / liblerc4.
+if apt-cache show libtiff6 >/dev/null 2>&1; then
+    PACKAGES+=(libtiff6)
+elif apt-cache show libtiff5 >/dev/null 2>&1; then
+    PACKAGES+=(libtiff5)
+fi
+PACKAGES+=(libtiff-dev)
+
 if apt-cache show liblerc4 >/dev/null 2>&1; then
     PACKAGES+=(liblerc4)
 elif apt-cache show liblerc3 >/dev/null 2>&1; then

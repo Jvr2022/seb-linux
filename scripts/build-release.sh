@@ -33,15 +33,14 @@ REQUIRED_EXTRA_LIBS=(
     libQt6QmlWorkerScript.so.6
     libsmime3.so
     libssh2.so.1
-    libtiff.so.6
     libxcb-cursor.so.0
     libxcb-xinput.so.0
 )
 
-# Optional: Jammy has libLerc.so.3, Noble+ has libLerc.so.4.
-OPTIONAL_EXTRA_LIBS=(
-    libLerc.so.4
-    libLerc.so.3
+# Prefer newer sonames first. Jammy: libtiff.so.5 / libLerc.so.3; Noble+: .6 / .4.
+ALTERNATE_EXTRA_LIBS=(
+    "libtiff.so.6|libtiff.so.5"
+    "libLerc.so.4|libLerc.so.3"
 )
 
 echo "Variables set"
@@ -141,7 +140,8 @@ resolve_library_path() {
 build_linuxdeploy_extra_args() {
     local lib_name
     local lib_path
-    local found_lerc=0
+    local alt_group
+    local found
 
     LINUXBUILD_EXTRA_ARGS=()
 
@@ -153,17 +153,20 @@ build_linuxdeploy_extra_args() {
         LINUXBUILD_EXTRA_ARGS+=(-l "${lib_path}")
     done
 
-    for lib_name in "${OPTIONAL_EXTRA_LIBS[@]}"; do
-        if lib_path="$(resolve_library_path "${lib_name}")"; then
-            LINUXBUILD_EXTRA_ARGS+=(-l "${lib_path}")
-            found_lerc=1
-            break
+    for alt_group in "${ALTERNATE_EXTRA_LIBS[@]}"; do
+        found=0
+        IFS='|' read -r -a alt_libs <<< "${alt_group}"
+        for lib_name in "${alt_libs[@]}"; do
+            if lib_path="$(resolve_library_path "${lib_name}")"; then
+                LINUXBUILD_EXTRA_ARGS+=(-l "${lib_path}")
+                found=1
+                break
+            fi
+        done
+        if [[ "${found}" -eq 0 ]]; then
+            echo "Warning: none of these libraries found (optional): ${alt_group}" >&2
         fi
     done
-
-    if [[ "${found_lerc}" -eq 0 ]]; then
-        echo "Warning: libLerc not found (optional); continuing without it" >&2
-    fi
 }
 
 version_gt() {
