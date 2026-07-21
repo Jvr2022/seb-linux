@@ -39,6 +39,7 @@ PACKAGES=(
     libatomic1
     libdeflate0
     libjbig0
+    libfreetype6
     libngtcp2-dev
     libngtcp2-crypto-gnutls-dev
     libqt6pdf6

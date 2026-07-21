@@ -151,6 +151,20 @@ jobs:
       - build-appimage
     runs-on: ubuntu-24.04
     steps:
+      - name: Install AppImage host runtime libs
+        run: |
+          # libEGL/GL stay on the host (not bundled). Fonts/GTK bits help the WebKit AppImage.
+          sudo apt-get update
+          sudo apt-get install -y \
+            libegl1 \
+            libgl1 \
+            libgles2 \
+            libfreetype6 \
+            fontconfig \
+            libxkbcommon0 \
+            libgtk-3-0t64 \
+            libwebkit2gtk-4.1-0
+
       - name: Download AppImage artifacts
         uses: actions/download-artifact@v8
         with:
@@ -175,6 +189,18 @@ jobs:
     container:
       image: fedora:latest
     steps:
+      - name: Install AppImage host runtime libs
+        run: |
+          dnf install -y \
+            libglvnd-egl \
+            mesa-libEGL \
+            mesa-libGL \
+            freetype \
+            fontconfig \
+            libxkbcommon \
+            gtk3 \
+            webkit2gtk4.1
+
       - name: Download AppImage artifacts
         uses: actions/download-artifact@v8
         with:

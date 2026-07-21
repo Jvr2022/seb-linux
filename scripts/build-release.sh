@@ -27,6 +27,7 @@ REQUIRED_EXTRA_LIBS=(
     libsoftokn3.so
     libatomic.so.1
     libdeflate.so.0
+    libfreetype.so.6
     libjbig.so.0
     libjpeg.so.62
     libQt6Pdf.so.6
