@@ -98,6 +98,7 @@ run_logged() {
 resolve_library_path() {
     local lib_name="$1"
     local resolved=""
+    local candidate
 
     if command -v ldconfig >/dev/null; then
         resolved="$(ldconfig -p 2>/dev/null | awk -v name="${lib_name}" '
@@ -112,11 +113,15 @@ resolve_library_path() {
         ')"
     fi
 
-    if [[ -z "${resolved}" ]]; then
-        local candidate
+    # NSS modules (e.g. libsoftokn3.so) live under .../nss/ and are often absent
+    # from ldconfig -p / the top-level multiarch lib dir.
+    if [[ -z "${resolved}" || ! -e "${resolved}" ]]; then
         for candidate in \
+            "/usr/lib/x86_64-linux-gnu/nss/${lib_name}" \
             "/usr/lib/x86_64-linux-gnu/${lib_name}" \
+            "/usr/lib64/nss/${lib_name}" \
             "/usr/lib64/${lib_name}" \
+            "/usr/lib/nss/${lib_name}" \
             "/usr/lib/${lib_name}"; do
             if [[ -e "${candidate}" ]]; then
                 resolved="${candidate}"
@@ -125,12 +130,9 @@ resolve_library_path() {
         done
     fi
 
-    if [[ -n "${resolved}" ]]; then
-        # Prefer the real file over a dangling/relative ldconfig entry.
-        if [[ -e "${resolved}" ]]; then
-            readlink -f "${resolved}" 2>/dev/null || printf '%s\n' "${resolved}"
-            return 0
-        fi
+    if [[ -n "${resolved}" && -e "${resolved}" ]]; then
+        readlink -f "${resolved}" 2>/dev/null || printf '%s\n' "${resolved}"
+        return 0
     fi
 
     return 1
