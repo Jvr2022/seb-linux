@@ -153,12 +153,13 @@ jobs:
     steps:
       - name: Install AppImage host runtime libs
         run: |
-          # libEGL/GL stay on the host (not bundled). Fonts/GTK bits help the WebKit AppImage.
+          # GL/EGL/OpenGL stay on the host (not bundled). Fonts/GTK bits help the WebKit AppImage.
           sudo apt-get update
           sudo apt-get install -y \
             libegl1 \
             libgl1 \
             libgles2 \
+            libopengl0 \
             libfreetype6 \
             fontconfig \
             libxkbcommon0 \
@@ -193,6 +194,8 @@ jobs:
         run: |
           dnf install -y \
             libglvnd-egl \
+            libglvnd-glx \
+            libglvnd-opengl \
             mesa-libEGL \
             mesa-libGL \
             freetype \
