@@ -6,6 +6,7 @@
 #include <QApplication>
 #include <QCommandLineOption>
 #include <QCommandLineParser>
+#include <QDir>
 #include <QIcon>
 #include <QInputDialog>
 #include <QLineEdit>
@@ -146,6 +147,32 @@ static void appendPkexecEnvironmentVariable(QStringList &args, const char *name)
     if (!value.isEmpty()) {
         args << (QString(name) + QLatin1Char('=') + QString::fromLocal8Bit(value));
     }
+}
+
+// Build pkexec argv without --keep-cwd (unsupported on Ubuntu 22.04 / pkexec 0.105).
+// Preserve the caller's cwd via /bin/sh so AppImage and relative paths keep working.
+static QStringList buildPkexecArguments(const QStringList &appArgs,
+                                        const QStringList &extraEnvAssignments = {})
+{
+    QStringList pkexecArgs;
+    pkexecArgs << QStringLiteral("env");
+    appendPkexecEnvironmentVariable(pkexecArgs, "DISPLAY");
+    appendPkexecEnvironmentVariable(pkexecArgs, "WAYLAND_DISPLAY");
+    appendPkexecEnvironmentVariable(pkexecArgs, "XAUTHORITY");
+    appendPkexecEnvironmentVariable(pkexecArgs, "XDG_RUNTIME_DIR");
+    appendPkexecEnvironmentVariable(pkexecArgs, "XDG_SESSION_TYPE");
+    appendPkexecEnvironmentVariable(pkexecArgs, "DBUS_SESSION_BUS_ADDRESS");
+    appendPkexecEnvironmentVariable(pkexecArgs, "QT_QPA_PLATFORM");
+    pkexecArgs << extraEnvAssignments;
+
+    pkexecArgs << QStringLiteral("/bin/sh");
+    pkexecArgs << QStringLiteral("-c");
+    pkexecArgs << QStringLiteral("cd -- \"$1\" && shift && exec \"$@\"");
+    pkexecArgs << QStringLiteral("sh");
+    pkexecArgs << QDir::currentPath();
+    pkexecArgs << QCoreApplication::applicationFilePath();
+    pkexecArgs << appArgs;
+    return pkexecArgs;
 }
 
 static int runNonDetachedPkexecChild(QProcess &child)
@@ -460,21 +487,7 @@ int main(int argc, char *argv[])
 
             QProcess child;
             child.setProgram(QStringLiteral("pkexec"));
-
-            QStringList pkexecArgs;
-            pkexecArgs << QStringLiteral("--keep-cwd");
-            pkexecArgs << QStringLiteral("env");
-            appendPkexecEnvironmentVariable(pkexecArgs, "DISPLAY");
-            appendPkexecEnvironmentVariable(pkexecArgs, "WAYLAND_DISPLAY");
-            appendPkexecEnvironmentVariable(pkexecArgs, "XAUTHORITY");
-            appendPkexecEnvironmentVariable(pkexecArgs, "XDG_RUNTIME_DIR");
-            appendPkexecEnvironmentVariable(pkexecArgs, "XDG_SESSION_TYPE");
-            appendPkexecEnvironmentVariable(pkexecArgs, "DBUS_SESSION_BUS_ADDRESS");
-            appendPkexecEnvironmentVariable(pkexecArgs, "QT_QPA_PLATFORM");
-            pkexecArgs << QCoreApplication::applicationFilePath();
-            pkexecArgs << args;
-
-            child.setArguments(pkexecArgs);
+            child.setArguments(buildPkexecArguments(args));
             return runNonDetachedPkexecChild(child);
         }
 
@@ -498,27 +511,15 @@ int main(int argc, char *argv[])
             if (!args.contains(QStringLiteral("--anti-cheat"))) {
                 args.prepend(QStringLiteral("--anti-cheat"));
             }
-            
+
+            QStringList extraEnv;
+            if (usedPassword) {
+                extraEnv << (QStringLiteral("SEB_PASSWORD=") + userPassword);
+            }
+
             QProcess child;
             child.setProgram(QStringLiteral("pkexec"));
-            
-            QStringList pkexecArgs;
-            pkexecArgs << QStringLiteral("--keep-cwd");
-            pkexecArgs << QStringLiteral("env");
-            appendPkexecEnvironmentVariable(pkexecArgs, "DISPLAY");
-            appendPkexecEnvironmentVariable(pkexecArgs, "WAYLAND_DISPLAY");
-            appendPkexecEnvironmentVariable(pkexecArgs, "XAUTHORITY");
-            appendPkexecEnvironmentVariable(pkexecArgs, "XDG_RUNTIME_DIR");
-            appendPkexecEnvironmentVariable(pkexecArgs, "XDG_SESSION_TYPE");
-            appendPkexecEnvironmentVariable(pkexecArgs, "DBUS_SESSION_BUS_ADDRESS");
-            appendPkexecEnvironmentVariable(pkexecArgs, "QT_QPA_PLATFORM");
-            if (usedPassword) {
-                pkexecArgs << (QStringLiteral("SEB_PASSWORD=") + userPassword);
-            }
-            pkexecArgs << QCoreApplication::applicationFilePath();
-            pkexecArgs << args;
-            
-            child.setArguments(pkexecArgs);
+            child.setArguments(buildPkexecArguments(args, extraEnv));
             return runNonDetachedPkexecChild(child);
         }
     }
