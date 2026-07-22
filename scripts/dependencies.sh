@@ -50,6 +50,7 @@ PACKAGES=(
     libxcb-cursor0
     libxcb-xinput0
     libjpeg62
+    qt6-qpa-plugins
     wget
 )
 

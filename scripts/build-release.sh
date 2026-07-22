@@ -256,9 +256,12 @@ echo "Installing dependencies"
 unset QML_SOURCES_PATHS
 unset QMAKE
 unset EXTRA_QT_MODULES
+unset EXTRA_PLATFORM_PLUGINS
 export QML_SOURCES_PATHS="$PROJECT_DIR"/src
 export QMAKE=$(which qmake6)
 export EXTRA_QT_MODULES="libssl;libcrypto"
+# Menu/anti-cheat lockdown uses QT_QPA_PLATFORM=linuxfb on a bare VT.
+export EXTRA_PLATFORM_PLUGINS="libqlinuxfb.so"
 echo "Environment variables set"
 
 mkdir -p "${BUILD_DIR}" "${ARTIFACT_DIR}" "${TOOLS_DIR}"
