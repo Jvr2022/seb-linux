@@ -149,6 +149,21 @@ static void appendPkexecEnvironmentVariable(QStringList &args, const char *name)
     }
 }
 
+// When running from an AppImage, applicationFilePath() is under the FUSE mount
+// (/tmp/.mount_*/usr/bin/...). Root cannot execute that path after pkexec.
+// Prefer $APPIMAGE so elevation re-runs the outer AppImage file instead.
+static QString elevatedExecutablePath()
+{
+    const QByteArray appImage = qgetenv("APPIMAGE");
+    if (!appImage.isEmpty()) {
+        const QString path = QString::fromLocal8Bit(appImage);
+        if (QFileInfo::exists(path)) {
+            return path;
+        }
+    }
+    return QCoreApplication::applicationFilePath();
+}
+
 // Build pkexec argv without --keep-cwd (unsupported on Ubuntu 22.04 / pkexec 0.105).
 // Preserve the caller's cwd via /bin/sh so AppImage and relative paths keep working.
 static QStringList buildPkexecArguments(const QStringList &appArgs,
@@ -163,6 +178,12 @@ static QStringList buildPkexecArguments(const QStringList &appArgs,
     appendPkexecEnvironmentVariable(pkexecArgs, "XDG_SESSION_TYPE");
     appendPkexecEnvironmentVariable(pkexecArgs, "DBUS_SESSION_BUS_ADDRESS");
     appendPkexecEnvironmentVariable(pkexecArgs, "QT_QPA_PLATFORM");
+    // Keep AppImage runtime hints for the elevated re-exec.
+    appendPkexecEnvironmentVariable(pkexecArgs, "APPIMAGE");
+    appendPkexecEnvironmentVariable(pkexecArgs, "APPDIR");
+    appendPkexecEnvironmentVariable(pkexecArgs, "OWD");
+    appendPkexecEnvironmentVariable(pkexecArgs, "ARGV0");
+    appendPkexecEnvironmentVariable(pkexecArgs, "APPIMAGE_EXTRACT_AND_RUN");
     pkexecArgs << extraEnvAssignments;
 
     pkexecArgs << QStringLiteral("/bin/sh");
@@ -170,7 +191,7 @@ static QStringList buildPkexecArguments(const QStringList &appArgs,
     pkexecArgs << QStringLiteral("cd -- \"$1\" && shift && exec \"$@\"");
     pkexecArgs << QStringLiteral("sh");
     pkexecArgs << QDir::currentPath();
-    pkexecArgs << QCoreApplication::applicationFilePath();
+    pkexecArgs << elevatedExecutablePath();
     pkexecArgs << appArgs;
     return pkexecArgs;
 }
