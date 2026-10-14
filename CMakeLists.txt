@@ -44,10 +44,17 @@ if(PkgConfig_FOUND)
     if(WEBKITGTK_FOUND)
         set(webkitgtk_available TRUE)
     endif()
+
+    pkg_check_modules(LIBSECRET QUIET libsecret-1)
 endif()
 
 set(SEB_HAS_QTWEBENGINE 0)
 set(SEB_HAS_WEBKITGTK 0)
+set(SEB_HAS_LIBSECRET 0)
+
+if(LIBSECRET_FOUND)
+    set(SEB_HAS_LIBSECRET 1)
+endif()
 
 if(SEB_FORCE_QTWEBENGINE)
     if(NOT qtwebengine_available)
@@ -407,6 +414,7 @@ target_compile_definitions(safe-exam-browser PRIVATE
     SEB_HAS_QTWEBENGINE=${SEB_HAS_QTWEBENGINE}
     SEB_HAS_WEBKITGTK=${SEB_HAS_WEBKITGTK}
     SEB_HAS_ANY_ENGINE=${SEB_HAS_ANY_ENGINE}
+    SEB_HAS_LIBSECRET=${SEB_HAS_LIBSECRET}
 )
 
 if(SEB_DEV_BYPASS)
@@ -431,6 +439,13 @@ if(SEB_HAS_WEBKITGTK)
     target_include_directories(safe-exam-browser PRIVATE ${WEBKITGTK_INCLUDE_DIRS})
     target_compile_options(safe-exam-browser PRIVATE ${WEBKITGTK_CFLAGS_OTHER})
     target_link_libraries(safe-exam-browser PRIVATE ${WEBKITGTK_LIBRARIES})
+endif()
+
+if(SEB_HAS_LIBSECRET)
+    target_include_directories(safe-exam-browser PRIVATE ${LIBSECRET_INCLUDE_DIRS})
+    target_link_directories(safe-exam-browser PRIVATE ${LIBSECRET_LIBRARY_DIRS})
+    target_compile_options(safe-exam-browser PRIVATE ${LIBSECRET_CFLAGS_OTHER})
+    target_link_libraries(safe-exam-browser PRIVATE ${LIBSECRET_LIBRARIES})
 endif()
 
 include(GNUInstallDirs)

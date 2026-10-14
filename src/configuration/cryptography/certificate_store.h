@@ -3,7 +3,6 @@
 #include "../contracts/cryptography/i_certificate_store.h"
 
 #include <QHash>
-#include <QString>
 
 namespace seb::configuration::cryptography {
 
@@ -19,7 +18,6 @@ public:
 private:
     void loadPersistedIdentities();
     bool persistIdentity(const QByteArray &keyHash, const QByteArray &data) const;
-    QString identityStoragePath() const;
 
     QHash<QByteArray, QSslCertificate> certificates_;
     QHash<QByteArray, QSslKey> privateKeys_;

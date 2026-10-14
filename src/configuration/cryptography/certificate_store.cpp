@@ -2,24 +2,46 @@
 
 #include <QBuffer>
 #include <QCryptographicHash>
-#include <QDir>
-#include <QFile>
-#include <QFileInfo>
 #include <QMetaType>
-#include <QSaveFile>
-#include <QStandardPaths>
 #include <QSslKey>
 
 #include <openssl/asn1.h>
 #include <openssl/x509.h>
 
+#if SEB_HAS_LIBSECRET
+#pragma push_macro("signals")
+#undef signals
+#include <libsecret/secret.h>
+#pragma pop_macro("signals")
+#endif
+
 namespace seb::configuration::cryptography {
 namespace {
 
 constexpr int IdentityCertificateType = 1;
-constexpr char IdentityFilePattern[] = "*.sebidentity";
-constexpr char IdentityFileSuffix[] = ".sebidentity";
-constexpr char IdentityDirectoryName[] = "identities";
+
+#if SEB_HAS_LIBSECRET
+constexpr char IdentitySchemaName[] = "org.safeexambrowser.seb.identity";
+constexpr char IdentityHashAttribute[] = "public-key-sha1";
+constexpr char IdentitySecretContentType[] = "application/x-pkcs12";
+
+const SecretSchema IdentitySchema = {
+    IdentitySchemaName,
+    SECRET_SCHEMA_NONE,
+    {
+        {IdentityHashAttribute, SECRET_SCHEMA_ATTRIBUTE_STRING},
+        {nullptr, SECRET_SCHEMA_ATTRIBUTE_STRING},
+    },
+    0,
+    nullptr,
+    nullptr,
+    nullptr,
+    nullptr,
+    nullptr,
+    nullptr,
+    nullptr,
+};
+#endif
 
 QByteArray publicKeyHash(const QSslCertificate &certificate)
 {
@@ -126,79 +148,101 @@ bool CertificateStore::tryGetPrivateKeyFor(const QSslCertificate &certificate, Q
     return true;
 }
 
-QString CertificateStore::identityStoragePath() const
-{
-    QString appDataPath = QStandardPaths::writableLocation(QStandardPaths::AppDataLocation);
-    if (appDataPath.isEmpty()) {
-        appDataPath = QDir::homePath() + QStringLiteral("/.seb-linux");
-    }
-    return QDir(appDataPath).filePath(QString::fromLatin1(IdentityDirectoryName));
-}
-
 void CertificateStore::loadPersistedIdentities()
 {
-    const QDir directory(identityStoragePath());
-    if (!directory.exists()) {
-        return;
+#if SEB_HAS_LIBSECRET
+    GError *error = nullptr;
+    GList *items = secret_password_search_sync(
+        &IdentitySchema,
+        static_cast<SecretSearchFlags>(SECRET_SEARCH_ALL | SECRET_SEARCH_LOAD_SECRETS),
+        nullptr,
+        &error,
+        nullptr);
+    if (error != nullptr) {
+        g_error_free(error);
     }
 
-    const QFileInfoList files = directory.entryInfoList(
-        QStringList{QString::fromLatin1(IdentityFilePattern)},
-        QDir::Files | QDir::Readable, QDir::Name);
-    for (const QFileInfo &fileInfo : files) {
-        QFile file(fileInfo.absoluteFilePath());
-        if (!file.open(QIODevice::ReadOnly)) {
-            continue;
-        }
+    for (GList *entry = items; entry != nullptr; entry = entry->next) {
+        auto *item = SECRET_ITEM(entry->data);
+        GHashTable *attributes = secret_item_get_attributes(item);
+        const gchar *hashText = attributes == nullptr
+            ? nullptr
+            : static_cast<const gchar *>(g_hash_table_lookup(
+                  attributes, IdentityHashAttribute));
+        const SecretValue *secret = secret_item_get_secret(item);
+        gsize secretLength = 0;
+        const gchar *secretData = secret == nullptr
+            ? nullptr
+            : secret_value_get(const_cast<SecretValue *>(secret), &secretLength);
 
-        const QByteArray data = file.readAll();
+        const QByteArray data = secretData == nullptr
+            ? QByteArray{}
+            : QByteArray(secretData, static_cast<qsizetype>(secretLength));
         QSslCertificate certificate;
         QSslKey privateKey;
         if (data.isEmpty() || !importIdentity(data, certificate, privateKey)) {
+            if (attributes != nullptr) {
+                g_hash_table_unref(attributes);
+            }
             continue;
         }
 
         const QByteArray keyHash = publicKeyHash(certificate);
-        if (keyHash.isEmpty()) {
+        if (keyHash.isEmpty() || hashText == nullptr
+            || QByteArray(hashText) != keyHash.toHex()) {
+            if (attributes != nullptr) {
+                g_hash_table_unref(attributes);
+            }
             continue;
         }
 
         certificates_.insert(keyHash, certificate);
-        if (!privateKey.isNull()) {
-            privateKeys_.insert(keyHash, privateKey);
+        privateKeys_.insert(keyHash, privateKey);
+        if (attributes != nullptr) {
+            g_hash_table_unref(attributes);
         }
     }
+
+    g_list_free_full(items, g_object_unref);
+#endif
 }
 
 bool CertificateStore::persistIdentity(const QByteArray &keyHash, const QByteArray &data) const
 {
+#if SEB_HAS_LIBSECRET
     if (keyHash.isEmpty() || data.isEmpty()) {
         return false;
     }
 
-    const QString path = identityStoragePath();
-    QDir directory;
-    if (!directory.mkpath(path)) {
+    const QByteArray hashText = keyHash.toHex();
+    const QByteArray label = QByteArrayLiteral("Safe Exam Browser identity ") + hashText;
+    SecretValue *secret = secret_value_new(
+        data.constData(), data.size(), IdentitySecretContentType);
+    if (secret == nullptr) {
         return false;
     }
 
-    QFile::setPermissions(
-        path,
-        QFileDevice::ReadOwner | QFileDevice::WriteOwner | QFileDevice::ExeOwner);
-
-    const QString filePath = QDir(path).filePath(
-        QString::fromLatin1(keyHash.toHex()) + QString::fromLatin1(IdentityFileSuffix));
-    QSaveFile file(filePath);
-    if (!file.open(QIODevice::WriteOnly)) {
-        return false;
+    GError *error = nullptr;
+    const gboolean stored = secret_password_store_binary_sync(
+        &IdentitySchema,
+        nullptr,
+        label.constData(),
+        secret,
+        nullptr,
+        &error,
+        IdentityHashAttribute,
+        hashText.constData(),
+        nullptr);
+    secret_value_unref(secret);
+    if (error != nullptr) {
+        g_error_free(error);
     }
-    file.setPermissions(QFileDevice::ReadOwner | QFileDevice::WriteOwner);
-    if (file.write(data) != data.size() || !file.commit()) {
-        return false;
-    }
-
-    return QFile::setPermissions(
-        filePath, QFileDevice::ReadOwner | QFileDevice::WriteOwner);
+    return stored != FALSE;
+#else
+    Q_UNUSED(keyHash)
+    Q_UNUSED(data)
+    return false;
+#endif
 }
 
 void CertificateStore::extractAndImportIdentities(QVariantMap &data)
