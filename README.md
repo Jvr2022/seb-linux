@@ -1,3 +1,9 @@
+
+> [!WARNING]  
+> This branch still got the legacy v0.x code.
+> We are currently working on v1.x inside the branch named "v1".
+> Feel free to help! :)
+
 <div align="center">
   <img src="assets/icons/safe-exam-browser.png" alt="Safe Exam Browser for Linux logo" width="120" />
 </div>
