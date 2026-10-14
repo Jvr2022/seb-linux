@@ -34,23 +34,23 @@ QByteArray publicKeyHash(const QSslCertificate &certificate)
         return {};
     }
 
-    const ASN1_BIT_STRING *encodedKey = X509_get0_pubkey_bitstr(x509);
-    QByteArray encodedValue;
-    if (encodedKey != nullptr) {
-        const int length = i2d_ASN1_BIT_STRING(encodedKey, nullptr);
-        if (length > 0) {
-            encodedValue.resize(length);
-            unsigned char *output = reinterpret_cast<unsigned char *>(encodedValue.data());
-            if (i2d_ASN1_BIT_STRING(encodedKey, &output) != length) {
-                encodedValue.clear();
-            }
-        }
+    const ASN1_BIT_STRING *keyValue = X509_get0_pubkey_bitstr(x509);
+    if (keyValue == nullptr) {
+        X509_free(x509);
+        return {};
     }
+
+    const auto *bytes = ASN1_STRING_get0_data(reinterpret_cast<const ASN1_STRING *>(keyValue));
+    const int length = ASN1_STRING_length(reinterpret_cast<const ASN1_STRING *>(keyValue));
+    if (bytes == nullptr || length <= 0) {
+        X509_free(x509);
+        return {};
+    }
+
+    const QByteArray rawKeyValue(reinterpret_cast<const char *>(bytes), length);
     X509_free(x509);
 
-    return encodedValue.isEmpty()
-        ? QByteArray{}
-        : QCryptographicHash::hash(encodedValue, QCryptographicHash::Sha1);
+    return QCryptographicHash::hash(rawKeyValue, QCryptographicHash::Sha1);
 }
 
 QByteArray certificateDataFrom(const QVariantMap &data)
