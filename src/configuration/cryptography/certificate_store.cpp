@@ -1,9 +1,94 @@
 #include "certificate_store.h"
 
+#include <QBuffer>
+#include <QCryptographicHash>
 #include <QSslKey>
-#include <QDebug>
+
+#include <openssl/asn1.h>
+#include <openssl/x509.h>
 
 namespace seb::configuration::cryptography {
+namespace {
+
+constexpr int IdentityCertificateType = 1;
+
+QByteArray publicKeyHash(const QSslCertificate &certificate)
+{
+    const QByteArray encodedCertificate = certificate.toDer();
+    if (encodedCertificate.isEmpty()) {
+        return {};
+    }
+
+    const unsigned char *cursor = reinterpret_cast<const unsigned char *>(encodedCertificate.constData());
+    X509 *x509 = d2i_X509(nullptr, &cursor, encodedCertificate.size());
+    if (x509 == nullptr) {
+        return {};
+    }
+
+    const ASN1_BIT_STRING *encodedKey = X509_get0_pubkey_bitstr(x509);
+    QByteArray encodedValue;
+    if (encodedKey != nullptr) {
+        const int length = i2d_ASN1_BIT_STRING(encodedKey, nullptr);
+        if (length > 0) {
+            encodedValue.resize(length);
+            unsigned char *output = reinterpret_cast<unsigned char *>(encodedValue.data());
+            if (i2d_ASN1_BIT_STRING(encodedKey, &output) != length) {
+                encodedValue.clear();
+            }
+        }
+    }
+    X509_free(x509);
+
+    return encodedValue.isEmpty()
+        ? QByteArray{}
+        : QCryptographicHash::hash(encodedValue, QCryptographicHash::Sha1);
+}
+
+QByteArray certificateDataFrom(const QVariantMap &data)
+{
+    const QByteArray certificateData = data.value(QStringLiteral("certificateData")).toByteArray();
+    if (!certificateData.isEmpty()) {
+        return certificateData;
+    }
+
+    const QString base64 = data.value(QStringLiteral("certificateDataBase64")).toString();
+    if (base64.isEmpty()) {
+        return {};
+    }
+
+    const auto decoded = QByteArray::fromBase64Encoding(
+        base64.toLatin1(), QByteArray::AbortOnBase64DecodingErrors);
+    return decoded.decodingStatus == QByteArray::Base64DecodingStatus::Ok
+        ? decoded.decoded
+        : QByteArray{};
+}
+
+bool importIdentity(const QByteArray &data, QSslCertificate &certificate, QSslKey &privateKey)
+{
+    QBuffer buffer;
+    buffer.setData(data);
+    if (buffer.open(QIODevice::ReadOnly)) {
+        const QByteArray sebIdentityPassword = QString::fromUtf8(
+            "Di𝈭l𝈖Ch𝈒ah𝉇t𝈁a𝉈Hai1972").toUtf8();
+        if (QSslCertificate::importPkcs12(
+                &buffer, &privateKey, &certificate, nullptr, sebIdentityPassword)) {
+            return true;
+        }
+        buffer.seek(0);
+        if (QSslCertificate::importPkcs12(
+                &buffer, &privateKey, &certificate, nullptr, QByteArray{})) {
+            return true;
+        }
+    }
+
+    certificate = QSslCertificate(data, QSsl::Der);
+    if (certificate.isNull()) {
+        certificate = QSslCertificate(data, QSsl::Pem);
+    }
+    return !certificate.isNull();
+}
+
+}  // namespace
 
 bool CertificateStore::tryGetCertificateWith(const QByteArray &keyHash, QSslCertificate &certificate) const
 {
@@ -28,42 +113,34 @@ bool CertificateStore::tryGetPrivateKeyFor(const QSslCertificate &certificate, Q
 
 void CertificateStore::extractAndImportIdentities(const QVariantMap &data)
 {
-    // SEB usually stores identities in a list of dictionaries
-    const QVariantList identities = data.value(QStringLiteral("identities")).toList();
-    for (const QVariant &v : identities) {
-        const QVariantMap m = v.toMap();
-        const QByteArray certData = m.value(QStringLiteral("certificate")).toByteArray();
-        const QByteArray keyData = m.value(QStringLiteral("privateKey")).toByteArray();
-
-        if (certData.isEmpty()) continue;
-
-        QSslCertificate cert(certData);
-        if (cert.isNull()) {
-            // Try base64
-            cert = QSslCertificate(QByteArray::fromBase64(certData));
+    const QVariantList embeddedCertificates = data.value(QStringLiteral("embeddedCertificates")).toList();
+    for (const QVariant &value : embeddedCertificates) {
+        const QVariantMap embeddedCertificate = value.toMap();
+        bool typeIsValid = false;
+        const int type = embeddedCertificate.value(QStringLiteral("type")).toInt(&typeIsValid);
+        if (!typeIsValid || type != IdentityCertificateType) {
+            continue;
         }
 
-        if (!cert.isNull()) {
-            certificates_.insert(cert.digest(), cert);
-            
-            if (!keyData.isEmpty()) {
-                QSslKey key(keyData, QSsl::Rsa); // Assuming RSA for SEB
-                if (key.isNull()) {
-                    key = QSslKey(QByteArray::fromBase64(keyData), QSsl::Rsa);
-                }
-                if (!key.isNull()) {
-                    identities_.append({cert, key});
-                }
-            }
+        const QByteArray certificateData = certificateDataFrom(embeddedCertificate);
+        if (certificateData.isEmpty()) {
+            continue;
         }
-    }
 
-    // Also check for legacy 'embeddedCertificate' for backward compatibility
-    const QByteArray pem = data.value(QStringLiteral("embeddedCertificate")).toByteArray();
-    if (!pem.isEmpty()) {
-        QSslCertificate certificate(pem);
-        if (!certificate.isNull()) {
-            certificates_.insert(certificate.digest(), certificate);
+        QSslCertificate certificate;
+        QSslKey privateKey;
+        if (!importIdentity(certificateData, certificate, privateKey)) {
+            continue;
+        }
+
+        const QByteArray keyHash = publicKeyHash(certificate);
+        if (keyHash.isEmpty()) {
+            continue;
+        }
+
+        certificates_.insert(keyHash, certificate);
+        if (!privateKey.isNull()) {
+            identities_.append({certificate, privateKey});
         }
     }
 }
