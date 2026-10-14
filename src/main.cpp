@@ -14,6 +14,7 @@
 #include <QUrl>
 #include <QProcess>
 #include <QProcessEnvironment>
+#include <QFile>
 #include <QFileInfo>
 #include <QDebug>
 #include <cstdio>
@@ -228,6 +229,118 @@ void applyProtectedSessionSettings(
     }
 }
 
+QString xkbValueAfterColon(const QString &line, const QString &key)
+{
+    const QString trimmed = line.trimmed();
+    if (!trimmed.startsWith(key)) {
+        return {};
+    }
+
+    const int separator = trimmed.indexOf(QLatin1Char(':'));
+    if (separator < 0) {
+        return {};
+    }
+
+    return trimmed.mid(separator + 1).trimmed();
+}
+
+QString stripQuotes(QString value)
+{
+    value = value.trimmed();
+    if (value.size() >= 2 && value.startsWith(QLatin1Char('"')) && value.endsWith(QLatin1Char('"'))) {
+        return value.mid(1, value.size() - 2);
+    }
+    return value;
+}
+
+bool isUsableKeyboardValue(const QString &value)
+{
+    return !value.isEmpty() && value != QStringLiteral("(unset)") && value != QStringLiteral("n/a");
+}
+
+// The barebones VT uses Qt's "linuxfb" platform, whose keyboard handlers
+// (libinput/xkbcommon, or the evdev fallback) never read the layout configured
+// for the desktop session. Without these variables xkbcommon defaults to "us",
+// which is why an azerty session ends up with a qwerty keyboard. Propagate the
+// configured layout so the exam shell keeps the expected key mapping.
+void applyKeyboardLayoutEnvironment()
+{
+    if (!qgetenv("XKB_DEFAULT_LAYOUT").isEmpty()) {
+        return;
+    }
+
+    QString layout;
+    QString variant;
+    QString model;
+    QString options;
+
+    QProcess localectl;
+    localectl.start(QStringLiteral("localectl"), {QStringLiteral("status")});
+    if (localectl.waitForFinished(3000)) {
+        const QString output = QString::fromUtf8(localectl.readAllStandardOutput());
+        const QStringList lines = output.split(QLatin1Char('\n'), Qt::SkipEmptyParts);
+        for (const QString &line : lines) {
+            const auto takeValue = [&line](QString &target, const QString &key) {
+                if (target.isEmpty()) {
+                    const QString value = xkbValueAfterColon(line, key);
+                    if (isUsableKeyboardValue(value)) {
+                        target = value;
+                    }
+                }
+            };
+            takeValue(layout, QStringLiteral("X11 Layout"));
+            takeValue(variant, QStringLiteral("X11 Variant"));
+            takeValue(model, QStringLiteral("X11 Model"));
+            takeValue(options, QStringLiteral("X11 Options"));
+        }
+    }
+
+    if (layout.isEmpty()) {
+        QFile keyboardConfig(QStringLiteral("/etc/default/keyboard"));
+        if (keyboardConfig.open(QIODevice::ReadOnly | QIODevice::Text)) {
+            const QString content = QString::fromUtf8(keyboardConfig.readAll());
+            const QStringList lines = content.split(QLatin1Char('\n'), Qt::SkipEmptyParts);
+            for (const QString &line : lines) {
+                if (line.trimmed().startsWith(QLatin1Char('#'))) {
+                    continue;
+                }
+
+                const int separator = line.indexOf(QLatin1Char('='));
+                if (separator < 0) {
+                    continue;
+                }
+
+                const QString key = line.left(separator).trimmed();
+                const QString value = stripQuotes(line.mid(separator + 1));
+                if (key == QStringLiteral("XKBLAYOUT")) {
+                    layout = value;
+                } else if (key == QStringLiteral("XKBVARIANT")) {
+                    variant = value;
+                } else if (key == QStringLiteral("XKBMODEL")) {
+                    model = value;
+                } else if (key == QStringLiteral("XKBOPTIONS")) {
+                    options = value;
+                }
+            }
+        }
+    }
+
+    if (!isUsableKeyboardValue(layout)) {
+        return;
+    }
+
+    qputenv("XKB_DEFAULT_LAYOUT", layout.toUtf8());
+    if (isUsableKeyboardValue(variant)) {
+        qputenv("XKB_DEFAULT_VARIANT", variant.toUtf8());
+    }
+    if (isUsableKeyboardValue(model)) {
+        qputenv("XKB_DEFAULT_MODEL", model.toUtf8());
+    }
+    if (isUsableKeyboardValue(options)) {
+        qputenv("XKB_DEFAULT_OPTIONS", options.toUtf8());
+    }
+}
+
 void applyEarlyEnvironment(int argc, char *argv[])
 {
     seb::SebSettings settings = seb::defaultSettings();
@@ -248,6 +361,7 @@ void applyEarlyEnvironment(int argc, char *argv[])
                 qCritical() << "Anti-cheat VT setup failed; aborting.";
                 _exit(1);
             }
+            applyKeyboardLayoutEnvironment();
             qputenv("QT_QPA_PLATFORM", "linuxfb");
             qputenv("QT_QUICK_BACKEND", "software");
         }
@@ -471,6 +585,10 @@ int main(int argc, char *argv[])
             appendPkexecEnvironmentVariable(pkexecArgs, "XDG_SESSION_TYPE");
             appendPkexecEnvironmentVariable(pkexecArgs, "DBUS_SESSION_BUS_ADDRESS");
             appendPkexecEnvironmentVariable(pkexecArgs, "QT_QPA_PLATFORM");
+            appendPkexecEnvironmentVariable(pkexecArgs, "XKB_DEFAULT_LAYOUT");
+            appendPkexecEnvironmentVariable(pkexecArgs, "XKB_DEFAULT_VARIANT");
+            appendPkexecEnvironmentVariable(pkexecArgs, "XKB_DEFAULT_MODEL");
+            appendPkexecEnvironmentVariable(pkexecArgs, "XKB_DEFAULT_OPTIONS");
             pkexecArgs << QCoreApplication::applicationFilePath();
             pkexecArgs << args;
 
@@ -512,6 +630,10 @@ int main(int argc, char *argv[])
             appendPkexecEnvironmentVariable(pkexecArgs, "XDG_SESSION_TYPE");
             appendPkexecEnvironmentVariable(pkexecArgs, "DBUS_SESSION_BUS_ADDRESS");
             appendPkexecEnvironmentVariable(pkexecArgs, "QT_QPA_PLATFORM");
+            appendPkexecEnvironmentVariable(pkexecArgs, "XKB_DEFAULT_LAYOUT");
+            appendPkexecEnvironmentVariable(pkexecArgs, "XKB_DEFAULT_VARIANT");
+            appendPkexecEnvironmentVariable(pkexecArgs, "XKB_DEFAULT_MODEL");
+            appendPkexecEnvironmentVariable(pkexecArgs, "XKB_DEFAULT_OPTIONS");
             if (usedPassword) {
                 pkexecArgs << (QStringLiteral("SEB_PASSWORD=") + userPassword);
             }
