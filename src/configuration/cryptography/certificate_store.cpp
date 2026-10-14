@@ -2,7 +2,12 @@
 
 #include <QBuffer>
 #include <QCryptographicHash>
+#include <QDir>
+#include <QFile>
+#include <QFileInfo>
 #include <QMetaType>
+#include <QSaveFile>
+#include <QStandardPaths>
 #include <QSslKey>
 
 #include <openssl/asn1.h>
@@ -12,6 +17,9 @@ namespace seb::configuration::cryptography {
 namespace {
 
 constexpr int IdentityCertificateType = 1;
+constexpr char IdentityFilePattern[] = "*.sebidentity";
+constexpr char IdentityFileSuffix[] = ".sebidentity";
+constexpr char IdentityDirectoryName[] = "identities";
 
 QByteArray publicKeyHash(const QSslCertificate &certificate)
 {
@@ -91,6 +99,11 @@ bool importIdentity(const QByteArray &data, QSslCertificate &certificate, QSslKe
 
 }  // namespace
 
+CertificateStore::CertificateStore()
+{
+    loadPersistedIdentities();
+}
+
 bool CertificateStore::tryGetCertificateWith(const QByteArray &keyHash, QSslCertificate &certificate) const
 {
     const auto it = certificates_.find(keyHash);
@@ -103,13 +116,93 @@ bool CertificateStore::tryGetCertificateWith(const QByteArray &keyHash, QSslCert
 
 bool CertificateStore::tryGetPrivateKeyFor(const QSslCertificate &certificate, QSslKey &key) const
 {
-    for (const auto &pair : identities_) {
-        if (pair.first == certificate) {
-            key = pair.second;
-            return true;
+    const QByteArray keyHash = publicKeyHash(certificate);
+    if (keyHash.isEmpty()) {
+        return false;
+    }
+
+    const auto it = privateKeys_.find(keyHash);
+    if (it == privateKeys_.end()) {
+        return false;
+    }
+
+    key = it.value();
+    return true;
+}
+
+QString CertificateStore::identityStoragePath() const
+{
+    QString appDataPath = QStandardPaths::writableLocation(QStandardPaths::AppDataLocation);
+    if (appDataPath.isEmpty()) {
+        appDataPath = QDir::homePath() + QStringLiteral("/.seb-linux");
+    }
+    return QDir(appDataPath).filePath(QString::fromLatin1(IdentityDirectoryName));
+}
+
+void CertificateStore::loadPersistedIdentities()
+{
+    const QDir directory(identityStoragePath());
+    if (!directory.exists()) {
+        return;
+    }
+
+    const QFileInfoList files = directory.entryInfoList(
+        QStringList{QString::fromLatin1(IdentityFilePattern)},
+        QDir::Files | QDir::Readable, QDir::Name);
+    for (const QFileInfo &fileInfo : files) {
+        QFile file(fileInfo.absoluteFilePath());
+        if (!file.open(QIODevice::ReadOnly)) {
+            continue;
+        }
+
+        const QByteArray data = file.readAll();
+        QSslCertificate certificate;
+        QSslKey privateKey;
+        if (data.isEmpty() || !importIdentity(data, certificate, privateKey)) {
+            continue;
+        }
+
+        const QByteArray keyHash = publicKeyHash(certificate);
+        if (keyHash.isEmpty()) {
+            continue;
+        }
+
+        certificates_.insert(keyHash, certificate);
+        if (!privateKey.isNull()) {
+            privateKeys_.insert(keyHash, privateKey);
         }
     }
-    return false;
+}
+
+bool CertificateStore::persistIdentity(const QByteArray &keyHash, const QByteArray &data) const
+{
+    if (keyHash.isEmpty() || data.isEmpty()) {
+        return false;
+    }
+
+    const QString path = identityStoragePath();
+    QDir directory;
+    if (!directory.mkpath(path)) {
+        return false;
+    }
+
+    QFile::setPermissions(
+        path,
+        QFileDevice::ReadOwner | QFileDevice::WriteOwner | QFileDevice::ExeOwner);
+
+    const QString filePath = QDir(path).filePath(
+        QString::fromLatin1(keyHash.toHex()) + QString::fromLatin1(IdentityFileSuffix));
+    QSaveFile file(filePath);
+    if (!file.open(QIODevice::WriteOnly)) {
+        return false;
+    }
+    file.setPermissions(QFileDevice::ReadOwner | QFileDevice::WriteOwner);
+    if (file.write(data) != data.size() || !file.commit()) {
+        return false;
+    }
+
+    return QFile::setPermissions(
+        filePath, QFileDevice::ReadOwner | QFileDevice::WriteOwner);
 }
 
 void CertificateStore::extractAndImportIdentities(QVariantMap &data)
@@ -154,7 +247,10 @@ void CertificateStore::extractAndImportIdentities(QVariantMap &data)
 
         certificates_.insert(keyHash, certificate);
         if (!privateKey.isNull()) {
-            identities_.append({certificate, privateKey});
+            privateKeys_.insert(keyHash, privateKey);
+        }
+        if (!persistIdentity(keyHash, certificateData)) {
+            retainedCertificates.append(value);
         }
     }
 
