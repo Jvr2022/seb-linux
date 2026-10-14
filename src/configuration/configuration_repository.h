@@ -6,6 +6,8 @@
 #include <QList>
 #include <QVariantMap>
 
+#include <memory>
+
 namespace seb::configuration {
 
 namespace contracts::cryptography {
@@ -19,11 +21,26 @@ namespace contracts::data_resources {
 class IResourceLoader;
 class IResourceSaver;
 }
+namespace cryptography {
+class CertificateStore;
+class HashAlgorithm;
+class PasswordEncryption;
+class PublicKeyEncryption;
+class PublicKeySymmetricEncryption;
+}
+namespace data_compression {
+class GZipCompressor;
+}
+namespace data_formats {
+class BinaryParser;
+class XmlParser;
+}
 
 class ConfigurationRepository : public contracts::IConfigurationRepository
 {
 public:
     ConfigurationRepository();
+    ~ConfigurationRepository() override;
 
     contracts::SaveStatus configureClientWith(const QUrl &resource, const contracts::cryptography::PasswordParameters *password = nullptr) override;
     contracts::AppConfig initializeAppConfig() override;
@@ -40,7 +57,7 @@ private:
     contracts::LoadStatus tryLoadData(const QUrl &resource, QByteArray &data) const;
     contracts::LoadStatus tryParseData(
         const QByteArray &data,
-        contracts::cryptography::EncryptionParameters *&encryption,
+        std::shared_ptr<contracts::cryptography::EncryptionParameters> &encryption,
         contracts::data_formats::FormatType &format,
         QVariantMap &rawData,
         const contracts::cryptography::PasswordParameters *password = nullptr) const;
@@ -55,7 +72,14 @@ private:
     QList<contracts::data_formats::IDataSerializer *> dataSerializers_;
     QList<contracts::data_resources::IResourceLoader *> resourceLoaders_;
     QList<contracts::data_resources::IResourceSaver *> resourceSavers_;
-    contracts::cryptography::ICertificateStore *certificateStore_ = nullptr;
+    std::unique_ptr<cryptography::CertificateStore> certificateStore_;
+    std::unique_ptr<data_compression::GZipCompressor> compressor_;
+    std::unique_ptr<cryptography::HashAlgorithm> hashAlgorithm_;
+    std::unique_ptr<cryptography::PasswordEncryption> passwordEncryption_;
+    std::unique_ptr<cryptography::PublicKeyEncryption> publicKeyEncryption_;
+    std::unique_ptr<cryptography::PublicKeySymmetricEncryption> publicKeySymmetricEncryption_;
+    std::unique_ptr<data_formats::XmlParser> xmlParser_;
+    std::unique_ptr<data_formats::BinaryParser> binaryParser_;
 };
 
 }  // namespace seb::configuration

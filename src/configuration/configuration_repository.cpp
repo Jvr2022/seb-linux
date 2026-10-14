@@ -9,6 +9,11 @@
 #include "contracts/data_resources/i_resource_loader.h"
 #include "contracts/data_resources/i_resource_saver.h"
 #include "cryptography/certificate_store.h"
+#include "cryptography/hash_algorithm.h"
+#include "cryptography/password_encryption.h"
+#include "cryptography/public_key_encryption.h"
+#include "cryptography/public_key_symmetric_encryption.h"
+#include "data_compression/gzip_compressor.h"
 #include "data_formats/binary_parser.h"
 #include "data_formats/binary_serializer.h"
 #include "data_formats/xml_parser.h"
@@ -42,15 +47,27 @@ configuration_data::DataValues &dataValues()
 
 ConfigurationRepository::ConfigurationRepository()
 {
-    certificateStore_ = new cryptography::CertificateStore();
-    registerParser(new data_formats::BinaryParser());
-    registerParser(new data_formats::XmlParser());
+    certificateStore_ = std::make_unique<cryptography::CertificateStore>();
+    compressor_ = std::make_unique<data_compression::GZipCompressor>();
+    hashAlgorithm_ = std::make_unique<cryptography::HashAlgorithm>();
+    passwordEncryption_ = std::make_unique<cryptography::PasswordEncryption>();
+    publicKeyEncryption_ = std::make_unique<cryptography::PublicKeyEncryption>(*certificateStore_);
+    publicKeySymmetricEncryption_ = std::make_unique<cryptography::PublicKeySymmetricEncryption>(
+        *certificateStore_, *publicKeyEncryption_, *passwordEncryption_);
+    xmlParser_ = std::make_unique<data_formats::XmlParser>(*compressor_);
+    binaryParser_ = std::make_unique<data_formats::BinaryParser>(
+        *compressor_, *hashAlgorithm_, *passwordEncryption_, *publicKeyEncryption_,
+        *publicKeySymmetricEncryption_, *xmlParser_);
+    registerParser(binaryParser_.get());
+    registerParser(xmlParser_.get());
     registerSerializer(new data_formats::BinarySerializer());
     registerSerializer(new data_formats::XmlSerializer());
     registerLoader(new data_resources::FileResourceLoader());
     registerLoader(new data_resources::NetworkResourceLoader(dataValues().initializeAppConfig()));
     registerSaver(new data_resources::FileResourceSaver());
 }
+
+ConfigurationRepository::~ConfigurationRepository() = default;
 
 contracts::SaveStatus ConfigurationRepository::configureClientWith(
     const QUrl &resource,
@@ -61,19 +78,17 @@ contracts::SaveStatus ConfigurationRepository::configureClientWith(
         return contracts::SaveStatus::UnexpectedError;
     }
 
-    contracts::cryptography::EncryptionParameters *encryption = nullptr;
+    std::shared_ptr<contracts::cryptography::EncryptionParameters> encryption;
     contracts::data_formats::FormatType format = contracts::data_formats::FormatType::Binary;
     QVariantMap rawData;
     if (tryParseData(data, encryption, format, rawData, password) != contracts::LoadStatus::Success) {
         return contracts::SaveStatus::UnexpectedError;
     }
 
-    if (certificateStore_ != nullptr) {
-        certificateStore_->extractAndImportIdentities(rawData);
-    }
+    certificateStore_->extractAndImportIdentities(rawData);
 
     QByteArray serialized;
-    const contracts::SaveStatus serializeStatus = trySerializeData(rawData, format, serialized, encryption);
+    const contracts::SaveStatus serializeStatus = trySerializeData(rawData, format, serialized, encryption.get());
     if (serializeStatus != contracts::SaveStatus::Success) {
         return serializeStatus;
     }
@@ -110,7 +125,7 @@ contracts::LoadStatus ConfigurationRepository::tryLoadSettings(
         return loadStatus;
     }
 
-    contracts::cryptography::EncryptionParameters *encryption = nullptr;
+    std::shared_ptr<contracts::cryptography::EncryptionParameters> encryption;
     contracts::data_formats::FormatType format = contracts::data_formats::FormatType::Binary;
     QVariantMap rawData;
     const contracts::LoadStatus parseStatus = tryParseData(data, encryption, format, rawData, password);
@@ -159,12 +174,12 @@ contracts::LoadStatus ConfigurationRepository::tryLoadData(const QUrl &resource,
 
 contracts::LoadStatus ConfigurationRepository::tryParseData(
     const QByteArray &data,
-    contracts::cryptography::EncryptionParameters *&encryption,
+    std::shared_ptr<contracts::cryptography::EncryptionParameters> &encryption,
     contracts::data_formats::FormatType &format,
     QVariantMap &rawData,
     const contracts::cryptography::PasswordParameters *password) const
 {
-    encryption = nullptr;
+    encryption.reset();
     for (const auto *parser : dataParsers_) {
         if (!parser->canParse(data)) {
             continue;

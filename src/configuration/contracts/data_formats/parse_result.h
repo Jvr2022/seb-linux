@@ -6,11 +6,13 @@
 
 #include <QVariantMap>
 
+#include <memory>
+
 namespace seb::configuration::contracts::data_formats {
 
 struct ParseResult
 {
-    cryptography::EncryptionParameters *encryption = nullptr;
+    std::shared_ptr<cryptography::EncryptionParameters> encryption;
     FormatType format = FormatType::Xml;
     QVariantMap rawData;
     LoadStatus status = LoadStatus::UnexpectedError;
