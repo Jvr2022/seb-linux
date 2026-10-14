@@ -2,6 +2,7 @@
 
 #include <QBuffer>
 #include <QCryptographicHash>
+#include <QMetaType>
 #include <QSslKey>
 
 #include <openssl/asn1.h>
@@ -111,30 +112,43 @@ bool CertificateStore::tryGetPrivateKeyFor(const QSslCertificate &certificate, Q
     return false;
 }
 
-void CertificateStore::extractAndImportIdentities(const QVariantMap &data)
+void CertificateStore::extractAndImportIdentities(QVariantMap &data)
 {
-    const QVariantList embeddedCertificates = data.value(QStringLiteral("embeddedCertificates")).toList();
+    const QString key = QStringLiteral("embeddedCertificates");
+    const QVariant embeddedValue = data.value(key);
+    if (!embeddedValue.isValid() || embeddedValue.metaType().id() != QMetaType::QVariantList) {
+        return;
+    }
+
+    const QVariantList embeddedCertificates = embeddedValue.toList();
+    QVariantList retainedCertificates;
+    retainedCertificates.reserve(embeddedCertificates.size());
+
     for (const QVariant &value : embeddedCertificates) {
         const QVariantMap embeddedCertificate = value.toMap();
         bool typeIsValid = false;
         const int type = embeddedCertificate.value(QStringLiteral("type")).toInt(&typeIsValid);
         if (!typeIsValid || type != IdentityCertificateType) {
+            retainedCertificates.append(value);
             continue;
         }
 
         const QByteArray certificateData = certificateDataFrom(embeddedCertificate);
         if (certificateData.isEmpty()) {
+            retainedCertificates.append(value);
             continue;
         }
 
         QSslCertificate certificate;
         QSslKey privateKey;
         if (!importIdentity(certificateData, certificate, privateKey)) {
+            retainedCertificates.append(value);
             continue;
         }
 
         const QByteArray keyHash = publicKeyHash(certificate);
         if (keyHash.isEmpty()) {
+            retainedCertificates.append(value);
             continue;
         }
 
@@ -143,6 +157,8 @@ void CertificateStore::extractAndImportIdentities(const QVariantMap &data)
             identities_.append({certificate, privateKey});
         }
     }
+
+    data.insert(key, retainedCertificates);
 }
 
 }  // namespace seb::configuration::cryptography

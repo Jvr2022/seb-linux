@@ -13,7 +13,7 @@ class CertificateStore : public contracts::cryptography::ICertificateStore
 public:
     bool tryGetCertificateWith(const QByteArray &keyHash, QSslCertificate &certificate) const override;
     bool tryGetPrivateKeyFor(const QSslCertificate &certificate, QSslKey &key) const override;
-    void extractAndImportIdentities(const QVariantMap &data) override;
+    void extractAndImportIdentities(QVariantMap &data) override;
 
 private:
     QHash<QByteArray, QSslCertificate> certificates_;
