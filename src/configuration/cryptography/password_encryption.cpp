@@ -25,11 +25,6 @@ contracts::LoadStatus PasswordEncryption::decrypt(const QByteArray &data,
   if (data.size() < (2 + 2 * kSaltSize + kIvSize + kHmacSize))
     return contracts::LoadStatus::InvalidData;
 
-  const char *ptr = data.constData();
-  if (static_cast<unsigned char>(ptr[0]) != kVersion ||
-      static_cast<unsigned char>(ptr[1]) != kOptions)
-    return contracts::LoadStatus::InvalidData;
-
   QByteArray encSalt = data.mid(2, kSaltSize);
   QByteArray authSalt = data.mid(2 + kSaltSize, kSaltSize);
   QByteArray iv = data.mid(2 + 2 * kSaltSize, kIvSize);
@@ -61,7 +56,7 @@ contracts::LoadStatus PasswordEncryption::decrypt(const QByteArray &data,
   }
 
   if (CRYPTO_memcmp(computedHmac, originalHmac.constData(), kHmacSize) != 0) {
-      return contracts::LoadStatus::InvalidData;
+      return contracts::LoadStatus::PasswordNeeded;
   }
 
   // Decrypt

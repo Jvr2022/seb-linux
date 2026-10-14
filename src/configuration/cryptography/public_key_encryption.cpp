@@ -14,6 +14,7 @@ PublicKeyEncryption::PublicKeyEncryption(contracts::cryptography::ICertificateSt
 
 contracts::LoadStatus PublicKeyEncryption::decrypt(const QByteArray &data, QByteArray &decrypted, QSslCertificate &certificate) const
 {
+    decrypted.clear();
     if (data.size() < 20) return contracts::LoadStatus::InvalidData;
 
     const QByteArray keyHash = data.left(20);
@@ -23,11 +24,11 @@ contracts::LoadStatus PublicKeyEncryption::decrypt(const QByteArray &data, QByte
 
     QSslKey privateKey;
     if (!store_.tryGetPrivateKeyFor(certificate, privateKey)) {
-        return contracts::LoadStatus::PasswordNeeded; // Or a more specific status
+        return contracts::LoadStatus::InvalidData;
     }
 
     const QByteArray cipherData = data.mid(20);
-    
+
     // Convert QSslKey to EVP_PKEY via PEM to avoid fragile handle() casts
     const QByteArray pemKey = privateKey.toPem();
     BIO *bio = BIO_new_mem_buf(pemKey.constData(), pemKey.size());
@@ -59,25 +60,58 @@ contracts::LoadStatus PublicKeyEncryption::decrypt(const QByteArray &data, QByte
         return contracts::LoadStatus::UnexpectedError;
     }
 
-    size_t outLen = 0;
-    if (EVP_PKEY_decrypt(ctx, nullptr, &outLen, 
-                          reinterpret_cast<const unsigned char*>(cipherData.constData()), 
-                          cipherData.size()) <= 0) {
+    const int blockSize = EVP_PKEY_size(pkey);
+    if (blockSize <= 0 || cipherData.isEmpty()) {
         EVP_PKEY_CTX_free(ctx);
         cleanup();
         return contracts::LoadStatus::InvalidData;
     }
 
-    decrypted.resize(static_cast<int>(outLen));
-    if (EVP_PKEY_decrypt(ctx, reinterpret_cast<unsigned char*>(decrypted.data()), &outLen, 
-                          reinterpret_cast<const unsigned char*>(cipherData.constData()), 
-                          cipherData.size()) <= 0) {
+    const auto decryptBlock = [&](const char *ciphertext, int ciphertextSize) {
+        size_t plaintextSize = 0;
+        if (EVP_PKEY_decrypt(
+                ctx,
+                nullptr,
+                &plaintextSize,
+                reinterpret_cast<const unsigned char *>(ciphertext),
+                static_cast<size_t>(ciphertextSize)) <= 0) {
+            return false;
+        }
+
+        QByteArray plaintext;
+        plaintext.resize(static_cast<qsizetype>(plaintextSize));
+        if (EVP_PKEY_decrypt(
+                ctx,
+                reinterpret_cast<unsigned char *>(plaintext.data()),
+                &plaintextSize,
+                reinterpret_cast<const unsigned char *>(ciphertext),
+                static_cast<size_t>(ciphertextSize)) <= 0) {
+            return false;
+        }
+
+        plaintext.resize(static_cast<qsizetype>(plaintextSize));
+        decrypted.append(plaintext);
+        return true;
+    };
+
+    const qsizetype blockCount = cipherData.size() / blockSize;
+    const qsizetype remainingBytes = cipherData.size() % blockSize;
+    for (qsizetype block = 0; block < blockCount; ++block) {
+        if (!decryptBlock(cipherData.constData() + block * blockSize, blockSize)) {
+            EVP_PKEY_CTX_free(ctx);
+            cleanup();
+            return contracts::LoadStatus::InvalidData;
+        }
+    }
+
+    if (remainingBytes > 0 &&
+        !decryptBlock(cipherData.constData() + blockCount * blockSize,
+                      static_cast<int>(remainingBytes))) {
         EVP_PKEY_CTX_free(ctx);
         cleanup();
         return contracts::LoadStatus::InvalidData;
     }
 
-    decrypted.resize(static_cast<int>(outLen));
     EVP_PKEY_CTX_free(ctx);
     cleanup();
 
