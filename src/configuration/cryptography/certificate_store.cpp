@@ -294,9 +294,8 @@ void CertificateStore::extractAndImportIdentities(QVariantMap &data)
         if (!privateKey.isNull()) {
             privateKeys_.insert(keyHash, privateKey);
         }
-        if (!persistIdentity(keyHash, certificateData)) {
-            retainedCertificates.append(value);
-        }
+
+        persistIdentity(keyHash, certificateData);
     }
 
     data.insert(key, retainedCertificates);
