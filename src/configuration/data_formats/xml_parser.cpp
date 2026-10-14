@@ -22,9 +22,9 @@ bool readText(QXmlStreamReader &reader, QString &text)
     return !reader.hasError();
 }
 
-bool parseValue(QXmlStreamReader &reader, QVariant &value);
+bool parseValue(QXmlStreamReader &reader, QVariant &value, const QString &sourceText);
 
-bool parseDictionary(QXmlStreamReader &reader, QVariant &value)
+bool parseDictionary(QXmlStreamReader &reader, QVariant &value, const QString &sourceText)
 {
     QVariantMap dictionary;
     while (reader.readNextStartElement()) {
@@ -38,7 +38,7 @@ bool parseDictionary(QXmlStreamReader &reader, QVariant &value)
         }
 
         QVariant child;
-        if (!parseValue(reader, child)) {
+        if (!parseValue(reader, child, sourceText)) {
             return false;
         }
         dictionary.insert(key, child);
@@ -53,12 +53,12 @@ bool parseDictionary(QXmlStreamReader &reader, QVariant &value)
     return true;
 }
 
-bool parseArray(QXmlStreamReader &reader, QVariant &value)
+bool parseArray(QXmlStreamReader &reader, QVariant &value, const QString &sourceText)
 {
     QVariantList array;
     while (reader.readNextStartElement()) {
         QVariant child;
-        if (!parseValue(reader, child)) {
+        if (!parseValue(reader, child, sourceText)) {
             return false;
         }
         array.push_back(child);
@@ -92,7 +92,22 @@ bool decodeBase64(const QString &text, QByteArray &data)
     return true;
 }
 
-bool parseSimpleValue(QXmlStreamReader &reader, QVariant &value)
+bool isSelfClosingElement(const QXmlStreamReader &reader, const QString &sourceText)
+{
+    const auto end = static_cast<qsizetype>(reader.characterOffset());
+    if (end <= 0 || end > sourceText.size()) {
+        return false;
+    }
+
+    const auto start = sourceText.lastIndexOf(QLatin1Char('<'), end - 1);
+    if (start < 0) {
+        return false;
+    }
+
+    return sourceText.mid(start, end - start).trimmed().endsWith(QStringLiteral("/>"));
+}
+
+bool parseSimpleValue(QXmlStreamReader &reader, QVariant &value, const QString &sourceText)
 {
     const QString type = elementName(reader);
     if (type == QLatin1String(XmlElement::True) || type == QLatin1String(XmlElement::False)) {
@@ -104,13 +119,15 @@ bool parseSimpleValue(QXmlStreamReader &reader, QVariant &value)
         return true;
     }
 
+    const bool emptyStringElement = type == QLatin1String(XmlElement::String) &&
+                                    isSelfClosingElement(reader, sourceText);
     QString text;
     if (!readText(reader, text)) {
         return false;
     }
 
     if (type == QLatin1String(XmlElement::String)) {
-        value = text;
+        value = emptyStringElement ? QVariant() : QVariant(text);
         return true;
     }
     if (type == QLatin1String(XmlElement::Data)) {
@@ -153,7 +170,7 @@ bool parseSimpleValue(QXmlStreamReader &reader, QVariant &value)
     return false;
 }
 
-bool parseValue(QXmlStreamReader &reader, QVariant &value)
+bool parseValue(QXmlStreamReader &reader, QVariant &value, const QString &sourceText)
 {
     if (reader.tokenType() != QXmlStreamReader::StartElement) {
         return false;
@@ -161,12 +178,12 @@ bool parseValue(QXmlStreamReader &reader, QVariant &value)
 
     const QString type = elementName(reader);
     if (type == QLatin1String(XmlElement::Dictionary)) {
-        return parseDictionary(reader, value);
+        return parseDictionary(reader, value, sourceText);
     }
     if (type == QLatin1String(XmlElement::Array)) {
-        return parseArray(reader, value);
+        return parseArray(reader, value, sourceText);
     }
-    return parseSimpleValue(reader, value);
+    return parseSimpleValue(reader, value, sourceText);
 }
 
 QByteArray xmlPrefix(const QByteArray &input)
@@ -226,7 +243,7 @@ contracts::data_formats::ParseResult XmlParser::tryParse(
     }
 
     QVariant root;
-    if (!parseDictionary(reader, root)) {
+    if (!parseDictionary(reader, root, QString::fromUtf8(data))) {
         result.status = contracts::LoadStatus::InvalidData;
         return result;
     }
