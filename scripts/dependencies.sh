@@ -19,6 +19,7 @@ if command -v apt >/dev/null; then
     shared-mime-info \
     zlib1g-dev \
     libssl-dev \
+    libsecret-1-dev \
     file \
     libatomic1 \
     libdeflate0 \
