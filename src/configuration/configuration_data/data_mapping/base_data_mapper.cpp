@@ -2,7 +2,7 @@
 
 namespace seb::configuration::configuration_data::data_mapping {
 
-void BaseDataMapper::map(const QVariantMap &, seb::SebSettings &) const
+void BaseDataMapper::mapGlobal(const QVariantMap &, seb::settings::AppSettings &) const
 {
 }
 

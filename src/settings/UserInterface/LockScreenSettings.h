@@ -1,2 +1,4 @@
 #pragma once
-namespace seb::settings::userinterface { struct LockScreenSettings { bool EnableLockScreen = false; }; }
+
+#include <QString>
+namespace seb::settings::userinterface { struct LockScreenSettings { QString BackgroundColor; bool EnableLockScreen = false; }; }

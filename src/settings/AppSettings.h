@@ -24,7 +24,7 @@ struct AppSettings
     applications::ApplicationSettings Applications;
     systemcomponents::AudioSettings Audio;
     browser::BrowserSettings Browser;
-    ConfigurationMode ConfigurationMode = ConfigurationMode::ConfigureClient;
+    seb::settings::ConfigurationMode ConfigurationMode = seb::settings::ConfigurationMode::Exam;
     monitoring::DisplaySettings Display;
     monitoring::KeyboardSettings Keyboard;
     logging::LogLevel LogLevel = logging::LogLevel::Info;
@@ -34,7 +34,7 @@ struct AppSettings
     security::SecuritySettings Security;
     server::ServerSettings Server;
     service::ServiceSettings Service;
-    SessionMode SessionMode = SessionMode::Server;
+    seb::settings::SessionMode SessionMode = seb::settings::SessionMode::Normal;
     system::SystemSettings System;
     userinterface::UserInterfaceSettings UserInterface;
 };

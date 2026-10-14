@@ -45,8 +45,8 @@ public:
     contracts::SaveStatus configureClientWith(const QUrl &resource, const contracts::cryptography::PasswordParameters *password = nullptr) override;
     contracts::AppConfig initializeAppConfig() override;
     contracts::SessionConfiguration initializeSessionConfiguration() override;
-    seb::SebSettings loadDefaultSettings() override;
-    contracts::LoadStatus tryLoadSettings(const QUrl &resource, seb::SebSettings &settings, const contracts::cryptography::PasswordParameters *password = nullptr) override;
+    seb::settings::AppSettings loadDefaultSettings() override;
+    contracts::LoadStatus tryLoadSettings(const QUrl &resource, seb::settings::AppSettings &settings, const contracts::cryptography::PasswordParameters *password = nullptr) override;
 
     void registerParser(contracts::data_formats::IDataParser *parser);
     void registerSerializer(contracts::data_formats::IDataSerializer *serializer);

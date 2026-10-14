@@ -39,7 +39,7 @@ struct BrowserSettings
     QString HomePasswordHash;
     QString HomeUrl;
     WindowSettings MainWindow;
-    PopupPolicy PopupPolicy = PopupPolicy::All;
+    seb::settings::browser::PopupPolicy PopupPolicy = seb::settings::browser::PopupPolicy::All;
     ProxySettings Proxy;
     QString QuitUrl;
     bool ResetOnQuitUrl = false;
@@ -54,6 +54,7 @@ struct BrowserSettings
     QString UserAgentSuffix;
     bool UseStartUrlAsHomeUrl = false;
     bool UseTemporaryDownAndUploadDirectory = false;
+    QString UserAgentMode;
 };
 
 }  // namespace seb::settings::browser

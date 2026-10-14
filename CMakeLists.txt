@@ -282,6 +282,7 @@ set(SEB_HEADERS
     src/configuration/configuration_data/data_mapping/application_data_mapper.h
     src/configuration/configuration_data/data_mapping/audio_data_mapper.h
     src/configuration/configuration_data/data_mapping/base_data_mapper.h
+    src/configuration/configuration_data/data_mapping/mapping_helpers.h
     src/configuration/configuration_data/data_mapping/browser_data_mapper.h
     src/configuration/configuration_data/data_mapping/configuration_file_data_mapper.h
     src/configuration/configuration_data/data_mapping/display_data_mapper.h

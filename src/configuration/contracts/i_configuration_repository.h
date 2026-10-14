@@ -6,7 +6,7 @@
 #include "save_status.h"
 #include "session_configuration.h"
 
-#include "../../seb_settings.h"
+#include "../../settings/AppSettings.h"
 
 #include <QUrl>
 
@@ -20,8 +20,8 @@ public:
     virtual SaveStatus configureClientWith(const QUrl &resource, const cryptography::PasswordParameters *password = nullptr) = 0;
     virtual AppConfig initializeAppConfig() = 0;
     virtual SessionConfiguration initializeSessionConfiguration() = 0;
-    virtual seb::SebSettings loadDefaultSettings() = 0;
-    virtual LoadStatus tryLoadSettings(const QUrl &resource, seb::SebSettings &settings, const cryptography::PasswordParameters *password = nullptr) = 0;
+    virtual seb::settings::AppSettings loadDefaultSettings() = 0;
+    virtual LoadStatus tryLoadSettings(const QUrl &resource, seb::settings::AppSettings &settings, const cryptography::PasswordParameters *password = nullptr) = 0;
 };
 
 }  // namespace seb::configuration::contracts

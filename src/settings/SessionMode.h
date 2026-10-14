@@ -1,2 +1,8 @@
 #pragma once
-namespace seb::settings { enum class SessionMode { Client, Server }; }
+namespace seb::settings {
+enum class SessionMode {
+    Normal,
+    Server,
+    Client = Normal
+};
+}

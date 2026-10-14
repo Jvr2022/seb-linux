@@ -1,2 +1,9 @@
 #pragma once
-namespace seb::settings::systemcomponents { struct PowerSupplySettings { bool EnableChargeIndicator = true; bool EnableLowBatteryWarning = true; }; }
+namespace seb::settings::systemcomponents {
+struct PowerSupplySettings {
+    double ChargeThresholdCritical = 0.1;
+    double ChargeThresholdLow = 0.2;
+    bool EnableChargeIndicator = true;
+    bool EnableLowBatteryWarning = true;
+};
+}

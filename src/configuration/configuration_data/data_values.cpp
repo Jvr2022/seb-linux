@@ -51,9 +51,50 @@ contracts::SessionConfiguration DataValues::initializeSessionConfiguration() con
     return configuration;
 }
 
-seb::SebSettings DataValues::loadDefaultSettings() const
+seb::settings::AppSettings DataValues::loadDefaultSettings() const
 {
-    return seb::defaultSettings();
+    seb::settings::AppSettings settings;
+    settings.Browser.StartUrl = QStringLiteral("https://www.safeexambrowser.org/start");
+    settings.Browser.DeleteCacheOnShutdown = true;
+    settings.Browser.DeleteCookiesOnShutdown = true;
+    settings.Browser.DeleteCookiesOnStartup = true;
+    settings.Browser.PopupPolicy = seb::settings::browser::PopupPolicy::Allow;
+    settings.Browser.AdditionalWindow.RelativeHeight = 100;
+    settings.Browser.AdditionalWindow.RelativeWidth = 50;
+    settings.Browser.AdditionalWindow.Position = seb::settings::browser::WindowPosition::Right;
+    settings.Browser.AdditionalWindow.UrlPolicy = seb::settings::browser::UrlPolicy::Never;
+    settings.Browser.AdditionalWindow.ShowToolbar = false;
+    settings.Browser.MainWindow.ShowReloadWarning = true;
+    settings.Browser.MainWindow.UrlPolicy = seb::settings::browser::UrlPolicy::Never;
+    settings.Display.AllowedDisplays = 1;
+    settings.Display.AlwaysOn = true;
+    settings.Display.IgnoreError = false;
+    settings.Display.InternalDisplayOnly = false;
+    settings.Security.AllowTermination = true;
+    settings.Security.AllowWindowCapture = false;
+    settings.Security.ClipboardPolicy = seb::settings::security::ClipboardPolicy::Isolated;
+    settings.Security.VirtualMachinePolicy = seb::settings::security::VirtualMachinePolicy::Deny;
+    settings.Security.KioskMode = seb::settings::security::KioskMode::CreateNewDesktop;
+    settings.Security.VerifyCursorConfiguration = true;
+    settings.Security.VerifySessionIntegrity = true;
+    settings.SessionMode = seb::settings::SessionMode::Normal;
+    settings.ConfigurationMode = seb::settings::ConfigurationMode::Exam;
+    settings.PowerSupply.ChargeThresholdCritical = 0.1;
+    settings.PowerSupply.ChargeThresholdLow = 0.2;
+    settings.LogLevel = seb::settings::logging::LogLevel::Debug;
+    settings.System.AlwaysOn = true;
+    settings.UserInterface.ActionCenter.EnableActionCenter = true;
+    settings.UserInterface.Taskbar.ShowVerificator = true;
+    settings.UserInterface.LockScreen.BackgroundColor = QStringLiteral("#ff0000");
+    settings.Proctoring.ScreenProctoring.CacheSize = 500;
+    settings.Proctoring.ScreenProctoring.IntervalMaximum = 5000;
+    settings.Proctoring.ScreenProctoring.IntervalMinimum = 1000;
+    settings.Proctoring.ScreenProctoring.ImageFormat = seb::settings::proctoring::ImageFormat::Png;
+    settings.Proctoring.ScreenProctoring.Quantization = seb::settings::proctoring::ImageQuantization::Grayscale4bpp;
+    settings.Service.DisableUserLock = true;
+    settings.Service.DisableUserSwitch = true;
+    settings.Service.Policy = seb::settings::service::ServicePolicy::Mandatory;
+    return settings;
 }
 
 QString DataValues::getAppDataFilePath() const

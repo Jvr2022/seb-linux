@@ -1,6 +1,6 @@
 #pragma once
 
-#include "../../seb_settings.h"
+#include "../../settings/AppSettings.h"
 #include "app_config.h"
 
 #include <QUuid>
@@ -13,7 +13,7 @@ struct SessionConfiguration
     QUuid clientAuthenticationToken;
     bool isBrowserResource = false;
     QUuid sessionId;
-    seb::SebSettings settings;
+    seb::settings::AppSettings settings;
 };
 
 }  // namespace seb::configuration::contracts

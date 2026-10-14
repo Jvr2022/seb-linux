@@ -1,6 +1,7 @@
 #pragma once
 
 #include "WindowPosition.h"
+#include "UrlPolicy.h"
 
 namespace seb::settings::browser {
 
@@ -19,12 +20,15 @@ struct WindowSettings
     bool AlwaysOnTop = false;
     bool FullScreenMode = false;
     bool HideBrowserWindowToolbar = false;
+    bool Frameless = false;
     bool ShowMenuBar = false;
     bool ShowHomeButton = false;
     bool ShowReloadButton = false;
     bool ShowReloadWarning = false;
+    bool ShowToolbar = true;
     bool ShowTitleBar = true;
     bool UseNativeBrowserToolbar = false;
+    seb::settings::browser::UrlPolicy UrlPolicy = seb::settings::browser::UrlPolicy::SameWindow;
     WindowPosition Position = WindowPosition::Center;
 };
 

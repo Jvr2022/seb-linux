@@ -106,14 +106,14 @@ contracts::SessionConfiguration ConfigurationRepository::initializeSessionConfig
     return dataValues().initializeSessionConfiguration();
 }
 
-seb::SebSettings ConfigurationRepository::loadDefaultSettings()
+seb::settings::AppSettings ConfigurationRepository::loadDefaultSettings()
 {
     return dataValues().loadDefaultSettings();
 }
 
 contracts::LoadStatus ConfigurationRepository::tryLoadSettings(
     const QUrl &resource,
-    seb::SebSettings &settings,
+    seb::settings::AppSettings &settings,
     const contracts::cryptography::PasswordParameters *password)
 {
     settings = loadDefaultSettings();

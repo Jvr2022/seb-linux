@@ -17,6 +17,7 @@ struct WhitelistApplication
     QString ExecutableName;
     QString ExecutablePath;
     QString Identifier;
+    int OperatingSystem = 0;
     QString OriginalName;
     bool ShowInShell = true;
     QString Signature;

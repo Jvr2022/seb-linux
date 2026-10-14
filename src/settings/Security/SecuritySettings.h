@@ -18,15 +18,16 @@ struct SecuritySettings
     bool AllowStickyKeys = false;
     bool AllowTermination = true;
     bool AllowWindowCapture = false;
-    ClipboardPolicy ClipboardPolicy = ClipboardPolicy::Isolated;
+    seb::settings::security::ClipboardPolicy ClipboardPolicy = seb::settings::security::ClipboardPolicy::Isolated;
     bool DisableSessionChangeLockScreen = false;
-    KioskMode KioskMode = KioskMode::None;
+    seb::settings::security::KioskMode KioskMode = seb::settings::security::KioskMode::None;
     QString QuitPasswordHash;
     QString ReconfigurationUrl;
+    QString Version;
     bool VerifyCursorConfiguration = false;
     bool VerifySessionIntegrity = false;
     QList<VersionRestriction> VersionRestrictions;
-    VirtualMachinePolicy VirtualMachinePolicy = VirtualMachinePolicy::Allow;
+    seb::settings::security::VirtualMachinePolicy VirtualMachinePolicy = seb::settings::security::VirtualMachinePolicy::Allow;
 };
 
 }  // namespace seb::settings::security
