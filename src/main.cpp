@@ -253,6 +253,11 @@ QString stripQuotes(QString value)
     return value;
 }
 
+bool isUsableKeyboardValue(const QString &value)
+{
+    return !value.isEmpty() && value != QStringLiteral("(unset)") && value != QStringLiteral("n/a");
+}
+
 // The barebones VT uses Qt's "linuxfb" platform, whose keyboard handlers
 // (libinput/xkbcommon, or the evdev fallback) never read the layout configured
 // for the desktop session. Without these variables xkbcommon defaults to "us",
@@ -260,7 +265,7 @@ QString stripQuotes(QString value)
 // configured layout so the exam shell keeps the expected key mapping.
 void applyKeyboardLayoutEnvironment()
 {
-    if (qEnvironmentVariableIsSet("XKB_DEFAULT_LAYOUT")) {
+    if (!qgetenv("XKB_DEFAULT_LAYOUT").isEmpty()) {
         return;
     }
 
@@ -275,18 +280,18 @@ void applyKeyboardLayoutEnvironment()
         const QString output = QString::fromUtf8(localectl.readAllStandardOutput());
         const QStringList lines = output.split(QLatin1Char('\n'), Qt::SkipEmptyParts);
         for (const QString &line : lines) {
-            if (layout.isEmpty()) {
-                layout = xkbValueAfterColon(line, QStringLiteral("X11 Layout"));
-            }
-            if (variant.isEmpty()) {
-                variant = xkbValueAfterColon(line, QStringLiteral("X11 Variant"));
-            }
-            if (model.isEmpty()) {
-                model = xkbValueAfterColon(line, QStringLiteral("X11 Model"));
-            }
-            if (options.isEmpty()) {
-                options = xkbValueAfterColon(line, QStringLiteral("X11 Options"));
-            }
+            const auto takeValue = [&line](QString &target, const QString &key) {
+                if (target.isEmpty()) {
+                    const QString value = xkbValueAfterColon(line, key);
+                    if (isUsableKeyboardValue(value)) {
+                        target = value;
+                    }
+                }
+            };
+            takeValue(layout, QStringLiteral("X11 Layout"));
+            takeValue(variant, QStringLiteral("X11 Variant"));
+            takeValue(model, QStringLiteral("X11 Model"));
+            takeValue(options, QStringLiteral("X11 Options"));
         }
     }
 
@@ -320,20 +325,18 @@ void applyKeyboardLayoutEnvironment()
         }
     }
 
-    const auto isUsable = [](const QString &value) {
-        return !value.isEmpty() && value != QStringLiteral("(unset)");
-    };
-
-    if (isUsable(layout)) {
-        qputenv("XKB_DEFAULT_LAYOUT", layout.toUtf8());
+    if (!isUsableKeyboardValue(layout)) {
+        return;
     }
-    if (isUsable(variant)) {
+
+    qputenv("XKB_DEFAULT_LAYOUT", layout.toUtf8());
+    if (isUsableKeyboardValue(variant)) {
         qputenv("XKB_DEFAULT_VARIANT", variant.toUtf8());
     }
-    if (isUsable(model)) {
+    if (isUsableKeyboardValue(model)) {
         qputenv("XKB_DEFAULT_MODEL", model.toUtf8());
     }
-    if (isUsable(options)) {
+    if (isUsableKeyboardValue(options)) {
         qputenv("XKB_DEFAULT_OPTIONS", options.toUtf8());
     }
 }
@@ -582,6 +585,10 @@ int main(int argc, char *argv[])
             appendPkexecEnvironmentVariable(pkexecArgs, "XDG_SESSION_TYPE");
             appendPkexecEnvironmentVariable(pkexecArgs, "DBUS_SESSION_BUS_ADDRESS");
             appendPkexecEnvironmentVariable(pkexecArgs, "QT_QPA_PLATFORM");
+            appendPkexecEnvironmentVariable(pkexecArgs, "XKB_DEFAULT_LAYOUT");
+            appendPkexecEnvironmentVariable(pkexecArgs, "XKB_DEFAULT_VARIANT");
+            appendPkexecEnvironmentVariable(pkexecArgs, "XKB_DEFAULT_MODEL");
+            appendPkexecEnvironmentVariable(pkexecArgs, "XKB_DEFAULT_OPTIONS");
             pkexecArgs << QCoreApplication::applicationFilePath();
             pkexecArgs << args;
 
@@ -623,6 +630,10 @@ int main(int argc, char *argv[])
             appendPkexecEnvironmentVariable(pkexecArgs, "XDG_SESSION_TYPE");
             appendPkexecEnvironmentVariable(pkexecArgs, "DBUS_SESSION_BUS_ADDRESS");
             appendPkexecEnvironmentVariable(pkexecArgs, "QT_QPA_PLATFORM");
+            appendPkexecEnvironmentVariable(pkexecArgs, "XKB_DEFAULT_LAYOUT");
+            appendPkexecEnvironmentVariable(pkexecArgs, "XKB_DEFAULT_VARIANT");
+            appendPkexecEnvironmentVariable(pkexecArgs, "XKB_DEFAULT_MODEL");
+            appendPkexecEnvironmentVariable(pkexecArgs, "XKB_DEFAULT_OPTIONS");
             if (usedPassword) {
                 pkexecArgs << (QStringLiteral("SEB_PASSWORD=") + userPassword);
             }
