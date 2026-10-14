@@ -74,27 +74,23 @@ QByteArray certificateDataFrom(const QVariantMap &data)
 
 bool importIdentity(const QByteArray &data, QSslCertificate &certificate, QSslKey &privateKey)
 {
+    certificate = QSslCertificate();
+    privateKey = QSslKey();
+
     QBuffer buffer;
     buffer.setData(data);
-    if (buffer.open(QIODevice::ReadOnly)) {
-        const QByteArray sebIdentityPassword = QString::fromUtf8(
-            "Di𝈭l𝈖Ch𝈒ah𝉇t𝈁a𝉈Hai1972").toUtf8();
-        if (QSslCertificate::importPkcs12(
-                &buffer, &privateKey, &certificate, nullptr, sebIdentityPassword)) {
-            return true;
-        }
-        buffer.seek(0);
-        if (QSslCertificate::importPkcs12(
-                &buffer, &privateKey, &certificate, nullptr, QByteArray{})) {
-            return true;
-        }
+    if (!buffer.open(QIODevice::ReadOnly)) {
+        return false;
     }
 
-    certificate = QSslCertificate(data, QSsl::Der);
-    if (certificate.isNull()) {
-        certificate = QSslCertificate(data, QSsl::Pem);
+    const QByteArray sebIdentityPassword = QString::fromUtf8(
+        "Di𝈭l𝈖Ch𝈒ah𝉇t𝈁a𝉈Hai1972").toUtf8();
+    if (!QSslCertificate::importPkcs12(
+            &buffer, &privateKey, &certificate, nullptr, sebIdentityPassword)) {
+        return false;
     }
-    return !certificate.isNull();
+
+    return !certificate.isNull() && !privateKey.isNull();
 }
 
 }  // namespace
