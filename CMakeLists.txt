@@ -43,7 +43,7 @@ pkg_check_modules(WEBKITGTK QUIET webkit2gtk-4.1 gtk+-3.0)
 if(WEBKITGTK_FOUND)
     set(webkitgtk_available TRUE)
 endif()
-pkg_check_modules(LIBSECRET REQUIRED libsecret-1)
+pkg_check_modules(LIBSECRET REQUIRED libsecret-1>=0.19.0)
 
 set(SEB_HAS_QTWEBENGINE 0)
 set(SEB_HAS_WEBKITGTK 0)
