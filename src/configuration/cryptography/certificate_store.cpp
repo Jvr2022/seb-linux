@@ -179,6 +179,10 @@ void CertificateStore::loadPersistedIdentities()
         const QByteArray data = secretData == nullptr
             ? QByteArray{}
             : QByteArray(secretData, static_cast<qsizetype>(secretLength));
+        if (secret != nullptr) {
+            secret_value_unref(const_cast<SecretValue *>(secret));
+        }
+
         QSslCertificate certificate;
         QSslKey privateKey;
         if (data.isEmpty() || !importIdentity(data, certificate, privateKey)) {
