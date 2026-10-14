@@ -154,7 +154,8 @@ void CertificateStore::loadPersistedIdentities()
     GError *error = nullptr;
     GList *items = secret_password_search_sync(
         &IdentitySchema,
-        static_cast<SecretSearchFlags>(SECRET_SEARCH_ALL | SECRET_SEARCH_LOAD_SECRETS),
+        static_cast<SecretSearchFlags>(
+            SECRET_SEARCH_ALL | SECRET_SEARCH_LOAD_SECRETS | SECRET_SEARCH_UNLOCK),
         nullptr,
         &error,
         nullptr);
