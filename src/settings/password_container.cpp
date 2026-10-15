@@ -288,6 +288,32 @@ unwrapSebContainer(QByteArray raw, QString *error, QStringList *warnings,
           prefix == kPrefixPasswordConfigureClient;
       const QByteArray encrypted = raw.mid(kSebPrefixLength);
 
+      // SEB stores client configurations (pwcc) that are not meant to be
+      // protected with an empty container password (see
+      // ConfigurationRepository.DetermineEncryptionForClientConfiguration,
+      // which uses PasswordParameters { Password = "", IsHash = true }).
+      // Try that first so such files load without prompting for a password.
+      if (hashPasswordBeforeUse) {
+        QByteArray decrypted;
+        QString decryptError;
+        if (decryptPasswordBlock(encrypted, QString(), &decrypted,
+                                 &decryptError)) {
+          if (decrypted.size() >= 2 &&
+              static_cast<unsigned char>(decrypted.at(0)) == 0x1f &&
+              static_cast<unsigned char>(decrypted.at(1)) == 0x8b) {
+            decrypted = inflateGzip(decrypted, &decryptError);
+            if (decrypted.isEmpty()) {
+              if (error) {
+                *error = decryptError;
+              }
+              return {};
+            }
+          }
+          raw = decrypted;
+          continue;
+        }
+      }
+
       for (int attempt = 0; attempt < 5; ++attempt) {
         if (!passwordProvider) {
           if (error) {
@@ -305,12 +331,24 @@ unwrapSebContainer(QByteArray raw, QString *error, QStringList *warnings,
           return {};
         }
 
-        const QString password =
-            hashPasswordBeforeUse ? hashPassword(supplied).toUpper() : supplied;
+        // For payloads that configure a client (pwcc) SEB derives the
+        // encryption password from the SHA-256 digest of the supplied
+        // password, rendered as lowercase hexadecimal (see
+        // HashAlgorithm.GenerateHashFor -> byte.ToString("x2")). Some tools
+        // emitted the digest uppercased, so fall back to that spelling.
+        QString password =
+            hashPasswordBeforeUse ? hashPassword(supplied) : supplied;
         QByteArray decrypted;
         QString decryptError;
-        if (decryptPasswordBlock(encrypted, password, &decrypted,
-                                 &decryptError)) {
+        bool decryptedOk = decryptPasswordBlock(encrypted, password, &decrypted,
+                                                &decryptError);
+        if (!decryptedOk && hashPasswordBeforeUse) {
+          password = password.toUpper();
+          decryptedOk = decryptPasswordBlock(encrypted, password, &decrypted,
+                                             &decryptError);
+        }
+
+        if (decryptedOk) {
           raw = decrypted;
           if (raw.size() >= 2 &&
               static_cast<unsigned char>(raw.at(0)) == 0x1f &&
