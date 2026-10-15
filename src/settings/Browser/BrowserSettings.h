@@ -54,7 +54,6 @@ struct BrowserSettings
     QString UserAgentSuffix;
     bool UseStartUrlAsHomeUrl = false;
     bool UseTemporaryDownAndUploadDirectory = false;
-    QString UserAgentMode;
 };
 
 }  // namespace seb::settings::browser

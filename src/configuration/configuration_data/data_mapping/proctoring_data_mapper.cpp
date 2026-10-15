@@ -16,8 +16,23 @@ void ProctoringDataMapper::map(const QString &key, const QVariant &value, seb::s
     else if (key == keys::Proctoring::ScreenProctoring::Enabled) screen.Enabled = boolean(value, screen.Enabled);
     else if (key == keys::Proctoring::ScreenProctoring::GroupId) screen.GroupId = string(value, screen.GroupId);
     else if (key == keys::Proctoring::ScreenProctoring::ImageDownscaling) screen.ImageDownscaling = real(value, screen.ImageDownscaling);
-    else if (key == keys::Proctoring::ScreenProctoring::ImageFormat && isString(value)) screen.ImageFormat = normalized(value) == QStringLiteral("png") ? seb::settings::proctoring::ImageFormat::Png : seb::settings::proctoring::ImageFormat::Jpeg;
-    else if (key == keys::Proctoring::ScreenProctoring::ImageQuantization) screen.Quantization = static_cast<seb::settings::proctoring::ImageQuantization>(integer(value, static_cast<int>(screen.Quantization)));
+    else if (key == keys::Proctoring::ScreenProctoring::ImageFormat && isString(value)) {
+        const QString format = normalized(value);
+        if (format == QStringLiteral("png")) screen.ImageFormat = seb::settings::proctoring::ImageFormat::Png;
+        else if (format == QStringLiteral("jpeg") || format == QStringLiteral("jpg")) screen.ImageFormat = seb::settings::proctoring::ImageFormat::Jpeg;
+    }
+    else if (key == keys::Proctoring::ScreenProctoring::ImageQuantization && isInteger(value)) {
+        switch (integer(value)) {
+        case 0: screen.ImageQuantization = seb::settings::proctoring::ImageQuantization::BlackAndWhite1bpp; break;
+        case 1: screen.ImageQuantization = seb::settings::proctoring::ImageQuantization::Grayscale2bpp; break;
+        case 2: screen.ImageQuantization = seb::settings::proctoring::ImageQuantization::Grayscale4bpp; break;
+        case 3: screen.ImageQuantization = seb::settings::proctoring::ImageQuantization::Grayscale8bpp; break;
+        case 4: screen.ImageQuantization = seb::settings::proctoring::ImageQuantization::Color8bpp; break;
+        case 5: screen.ImageQuantization = seb::settings::proctoring::ImageQuantization::Color16bpp; break;
+        case 6: screen.ImageQuantization = seb::settings::proctoring::ImageQuantization::Color24bpp; break;
+        default: break;
+        }
+    }
     else if (key == keys::Proctoring::ScreenProctoring::IntervalMaximum) screen.IntervalMaximum = integer(value, screen.IntervalMaximum);
     else if (key == keys::Proctoring::ScreenProctoring::IntervalMinimum) screen.IntervalMinimum = integer(value, screen.IntervalMinimum);
     else if (key == keys::Proctoring::ShowDisclaimer) p.ShowDisclaimer = boolean(value, p.ShowDisclaimer);

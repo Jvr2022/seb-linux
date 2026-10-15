@@ -23,7 +23,6 @@ struct SecuritySettings
     seb::settings::security::KioskMode KioskMode = seb::settings::security::KioskMode::None;
     QString QuitPasswordHash;
     QString ReconfigurationUrl;
-    QString Version;
     bool VerifyCursorConfiguration = false;
     bool VerifySessionIntegrity = false;
     QList<VersionRestriction> VersionRestrictions;

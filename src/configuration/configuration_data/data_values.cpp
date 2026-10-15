@@ -94,7 +94,7 @@ seb::settings::AppSettings DataValues::loadDefaultSettings() const
     settings.Proctoring.ScreenProctoring.IntervalMinimum = 1000;
     settings.Proctoring.ScreenProctoring.ImageFormat = seb::settings::proctoring::ImageFormat::Png;
     settings.Proctoring.ScreenProctoring.ImageDownscaling = 1.0;
-    settings.Proctoring.ScreenProctoring.Quantization = seb::settings::proctoring::ImageQuantization::Grayscale4bpp;
+    settings.Proctoring.ScreenProctoring.ImageQuantization = seb::settings::proctoring::ImageQuantization::Grayscale4bpp;
     settings.Proctoring.ScreenProctoring.MetaData.CaptureApplicationData = true;
     settings.Proctoring.ScreenProctoring.MetaData.CaptureBrowserData = true;
     settings.Proctoring.ScreenProctoring.MetaData.CaptureWindowTitle = true;

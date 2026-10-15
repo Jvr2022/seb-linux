@@ -24,7 +24,5 @@ struct KeyboardSettings {
     bool AllowInjected = false;
     bool AllowPrintScreen = false;
     bool AllowSystemKey = false;
-    bool EnableKeyCheck = false;
-    bool EnableLayoutCheck = false;
 };
 }

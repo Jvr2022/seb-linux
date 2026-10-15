@@ -25,7 +25,6 @@ void ApplicationDataMapper::map(const QString &key, const QVariant &value, seb::
             seb::settings::applications::BlacklistApplication application;
             application.AutoTerminate = boolean(raw.value(keys::Applications::AutoTerminate), application.AutoTerminate);
             application.ExecutableName = string(raw.value(keys::Applications::ExecutableName));
-            application.OperatingSystem = integer(raw.value(keys::Applications::OperatingSystem));
             application.OriginalName = string(raw.value(keys::Applications::OriginalName));
             settings.Applications.Blacklist.push_back(application);
         } else {
@@ -52,7 +51,6 @@ void ApplicationDataMapper::map(const QString &key, const QVariant &value, seb::
             application.DisplayName = string(raw.value(keys::Applications::DisplayName));
             application.ExecutableName = string(raw.value(keys::Applications::ExecutableName));
             application.ExecutablePath = string(raw.value(keys::Applications::ExecutablePath));
-            application.OperatingSystem = integer(raw.value(keys::Applications::OperatingSystem));
             application.OriginalName = string(raw.value(keys::Applications::OriginalName));
             application.ShowInShell = boolean(raw.value(keys::Applications::ShowInShell), application.ShowInShell);
             application.Signature = string(raw.value(keys::Applications::Signature));

@@ -3,6 +3,5 @@ namespace seb::settings::monitoring {
 struct MouseSettings {
     bool AllowMiddleButton = false;
     bool AllowRightButton = true;
-    bool EnableMovementCheck = false;
 };
 }

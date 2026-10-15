@@ -21,7 +21,7 @@ struct ScreenProctoringSettings
     int IntervalMaximum = 0;
     int IntervalMinimum = 0;
     MetaDataSettings MetaData;
-    ImageQuantization Quantization = ImageQuantization::Medium;
+    seb::settings::proctoring::ImageQuantization ImageQuantization = seb::settings::proctoring::ImageQuantization::Medium;
     QString ServiceUrl;
 };
 

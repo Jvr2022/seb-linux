@@ -3,7 +3,5 @@ namespace seb::settings::systemcomponents {
 struct PowerSupplySettings {
     double ChargeThresholdCritical = 0.1;
     double ChargeThresholdLow = 0.2;
-    bool EnableChargeIndicator = true;
-    bool EnableLowBatteryWarning = true;
 };
 }

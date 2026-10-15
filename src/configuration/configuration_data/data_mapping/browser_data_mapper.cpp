@@ -130,15 +130,15 @@ void BrowserDataMapper::mapGlobal(const QVariantMap &data, seb::settings::AppSet
     settings.Browser.Filter.ProcessContentRequests = processMain && processContent;
     const bool mobile = integer(data.value(keys::Browser::UserAgentModeMobile), 0) != 0;
     const bool desktop = integer(data.value(keys::Browser::UserAgentModeDesktop), 0) != 0;
-    if (mobile && settings.UserInterface.Mode == seb::settings::userinterface::UserInterfaceMode::Mobile) {
-        settings.Browser.UseCustomUserAgent = true;
-        if (isString(data.value(keys::Browser::CustomUserAgentMobile))) {
-            settings.Browser.CustomUserAgent = data.value(keys::Browser::CustomUserAgentMobile).toString();
-        }
-    } else if (desktop) {
+    if (settings.UserInterface.Mode == seb::settings::userinterface::UserInterfaceMode::Desktop && desktop) {
         settings.Browser.UseCustomUserAgent = true;
         if (isString(data.value(keys::Browser::CustomUserAgentDesktop))) {
             settings.Browser.CustomUserAgent = data.value(keys::Browser::CustomUserAgentDesktop).toString();
+        }
+    } else if (settings.UserInterface.Mode == seb::settings::userinterface::UserInterfaceMode::Mobile && mobile) {
+        settings.Browser.UseCustomUserAgent = true;
+        if (isString(data.value(keys::Browser::CustomUserAgentMobile))) {
+            settings.Browser.CustomUserAgent = data.value(keys::Browser::CustomUserAgentMobile).toString();
         }
     }
 }
