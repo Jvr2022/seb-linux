@@ -13,7 +13,7 @@ void UserInterfaceDataMapper::map(const QString &key, const QVariant &value, seb
     else if (key == keys::UserInterface::Taskbar::EnableTaskbar) ui.Taskbar.EnableTaskbar = boolean(value, ui.Taskbar.EnableTaskbar);
     else if (key == keys::UserInterface::Taskbar::ShowVerificator) ui.Taskbar.ShowVerificator = boolean(value, ui.Taskbar.ShowVerificator);
     else if (key == keys::UserInterface::Taskbar::ShowApplicationLog) { ui.Taskbar.ShowApplicationLog = boolean(value, ui.Taskbar.ShowApplicationLog); ui.ActionCenter.ShowApplicationLog = ui.Taskbar.ShowApplicationLog; }
-    else if (key == keys::UserInterface::SystemControls::Audio::Show) { ui.Taskbar.ShowAudio = boolean(value, ui.Taskbar.ShowAudio); ui.Taskbar.ShowAudioControl = ui.Taskbar.ShowAudio; ui.ActionCenter.ShowAudio = ui.Taskbar.ShowAudio; }
+    else if (key == keys::UserInterface::SystemControls::Audio::Show) { ui.Taskbar.ShowAudio = boolean(value, ui.Taskbar.ShowAudio); ui.ActionCenter.ShowAudio = ui.Taskbar.ShowAudio; }
     else if (key == keys::UserInterface::SystemControls::Clock::Show) { ui.Taskbar.ShowClock = boolean(value, ui.Taskbar.ShowClock); ui.ActionCenter.ShowClock = ui.Taskbar.ShowClock; }
     else if (key == keys::UserInterface::SystemControls::KeyboardLayout::Show) { ui.Taskbar.ShowKeyboardLayout = boolean(value, ui.Taskbar.ShowKeyboardLayout); ui.ActionCenter.ShowKeyboardLayout = ui.Taskbar.ShowKeyboardLayout; }
     else if (key == keys::UserInterface::SystemControls::Network::Show) { ui.Taskbar.ShowNetwork = boolean(value, ui.Taskbar.ShowNetwork); ui.ActionCenter.ShowNetwork = ui.Taskbar.ShowNetwork; }

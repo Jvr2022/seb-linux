@@ -14,6 +14,7 @@ struct ScreenProctoringSettings
     QString ClientId;
     QString ClientSecret;
     bool Enabled = false;
+    QString EncryptionSecret;
     QString GroupId;
     seb::settings::proctoring::ImageFormat ImageFormat = seb::settings::proctoring::ImageFormat::Jpeg;
     double ImageDownscaling = 0.0;
@@ -22,8 +23,6 @@ struct ScreenProctoringSettings
     MetaDataSettings MetaData;
     ImageQuantization Quantization = ImageQuantization::Medium;
     QString ServiceUrl;
-    bool ShowDisclaimer = true;
-    bool ShowTaskbarNotification = true;
 };
 
 }  // namespace seb::settings::proctoring
