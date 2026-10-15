@@ -110,6 +110,16 @@ SebSession::SebSession(
     }
     profile_ = engineProvider_->createProfile(this);
 
+    connect(profile_.get(), &seb::browser::contracts::IWebProfile::downloadFinished,
+            this, [this](const QString &path) {
+                if (!configuration_.isBrowserResource || path.isEmpty() ||
+                    !path.endsWith(QStringLiteral(".seb"), Qt::CaseInsensitive)) {
+                    return;
+                }
+
+                openSebResource(QUrl::fromLocalFile(path), QApplication::activeWindow());
+            });
+
     if (useTemporaryProfile) {
         profileDirectory_ = std::make_unique<QTemporaryDir>(
             QDir::tempPath() + QStringLiteral("/seb-linux-profile-XXXXXX"));
@@ -410,6 +420,19 @@ void SebSession::handleDownloadRequested(const QUrl &url, const QString &suggest
     }
 
     if (sebConfig) {
+        if (configuration_.isBrowserResource) {
+            if (!configurationDownloadDirectory_ || !configurationDownloadDirectory_->isValid()) {
+                configurationDownloadDirectory_ = std::make_unique<QTemporaryDir>(
+                    QDir::tempPath() + QStringLiteral("/seb-linux-configuration-XXXXXX"));
+            }
+
+            if (configurationDownloadDirectory_ && configurationDownloadDirectory_->isValid()) {
+                downloadDirectory = configurationDownloadDirectory_->path();
+                accepted = true;
+                return;
+            }
+        }
+
         accepted = false;
         openSebResource(url, QApplication::activeWindow());
         return;

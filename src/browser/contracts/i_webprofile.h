@@ -39,6 +39,7 @@ public:
 signals:
     // Simple download abstraction. A full download interceptor would have its own class.
     void downloadRequested(const QUrl &url, const QString &suggestedFilename, bool &accepted, QString &downloadDirectory);
+    void downloadFinished(const QString &localPath);
 };
 
 }  // namespace seb::browser::contracts

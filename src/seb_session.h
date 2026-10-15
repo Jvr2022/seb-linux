@@ -85,6 +85,7 @@ private:
     std::unique_ptr<seb::browser::contracts::IWebProfile> profile_;
     std::unique_ptr<QTemporaryDir> profileDirectory_;
     std::unique_ptr<QTemporaryDir> downloadDirectory_;
+    std::unique_ptr<QTemporaryDir> configurationDownloadDirectory_;
     std::unique_ptr<seb::applications::ApplicationManager> applicationManager_;
     ResourceOpener opener_;
     QList<BrowserWindow *> browserWindows_;

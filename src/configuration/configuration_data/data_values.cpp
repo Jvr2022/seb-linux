@@ -31,7 +31,7 @@ contracts::AppConfig DataValues::initializeAppConfig() const
     const QString version = QCoreApplication::applicationVersion();
     config.programBuildVersion = version;
     config.programCopyright = QStringLiteral("JVR2022");
-    config.programDataFilePath = appData + QStringLiteral("/program.seb");
+    config.programDataFilePath = QStringLiteral("/etc/safe-exam-browser/client.seb");
     config.programTitle = QStringLiteral("Safe Exam Browser");
     config.programInformationalVersion = version;
     config.runtimeAddress = QStringLiteral("local://safeexambrowser/runtime");

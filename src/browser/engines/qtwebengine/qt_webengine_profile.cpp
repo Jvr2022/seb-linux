@@ -8,6 +8,7 @@
 #include <QWebEngineSettings>
 #include <QWebEngineUrlRequestInterceptor>
 #include <QWebEngineUrlRequestInfo>
+#include <QDir>
 
 namespace seb::browser {
 
@@ -84,6 +85,13 @@ QtWebEngineProfile::QtWebEngineProfile(QObject *parent)
             if (!downloadDir.isEmpty()) {
                 download->setDownloadDirectory(downloadDir);
             }
+            connect(download, &QWebEngineDownloadRequest::isFinishedChanged, this, [this, download]() {
+                if (download->state() != QWebEngineDownloadRequest::DownloadCompleted) {
+                    return;
+                }
+                emit this->downloadFinished(
+                    QDir(download->downloadDirectory()).filePath(download->downloadFileName()));
+            });
             download->accept();
         }
     });

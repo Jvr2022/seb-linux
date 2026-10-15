@@ -12,6 +12,7 @@ namespace seb::configuration {
 
 namespace contracts::cryptography {
 class ICertificateStore;
+struct EncryptionParameters;
 }
 namespace contracts::data_formats {
 class IDataParser;
@@ -33,7 +34,9 @@ class GZipCompressor;
 }
 namespace data_formats {
 class BinaryParser;
+class BinarySerializer;
 class XmlParser;
+class XmlSerializer;
 }
 
 class ConfigurationRepository : public contracts::IConfigurationRepository
@@ -80,6 +83,13 @@ private:
     std::unique_ptr<cryptography::PublicKeySymmetricEncryption> publicKeySymmetricEncryption_;
     std::unique_ptr<data_formats::XmlParser> xmlParser_;
     std::unique_ptr<data_formats::BinaryParser> binaryParser_;
+    std::unique_ptr<data_formats::BinarySerializer> binarySerializer_;
+    std::unique_ptr<data_formats::XmlSerializer> xmlSerializer_;
+
+    std::shared_ptr<contracts::cryptography::EncryptionParameters>
+    determineEncryptionForClientConfiguration(
+        const QVariantMap &data,
+        const std::shared_ptr<contracts::cryptography::EncryptionParameters> &current) const;
 };
 
 }  // namespace seb::configuration

@@ -151,11 +151,6 @@ set(SEB_SOURCES
     src/browser/webengine_environment.cpp
     src/app_controller.cpp
     src/main.cpp
-    src/settings/password_container.cpp
-    src/settings/resource_loader.cpp
-    src/settings/settings_defaults.cpp
-    src/settings/settings_mapping.cpp
-    src/settings/settings_parsing.cpp
     src/shell/taskbar/taskbar_service.cpp
     src/shell/taskbar/platform/audio_controller.cpp
     src/shell/taskbar/platform/battery_controller.cpp
@@ -177,7 +172,6 @@ set(SEB_SOURCES
     src/ui/taskbar/taskbar_widget.cpp
     src/ui/runtime_window.cpp
     src/ui/seb_taskbar.cpp
-    src/seb_settings.cpp
     src/seb_session.cpp
     src/security/security_service.cpp
     src/browser_window.cpp
@@ -363,11 +357,6 @@ set(SEB_HEADERS
     src/browser/request_interceptor.h
     src/browser/engines/engine_factory.h
     src/browser/webengine_environment.h
-    src/settings/password_container.h
-    src/settings/resource_loader.h
-    src/settings/settings_defaults.h
-    src/settings/settings_mapping.h
-    src/settings/settings_parsing.h
     src/shell/taskbar/taskbar_model.h
     src/shell/taskbar/platform/audio_controller.h
     src/shell/taskbar/platform/battery_controller.h
@@ -391,7 +380,6 @@ set(SEB_HEADERS
     src/ui/taskbar/taskbar_widget.h
     src/ui/runtime_window.h
     src/ui/seb_taskbar.h
-    src/seb_settings.h
     src/seb_session.h
     src/security/security_service.h
     src/browser_window.h

@@ -4,6 +4,7 @@
 #include "configuration_data/data_processor.h"
 #include "configuration_data/data_validator.h"
 #include "configuration_data/data_values.h"
+#include "configuration_data/keys.h"
 #include "contracts/cryptography/i_certificate_store.h"
 #include "contracts/data_formats/i_data_parser.h"
 #include "contracts/data_formats/i_data_serializer.h"
@@ -66,10 +67,12 @@ ConfigurationRepository::ConfigurationRepository()
     binaryParser_ = std::make_unique<data_formats::BinaryParser>(
         *compressor_, *hashAlgorithm_, *passwordEncryption_, *publicKeyEncryption_,
         *publicKeySymmetricEncryption_, *xmlParser_);
+    xmlSerializer_ = std::make_unique<data_formats::XmlSerializer>();
+    binarySerializer_ = std::make_unique<data_formats::BinarySerializer>(*compressor_, *passwordEncryption_);
     registerParser(binaryParser_.get());
     registerParser(xmlParser_.get());
-    registerSerializer(new data_formats::BinarySerializer());
-    registerSerializer(new data_formats::XmlSerializer());
+    registerSerializer(binarySerializer_.get());
+    registerSerializer(xmlSerializer_.get());
     registerLoader(new data_resources::FileResourceLoader());
     registerLoader(new data_resources::NetworkResourceLoader(dataValues().initializeAppConfig()));
     registerSaver(new data_resources::FileResourceSaver());
@@ -95,6 +98,11 @@ contracts::SaveStatus ConfigurationRepository::configureClientWith(
 
     certificateStore_->extractAndImportIdentities(rawData);
 
+    encryption = determineEncryptionForClientConfiguration(rawData, encryption);
+    if (encryption) {
+        format = contracts::data_formats::FormatType::Binary;
+    }
+
     QByteArray serialized;
     const contracts::SaveStatus serializeStatus = trySerializeData(rawData, format, serialized, encryption.get());
     if (serializeStatus != contracts::SaveStatus::Success) {
@@ -102,6 +110,26 @@ contracts::SaveStatus ConfigurationRepository::configureClientWith(
     }
 
     return trySaveData(QUrl::fromLocalFile(dataValues().getAppDataFilePath()), serialized);
+}
+
+std::shared_ptr<contracts::cryptography::EncryptionParameters>
+ConfigurationRepository::determineEncryptionForClientConfiguration(
+    const QVariantMap &data,
+    const std::shared_ptr<contracts::cryptography::EncryptionParameters> &current) const
+{
+    const auto it = data.constFind(configuration_data::keys::ConfigurationFile::KeepClientConfigEncryption);
+    const bool useDefaultEncryption =
+        it == data.cend() ||
+        (it.value().metaType().id() == QMetaType::Bool && !it.value().toBool());
+
+    if (!useDefaultEncryption) {
+        return current;
+    }
+
+    auto password = std::make_shared<contracts::cryptography::PasswordParameters>();
+    password->password = QStringLiteral("");
+    password->isHash = true;
+    return password;
 }
 
 contracts::AppConfig ConfigurationRepository::initializeAppConfig()
