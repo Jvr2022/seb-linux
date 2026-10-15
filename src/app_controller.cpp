@@ -14,6 +14,7 @@
 #include <QLineEdit>
 #include <QMessageBox>
 #include <QTimer>
+#include <QTemporaryDir>
 #include <QTextStream>
 
 namespace {
@@ -125,14 +126,80 @@ AppController::AppController(QObject *parent)
 
 AppController::~AppController() = default;
 
+bool AppController::loadSettingsWithPassword(
+    const QUrl &resource,
+    seb::settings::AppSettings &settings,
+    seb::configuration::contracts::cryptography::PasswordParameters &password,
+    const QString &currentPasswordHash,
+    bool localSettings,
+    seb::configuration::contracts::LoadStatus &status,
+    bool &aborted)
+{
+    password.password = QStringLiteral("");
+    password.isHash = true;
+    aborted = false;
+    status = repository_.tryLoadSettings(resource, settings, &password);
+
+    if (status == seb::configuration::contracts::LoadStatus::PasswordNeeded &&
+        !currentPasswordHash.isEmpty()) {
+        password.password = currentPasswordHash;
+        password.isHash = true;
+        status = repository_.tryLoadSettings(resource, settings, &password);
+    }
+
+    for (int attempt = 0;
+         attempt < 5 && status == seb::configuration::contracts::LoadStatus::PasswordNeeded;
+         ++attempt) {
+        bool accepted = false;
+        const QString passwordText = QInputDialog::getText(
+            mainWindow_,
+            localSettings
+                ? QStringLiteral("Local SEB Settings Password")
+                : QStringLiteral("SEB Password Required"),
+            localSettings
+                ? QStringLiteral("Enter the password for the local SEB settings.")
+                : QStringLiteral("Enter the password for this SEB configuration file."),
+            QLineEdit::Password,
+            QString(),
+            &accepted);
+        if (!accepted) {
+            aborted = true;
+            return false;
+        }
+
+        password.password = passwordText;
+        password.isHash = false;
+        status = repository_.tryLoadSettings(resource, settings, &password);
+    }
+
+    return status == seb::configuration::contracts::LoadStatus::Success ||
+           status == seb::configuration::contracts::LoadStatus::LoadWithBrowser;
+}
+
+bool AppController::ensureBrowserProfile()
+{
+    if (browserProfileDirectory_ && browserProfileDirectory_->isValid()) {
+        return true;
+    }
+
+    browserProfileDirectory_ = std::make_unique<QTemporaryDir>(
+        QDir::tempPath() + QStringLiteral("/seb-linux-profile-XXXXXX"));
+    return browserProfileDirectory_ && browserProfileDirectory_->isValid();
+}
+
 bool AppController::launch(const QString &resource, QString *error)
 {
     const bool isReconfiguration = session_ != nullptr;
     const bool previousBrowserResource = sessionConfiguration_.isBrowserResource;
+    const QString previousBrowserProfilePath = sessionConfiguration_.browserProfilePath;
     const QString previousAdminPasswordHash = session_
         ? session_->settings().Security.AdminPasswordHash
         : QString();
     sessionConfiguration_ = repository_.initializeSessionConfiguration();
+    if (previousBrowserResource && !previousBrowserProfilePath.isEmpty()) {
+        sessionConfiguration_.browserProfilePath = previousBrowserProfilePath;
+        sessionConfiguration_.reuseBrowserProfile = true;
+    }
     const QStringList warnings;
     const bool hasRequestedResource = !resource.trimmed().isEmpty();
 
@@ -150,23 +217,28 @@ bool AppController::launch(const QString &resource, QString *error)
         sessionConfiguration_.settings = repository_.loadDefaultSettings();
     } else {
         auto &settings = sessionConfiguration_.settings;
-        seb::configuration::contracts::cryptography::PasswordParameters emptyPassword;
-        emptyPassword.password = QStringLiteral("");
-        emptyPassword.isHash = true;
-        auto passwordUsed = emptyPassword;
+        seb::configuration::contracts::cryptography::PasswordParameters passwordUsed;
+        seb::configuration::contracts::LoadStatus status;
+        bool passwordAborted = false;
         QString currentAdminPasswordHash;
 
         if (hasRequestedResource && !isReconfiguration) {
             const QString clientPath = persistentClientPath(sessionConfiguration_.appConfig);
             if (!clientPath.isEmpty()) {
                 seb::settings::AppSettings clientSettings;
-                const auto clientStatus = repository_.tryLoadSettings(
+                const bool loaded = loadSettingsWithPassword(
                     QUrl::fromLocalFile(clientPath),
                     clientSettings,
-                    &emptyPassword);
-                if (clientStatus != seb::configuration::contracts::LoadStatus::Success) {
+                    passwordUsed,
+                    QString(),
+                    true,
+                    status,
+                    passwordAborted);
+                if (!loaded) {
                     if (error) {
-                        *error = loadStatusMessage(clientStatus);
+                        *error = passwordAborted
+                            ? QStringLiteral("The local SEB settings password was not accepted.")
+                            : loadStatusMessage(status);
                     }
                     return false;
                 }
@@ -178,48 +250,39 @@ bool AppController::launch(const QString &resource, QString *error)
             currentAdminPasswordHash = previousAdminPasswordHash;
         }
 
-        auto status = repository_.tryLoadSettings(targetResource, settings, &emptyPassword);
+        const bool loaded = loadSettingsWithPassword(
+            targetResource,
+            settings,
+            passwordUsed,
+            currentAdminPasswordHash,
+            false,
+            status,
+            passwordAborted);
 
-        if (status == seb::configuration::contracts::LoadStatus::PasswordNeeded &&
-            !currentAdminPasswordHash.isEmpty()) {
-            passwordUsed.password = currentAdminPasswordHash;
-            passwordUsed.isHash = true;
-            status = repository_.tryLoadSettings(targetResource, settings, &passwordUsed);
+        if (!loaded && status == seb::configuration::contracts::LoadStatus::PasswordNeeded) {
+            if (error) {
+                *error = passwordAborted
+                    ? QStringLiteral("The SEB configuration password was not accepted.")
+                    : QStringLiteral("The SEB configuration password was not accepted after five attempts.");
+            }
+            return false;
         }
 
-        if (status == seb::configuration::contracts::LoadStatus::PasswordNeeded) {
-            bool loaded = false;
-            for (int attempt = 0; attempt < 5 && !loaded; ++attempt) {
-                bool accepted = false;
-                const QString password = QInputDialog::getText(
-                    mainWindow_,
-                    QStringLiteral("SEB Password Required"),
-                    QStringLiteral("Enter the password for this SEB configuration file."),
-                    QLineEdit::Password,
-                    QString(),
-                    &accepted);
-                if (!accepted) {
-                    break;
-                }
-
-                seb::configuration::contracts::cryptography::PasswordParameters enteredPassword;
-                enteredPassword.password = password;
-                enteredPassword.isHash = false;
-                passwordUsed = enteredPassword;
-                status = repository_.tryLoadSettings(targetResource, settings, &enteredPassword);
-                if (status == seb::configuration::contracts::LoadStatus::Success) {
-                    loaded = true;
-                } else if (status != seb::configuration::contracts::LoadStatus::PasswordNeeded) {
-                    break;
-                }
-            }
-
-            if (!loaded) {
-                if (error) *error = QStringLiteral("The SEB configuration password was not accepted.");
-                return false;
-            }
-        } else if (status == seb::configuration::contracts::LoadStatus::LoadWithBrowser) {
+        if (status == seb::configuration::contracts::LoadStatus::LoadWithBrowser) {
             sessionConfiguration_.isBrowserResource = true;
+            if (sessionConfiguration_.browserProfilePath.isEmpty()) {
+                if (!previousBrowserResource) {
+                    browserProfileDirectory_.reset();
+                }
+                if (!ensureBrowserProfile()) {
+                    if (error) {
+                        *error = QStringLiteral("Could not create temporary browser profile storage.");
+                    }
+                    return false;
+                }
+                sessionConfiguration_.browserProfilePath = browserProfileDirectory_->path();
+                sessionConfiguration_.reuseBrowserProfile = true;
+            }
             settings.Applications.Blacklist.clear();
             settings.Applications.Whitelist.clear();
             settings.Browser.DeleteCacheOnShutdown = false;

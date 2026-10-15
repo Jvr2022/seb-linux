@@ -120,7 +120,10 @@ SebSession::SebSession(
                 openSebResource(QUrl::fromLocalFile(path), QApplication::activeWindow());
             });
 
-    if (useTemporaryProfile) {
+    if (configuration_.reuseBrowserProfile && !configuration_.browserProfilePath.isEmpty()) {
+        profile_->setPersistentStoragePath(configuration_.browserProfilePath);
+        profile_->setCachePath(configuration_.browserProfilePath + QStringLiteral("/cache"));
+    } else if (useTemporaryProfile) {
         profileDirectory_ = std::make_unique<QTemporaryDir>(
             QDir::tempPath() + QStringLiteral("/seb-linux-profile-XXXXXX"));
         profile_->setPersistentStoragePath(profileDirectory_->path());

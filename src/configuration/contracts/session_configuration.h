@@ -10,8 +10,10 @@ namespace seb::configuration::contracts {
 struct SessionConfiguration
 {
     AppConfig appConfig;
+    QString browserProfilePath;
     QUuid clientAuthenticationToken;
     bool isBrowserResource = false;
+    bool reuseBrowserProfile = false;
     QUuid sessionId;
     seb::settings::AppSettings settings;
 };
