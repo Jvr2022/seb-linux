@@ -31,7 +31,7 @@ bool DataValidator::validate(const QVariantMap &rawData) const
     valid &= validateStringValues(rawData);
 
     if (valid) {
-        qInfo() << "SEB configuration data is valid.";
+        qDebug() << "SEB configuration data is valid.";
     } else {
         qWarning() << "SEB configuration data is invalid and cannot be applied.";
     }
