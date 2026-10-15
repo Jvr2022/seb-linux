@@ -18,6 +18,7 @@
 #include "data_formats/binary_serializer.h"
 #include "data_formats/xml_parser.h"
 #include "data_formats/xml_serializer.h"
+#include "data_formats/internal_keys.h"
 #include "data_resources/file_resource_loader.h"
 #include "data_resources/file_resource_saver.h"
 #include "data_resources/network_resource_loader.h"
@@ -133,8 +134,10 @@ contracts::LoadStatus ConfigurationRepository::tryLoadSettings(
         return parseStatus;
     }
 
-    dataMapper().map(rawData, settings);
-    dataProcessor().process(rawData, settings);
+    QVariantMap settingsData = rawData;
+    settingsData.remove(data_formats::internal_keys::RawSebData);
+    dataMapper().map(settingsData, settings);
+    dataProcessor().process(settingsData, settings);
     return contracts::LoadStatus::Success;
 }
 
