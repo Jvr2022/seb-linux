@@ -1,6 +1,7 @@
 #pragma once
 
-#include "seb_settings.h"
+#include "configuration/configuration_repository.h"
+#include "configuration/contracts/session_configuration.h"
 
 #include <memory>
 
@@ -20,11 +21,15 @@ public:
     ~AppController() override;
 
     bool launch(const QString &resource, QString *error);
-    bool launchResolved(const seb::SebSettings &settings, const QStringList &warnings, QString *error);
 
 private:
-    bool applySettings(const seb::SebSettings &settings, const QStringList &warnings, QString *error);
+    bool applySettings(
+        const seb::configuration::contracts::SessionConfiguration &configuration,
+        const QStringList &warnings,
+        QString *error);
 
+    seb::configuration::ConfigurationRepository repository_;
+    seb::configuration::contracts::SessionConfiguration sessionConfiguration_;
     std::unique_ptr<RuntimeWindow> runtimeWindow_;
     std::unique_ptr<SebSession> session_;
     BrowserWindow *mainWindow_ = nullptr;

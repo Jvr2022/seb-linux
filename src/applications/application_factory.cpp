@@ -7,11 +7,13 @@
 
 namespace seb::applications {
 
-std::unique_ptr<ExternalApplication> ApplicationFactory::tryCreate(const seb::WhitelistApplicationSettings &settings)
+std::unique_ptr<ExternalApplication> ApplicationFactory::tryCreate(
+    const seb::settings::applications::WhitelistApplication &settings)
 {
     auto application = std::make_unique<ExternalApplication>(settings);
     application->initialize();
-    if (application->executablePath().isEmpty() && QStandardPaths::findExecutable(settings.executableName).isEmpty()) {
+    if (application->executablePath().isEmpty() &&
+        QStandardPaths::findExecutable(settings.ExecutableName).isEmpty()) {
         return {};
     }
     return application;

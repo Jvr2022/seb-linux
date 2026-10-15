@@ -2,20 +2,24 @@
 
 namespace seb::shell::taskbar {
 
-TaskbarModel TaskbarService::buildModel(const seb::SebSettings &settings, bool hasBattery)
+TaskbarModel TaskbarService::buildModel(
+    const seb::settings::userinterface::TaskbarSettings &taskbar,
+    const seb::settings::security::SecuritySettings &security,
+    const seb::settings::proctoring::ProctoringSettings &proctoring,
+    bool hasBattery)
 {
     TaskbarModel model;
-    model.visible = settings.taskbar.enableTaskbar;
-    model.showApplicationInfo = settings.taskbar.showApplicationInfo;
-    model.showApplicationLog = settings.taskbar.showApplicationLog;
-    model.showProctoring = settings.taskbar.showProctoringNotification;
-    model.showVerificator = settings.taskbar.showVerificator;
+    model.visible = taskbar.EnableTaskbar;
+    model.showApplicationInfo = taskbar.ShowApplicationInfo;
+    model.showApplicationLog = taskbar.ShowApplicationLog;
+    model.showProctoring = proctoring.ShowTaskbarNotification;
+    model.showVerificator = taskbar.ShowVerificator;
     model.showPower = hasBattery;
-    model.showNetwork = settings.taskbar.showNetwork;
-    model.showAudio = settings.taskbar.showAudio;
-    model.showKeyboardLayout = settings.taskbar.showKeyboardLayout;
-    model.showClock = settings.taskbar.showClock;
-    model.showQuit = settings.security.allowTermination;
+    model.showNetwork = taskbar.ShowNetwork;
+    model.showAudio = taskbar.ShowAudio;
+    model.showKeyboardLayout = taskbar.ShowKeyboardLayout;
+    model.showClock = taskbar.ShowClock;
+    model.showQuit = security.AllowTermination;
     return model;
 }
 

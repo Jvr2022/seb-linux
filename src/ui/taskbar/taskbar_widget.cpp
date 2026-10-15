@@ -26,7 +26,7 @@
 
 namespace seb::ui::taskbar {
 
-TaskbarWidget::TaskbarWidget(SebSession &session, const seb::SebSettings &settings, QWidget *parent)
+TaskbarWidget::TaskbarWidget(SebSession &session, QWidget *parent)
     : QWidget(parent)
     , session_(session)
 {
@@ -69,7 +69,12 @@ TaskbarWidget::TaskbarWidget(SebSession &session, const seb::SebSettings &settin
     batteryController_ = new seb::shell::taskbar::platform::BatteryController(this);
     keyboardController_ = new seb::shell::taskbar::platform::KeyboardController(this);
 
-    const auto model = seb::shell::taskbar::TaskbarService::buildModel(settings, batteryController_->state().available);
+    const auto &settings = session_.settings();
+    const auto model = seb::shell::taskbar::TaskbarService::buildModel(
+        settings.UserInterface.Taskbar,
+        settings.Security,
+        settings.Proctoring,
+        batteryController_->state().available);
 
     auto *notificationContainer = new QWidget(this);
     auto *notificationLayout = new QHBoxLayout(notificationContainer);

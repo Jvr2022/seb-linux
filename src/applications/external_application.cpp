@@ -10,7 +10,9 @@
 
 namespace seb::applications {
 
-ExternalApplication::ExternalApplication(const seb::WhitelistApplicationSettings &settings, QObject *parent)
+ExternalApplication::ExternalApplication(
+    const seb::settings::applications::WhitelistApplication &settings,
+    QObject *parent)
     : QObject(parent)
     , settings_(settings)
 {
@@ -23,7 +25,7 @@ ExternalApplication::~ExternalApplication()
 
 bool ExternalApplication::autoStart() const
 {
-    return settings_.autoStart;
+    return settings_.AutoStart;
 }
 
 QString ExternalApplication::executablePath() const
@@ -33,27 +35,29 @@ QString ExternalApplication::executablePath() const
 
 QString ExternalApplication::iconPath() const
 {
-    return resolvedExecutablePath_.isEmpty() ? settings_.executableName : resolvedExecutablePath_;
+    return resolvedExecutablePath_.isEmpty() ? settings_.ExecutableName : resolvedExecutablePath_;
 }
 
 QString ExternalApplication::id() const
 {
-    return settings_.id;
+    return settings_.ExecutableName;
 }
 
 QString ExternalApplication::name() const
 {
-    return settings_.displayName.isEmpty() ? QFileInfo(settings_.executableName).completeBaseName() : settings_.displayName;
+    return settings_.DisplayName.isEmpty()
+        ? QFileInfo(settings_.ExecutableName).completeBaseName()
+        : settings_.DisplayName;
 }
 
 QString ExternalApplication::tooltip() const
 {
-    return settings_.description.isEmpty() ? name() : settings_.description;
+    return settings_.Description.isEmpty() ? name() : settings_.Description;
 }
 
 bool ExternalApplication::showInShell() const
 {
-    return settings_.showInShell;
+    return settings_.ShowInShell;
 }
 
 QList<ApplicationWindow *> ExternalApplication::typedWindows() const
@@ -76,11 +80,12 @@ QList<contracts::IApplicationWindow *> ExternalApplication::windows() const
 
 void ExternalApplication::initialize()
 {
-    resolvedExecutablePath_ = settings_.executablePath;
+    resolvedExecutablePath_ = settings_.ExecutablePath;
     if (resolvedExecutablePath_.isEmpty()) {
-        resolvedExecutablePath_ = QStandardPaths::findExecutable(settings_.executableName);
+        resolvedExecutablePath_ = QStandardPaths::findExecutable(settings_.ExecutableName);
     } else if (QFileInfo(resolvedExecutablePath_).isDir()) {
-        resolvedExecutablePath_ = QFileInfo(resolvedExecutablePath_ + QLatin1Char('/') + settings_.executableName).absoluteFilePath();
+        resolvedExecutablePath_ = QFileInfo(
+            resolvedExecutablePath_ + QLatin1Char('/') + settings_.ExecutableName).absoluteFilePath();
     }
 }
 
@@ -114,7 +119,7 @@ void ExternalApplication::start()
 void ExternalApplication::terminate()
 {
     for (ExternalApplicationInstance *instance : std::as_const(instances_)) {
-        instance->terminate(!settings_.allowRunning || settings_.autoTerminate);
+        instance->terminate(!settings_.AllowRunning || settings_.AutoTerminate);
     }
 }
 
@@ -132,7 +137,7 @@ void ExternalApplication::handleInstanceTerminated(qint64 processId)
 QStringList ExternalApplication::arguments() const
 {
     QStringList args;
-    for (const QString &argument : settings_.arguments) {
+    for (const QString &argument : settings_.Arguments) {
         args.push_back(QProcessEnvironment::systemEnvironment().value(argument, argument));
     }
     return args;

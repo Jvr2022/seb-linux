@@ -78,15 +78,19 @@ QString getCachedSebVersion()
 
 }  // namespace
 
-SebSession::SebSession(const seb::SebSettings &settings, ResourceOpener opener, QObject *parent)
+SebSession::SebSession(
+    const seb::configuration::contracts::SessionConfiguration &configuration,
+    ResourceOpener opener,
+    QObject *parent)
     : QObject(parent)
-    , settings_(settings)
+    , configuration_(configuration)
     , opener_(std::move(opener))
 {
+    const auto &settings = configuration_.settings;
     const bool useTemporaryProfile =
-        settings_.browser.deleteCacheOnShutdown ||
-        settings_.browser.deleteCookiesOnShutdown ||
-        settings_.browser.deleteCookiesOnStartup;
+        settings.Browser.DeleteCacheOnShutdown ||
+        settings.Browser.DeleteCookiesOnShutdown ||
+        settings.Browser.DeleteCookiesOnStartup;
 
     engineProvider_ = seb::browser::createEngineProvider();
     if (!engineProvider_) {
@@ -117,7 +121,7 @@ SebSession::SebSession(const seb::SebSettings &settings, ResourceOpener opener, 
         profile_->setCachePath(baseDir + QStringLiteral("/cache"));
     }
 
-    if (settings_.browser.useTemporaryDownAndUploadDirectory) {
+    if (settings.Browser.UseTemporaryDownAndUploadDirectory) {
         downloadDirectory_ = std::make_unique<QTemporaryDir>(
             QDir::tempPath() + QStringLiteral("/seb-linux-downloads-XXXXXX"));
         profile_->setDownloadPath(downloadDirectory_->path());
@@ -125,23 +129,23 @@ SebSession::SebSession(const seb::SebSettings &settings, ResourceOpener opener, 
         profile_->setDownloadPath(defaultDownloadDirectory());
     }
 
-    profile_->setPdfViewerEnabled(settings_.browser.allowPdfReader);
-    profile_->setSpellCheckEnabled(settings_.browser.allowSpellChecking);
+    profile_->setPdfViewerEnabled(settings.Browser.AllowPdfReader);
+    profile_->setSpellCheckEnabled(settings.Browser.AllowSpellChecking);
     profile_->setSpellCheckLanguages(QStringList{QLocale::system().bcp47Name()});
     profile_->setHttpUserAgent(buildUserAgent());
-    profile_->setDevBypass(settings_.devBypass);
+    profile_->setDevBypass(false);
 
-    interceptor_.reset(new seb::browser::RequestInterceptor(settings_));
+    interceptor_.reset(new seb::browser::RequestInterceptor(settings.Browser));
     profile_->setUrlRequestInterceptor(interceptor_.data());
 
     connect(profile_.get(), &seb::browser::contracts::IWebProfile::downloadRequested,
             this, &SebSession::handleDownloadRequested);
 
-    if (settings_.browser.deleteCookiesOnStartup) {
+    if (settings.Browser.DeleteCookiesOnStartup) {
         profile_->deleteAllCookies();
     }
 
-    applicationManager_ = std::make_unique<seb::applications::ApplicationManager>(settings_.applications, this);
+    applicationManager_ = std::make_unique<seb::applications::ApplicationManager>(settings.Applications, this);
     connect(applicationManager_.get(), &seb::applications::ApplicationManager::applicationsChanged, this, &SebSession::externalApplicationsChanged);
     applicationManager_->initialize();
     applicationManager_->autoStart();
@@ -156,7 +160,9 @@ SebSession::~SebSession()
 
 BrowserWindow *SebSession::createWindow(const QUrl &url, bool isMainWindow)
 {
-    const auto &windowSettings = isMainWindow ? settings_.browser.mainWindow : settings_.browser.additionalWindow;
+    const auto &windowSettings = isMainWindow
+        ? configuration_.settings.Browser.MainWindow
+        : configuration_.settings.Browser.AdditionalWindow;
     auto *window = new BrowserWindow(*this, windowSettings, url, isMainWindow);
     if (!isMainWindow) {
         window->setAttribute(Qt::WA_DeleteOnClose);
@@ -170,11 +176,11 @@ bool SebSession::applyProxyAuthentication(const QString &proxyHost, QAuthenticat
         return false;
     }
 
-    for (const seb::ProxyConfiguration &proxy : settings_.browser.proxy.proxies) {
-        if (proxy.requiresAuthentication &&
-            proxy.host.compare(proxyHost, Qt::CaseInsensitive) == 0) {
-            authenticator->setUser(proxy.username);
-            authenticator->setPassword(proxy.password);
+    for (const auto &proxy : configuration_.settings.Browser.Proxy.Proxies) {
+        if (proxy.RequiresAuthentication &&
+            proxy.Host.compare(proxyHost, Qt::CaseInsensitive) == 0) {
+            authenticator->setUser(proxy.Username);
+            authenticator->setPassword(proxy.Password);
             return true;
         }
     }
@@ -209,22 +215,22 @@ bool SebSession::isPopupAllowed(const QUrl &opener, const QUrl &target, bool *op
     }
 
     const bool sameHost = opener.host().compare(target.host(), Qt::CaseInsensitive) == 0;
-    switch (settings_.browser.popupPolicy) {
-    case seb::PopupPolicy::Allow:
+    switch (configuration_.settings.Browser.PopupPolicy) {
+    case seb::settings::browser::PopupPolicy::Allow:
         return true;
-    case seb::PopupPolicy::AllowSameHost:
+    case seb::settings::browser::PopupPolicy::AllowSameHost:
         return sameHost;
-    case seb::PopupPolicy::AllowSameHostAndWindow:
+    case seb::settings::browser::PopupPolicy::AllowSameHostAndWindow:
         if (openInSameWindow) {
             *openInSameWindow = true;
         }
         return sameHost;
-    case seb::PopupPolicy::AllowSameWindow:
+    case seb::settings::browser::PopupPolicy::AllowSameWindow:
         if (openInSameWindow) {
             *openInSameWindow = true;
         }
         return true;
-    case seb::PopupPolicy::Block:
+    case seb::settings::browser::PopupPolicy::Block:
         return false;
     }
 
@@ -233,19 +239,19 @@ bool SebSession::isPopupAllowed(const QUrl &opener, const QUrl &target, bool *op
 
 bool SebSession::isQuitUrl(const QUrl &url) const
 {
-    if (settings_.browser.quitUrl.isEmpty()) {
+    if (configuration_.settings.Browser.QuitUrl.isEmpty()) {
         return false;
     }
-    return normalizeUrl(url) == normalizeUrl(QUrl(settings_.browser.quitUrl));
+    return normalizeUrl(url) == normalizeUrl(QUrl(configuration_.settings.Browser.QuitUrl));
 }
 
 bool SebSession::promptForHomeNavigation(QWidget *parent) const
 {
-    if (!settings_.browser.homeNavigationMessage.isEmpty()) {
+    if (!configuration_.settings.Browser.HomeNavigationMessage.isEmpty()) {
         const auto answer = QMessageBox::question(
             parent,
             QStringLiteral("Navigate Home"),
-            settings_.browser.homeNavigationMessage,
+            configuration_.settings.Browser.HomeNavigationMessage,
             QMessageBox::Yes | QMessageBox::No,
             QMessageBox::No);
         if (answer != QMessageBox::Yes) {
@@ -253,8 +259,8 @@ bool SebSession::promptForHomeNavigation(QWidget *parent) const
         }
     }
 
-    if (settings_.browser.homeNavigationRequiresPassword &&
-        !settings_.security.quitPasswordHash.isEmpty()) {
+    if (configuration_.settings.Browser.HomeNavigationRequiresPassword &&
+        !configuration_.settings.Security.QuitPasswordHash.isEmpty()) {
         return promptForPassword(
             parent,
             QStringLiteral("Quit Password Required"),
@@ -266,7 +272,7 @@ bool SebSession::promptForHomeNavigation(QWidget *parent) const
 
 bool SebSession::requestApplicationQuit(QWidget *parent, const QString &reason) const
 {
-    if (!settings_.security.allowTermination) {
+    if (!configuration_.settings.Security.AllowTermination) {
         QMessageBox::warning(
             parent,
             QStringLiteral("Termination Disabled"),
@@ -274,16 +280,16 @@ bool SebSession::requestApplicationQuit(QWidget *parent, const QString &reason) 
         return false;
     }
 
-    if (!settings_.security.quitPasswordHash.isEmpty()) {
+    if (!configuration_.settings.Security.QuitPasswordHash.isEmpty()) {
         return promptForPassword(parent, QStringLiteral("Quit Password Required"), reason);
     }
 
     return true;
 }
 
-const seb::SebSettings &SebSession::settings() const
+const seb::settings::AppSettings &SebSession::settings() const
 {
-    return settings_;
+    return configuration_.settings;
 }
 
 seb::browser::contracts::IWebProfile *SebSession::profile() const
@@ -298,20 +304,20 @@ seb::browser::contracts::IEngineProvider *SebSession::engineProvider() const
 
 QUrl SebSession::homeUrl() const
 {
-    return QUrl(settings_.browser.homeUrl);
+    return QUrl(configuration_.settings.Browser.HomeUrl);
 }
 
 QUrl SebSession::initialUrl() const
 {
-    QUrl url(settings_.browser.startUrl);
+    QUrl url(configuration_.settings.Browser.StartUrl);
     if (!url.isValid()) {
         return url;
     }
 
-    if (settings_.browser.useQueryParameter && !settings_.browser.startUrlQuery.isEmpty()) {
-        const QString query = settings_.browser.startUrlQuery.startsWith('?')
-            ? settings_.browser.startUrlQuery.mid(1)
-            : settings_.browser.startUrlQuery;
+    if (configuration_.settings.Browser.UseQueryParameter && !configuration_.settings.Browser.StartUrlQuery.isEmpty()) {
+        const QString query = configuration_.settings.Browser.StartUrlQuery.startsWith('?')
+            ? configuration_.settings.Browser.StartUrlQuery.mid(1)
+            : configuration_.settings.Browser.StartUrlQuery;
 
         QString existing = url.query(QUrl::FullyDecoded);
         if (existing.isEmpty()) {
@@ -393,12 +399,12 @@ void SebSession::handleDownloadRequested(const QUrl &url, const QString &suggest
         : suggestedFilename;
     const bool sebConfig = fileName.endsWith(QStringLiteral(".seb"), Qt::CaseInsensitive);
 
-    if (!settings_.browser.allowDownloads && !(sebConfig && settings_.browser.allowConfigurationDownloads)) {
+    if (!configuration_.settings.Browser.AllowDownloads && !(sebConfig && configuration_.settings.Browser.AllowConfigurationDownloads)) {
         accepted = false;
         return;
     }
 
-    if (sebConfig && !settings_.browser.allowConfigurationDownloads) {
+    if (sebConfig && !configuration_.settings.Browser.AllowConfigurationDownloads) {
         accepted = false;
         return;
     }
@@ -410,7 +416,7 @@ void SebSession::handleDownloadRequested(const QUrl &url, const QString &suggest
     }
 
     QString destination = QDir(defaultDownloadDirectory()).filePath(fileName);
-    if (settings_.browser.allowCustomDownAndUploadLocation) {
+    if (configuration_.settings.Browser.AllowCustomDownAndUploadLocation) {
         const QString selected = QFileDialog::getSaveFileName(
             QApplication::activeWindow(),
             QStringLiteral("Save Download"),
@@ -433,8 +439,8 @@ QString SebSession::buildUserAgent() const
 {
     QString agent;
 
-    if (settings_.browser.useCustomUserAgent && !settings_.browser.customUserAgent.isEmpty()) {
-        agent = settings_.browser.customUserAgent.trimmed();
+    if (configuration_.settings.Browser.UseCustomUserAgent && !configuration_.settings.Browser.CustomUserAgent.isEmpty()) {
+        agent = configuration_.settings.Browser.CustomUserAgent.trimmed();
     } else {
         const QString chromeVersion = QStringLiteral("110.0.0.0");
         agent = QStringLiteral("Mozilla/5.0 (Windows NT 10.0) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/") + chromeVersion;
@@ -446,11 +452,11 @@ QString SebSession::buildUserAgent() const
     }
     agent += sebVersion;
 
-    if (!settings_.browser.userAgentSuffix.trimmed().isEmpty()) {
+    if (!configuration_.settings.Browser.UserAgentSuffix.trimmed().isEmpty()) {
         if (!agent.endsWith(' ')) {
             agent += QLatin1Char(' ');
         }
-        agent += settings_.browser.userAgentSuffix.trimmed();
+        agent += configuration_.settings.Browser.UserAgentSuffix.trimmed();
     }
 
     return agent;
@@ -462,8 +468,8 @@ QString SebSession::defaultDownloadDirectory() const
         return downloadDirectory_->path();
     }
 
-    if (!settings_.browser.downloadDirectory.trimmed().isEmpty()) {
-        return settings_.browser.downloadDirectory.trimmed();
+    if (!configuration_.settings.Browser.DownAndUploadDirectory.trimmed().isEmpty()) {
+        return configuration_.settings.Browser.DownAndUploadDirectory.trimmed();
     }
 
     QString path = QStandardPaths::writableLocation(QStandardPaths::DownloadLocation);
@@ -499,7 +505,7 @@ bool SebSession::promptForPassword(QWidget *parent, const QString &title, const 
 
     const QByteArray digest = QCryptographicHash::hash(password.toUtf8(), QCryptographicHash::Sha256);
     const QString hash = QString::fromLatin1(digest.toHex());
-    if (hash.compare(settings_.security.quitPasswordHash, Qt::CaseInsensitive) == 0) {
+    if (hash.compare(configuration_.settings.Security.QuitPasswordHash, Qt::CaseInsensitive) == 0) {
         return true;
     }
 

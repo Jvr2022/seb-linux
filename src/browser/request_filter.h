@@ -1,5 +1,5 @@
 #pragma once
-#include "../seb_settings.h"
+#include "../settings/Browser/FilterSettings.h"
 
 #include <QRegularExpression>
 #include <QVector>
@@ -21,7 +21,7 @@ enum class FilterDecision
 class RequestFilter
 {
 public:
-    explicit RequestFilter(const seb::FilterSettings &settings);
+    explicit RequestFilter(const seb::settings::browser::FilterSettings &settings);
 
     FilterDecision evaluate(const QUrl &url, contracts::ResourceType resourceType) const;
 
@@ -29,13 +29,15 @@ private:
     struct CompiledRule
     {
         QRegularExpression expression;
-        seb::FilterResult result = seb::FilterResult::Block;
+        seb::settings::browser::filter::FilterResult result =
+            seb::settings::browser::filter::FilterResult::Block;
     };
 
-    static QRegularExpression compileRule(const seb::FilterRuleSettings &rule);
+    static QRegularExpression compileRule(
+        const seb::settings::browser::filter::FilterRuleSettings &rule);
     static bool isMainRequest(contracts::ResourceType resourceType);
 
-    seb::FilterSettings settings_;
+    seb::settings::browser::FilterSettings settings_;
     QVector<CompiledRule> allowRules_;
     QVector<CompiledRule> blockRules_;
 };

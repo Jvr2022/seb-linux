@@ -11,7 +11,7 @@
 
 namespace seb::browser {
 
-KeyGenerator::KeyGenerator(const seb::SebSettings &settings)
+KeyGenerator::KeyGenerator(const seb::settings::browser::BrowserSettings &settings)
     : settings_(settings)
 {
 }
@@ -19,7 +19,7 @@ KeyGenerator::KeyGenerator(const seb::SebSettings &settings)
 QByteArray KeyGenerator::configurationKeyHash(const QUrl &url) const
 {
     return QCryptographicHash::hash(
-               (normalizeUrl(url) + settings_.browser.configurationKey).toUtf8(),
+               (normalizeUrl(url) + settings_.ConfigurationKey).toUtf8(),
                QCryptographicHash::Sha256)
         .toHex();
 }
@@ -27,20 +27,20 @@ QByteArray KeyGenerator::configurationKeyHash(const QUrl &url) const
 QByteArray KeyGenerator::requestHash(const QUrl &url) const
 {
     return QCryptographicHash::hash(
-               (normalizeUrl(url) + browserExamKey()).toUtf8(),
+        (normalizeUrl(url) + browserExamKey()).toUtf8(),
                QCryptographicHash::Sha256)
         .toHex();
 }
 
 QString KeyGenerator::browserExamKey() const
 {
-    if (!settings_.browser.customBrowserExamKey.isEmpty()) {
-        return settings_.browser.customBrowserExamKey;
+    if (!settings_.CustomBrowserExamKey.isEmpty()) {
+        return settings_.CustomBrowserExamKey;
     }
 
     if (browserExamKey_.isEmpty()) {
-        const QByteArray salt = settings_.browser.browserExamKeySalt;
-        const QString payload = codeSignatureHash() + buildVersion() + settings_.browser.configurationKey;
+        const QByteArray salt = settings_.BrowserExamKeySalt;
+        const QString payload = codeSignatureHash() + buildVersion() + settings_.ConfigurationKey;
 
         browserExamKey_ = QString::fromLatin1(
             QMessageAuthenticationCode::hash(payload.toUtf8(), salt, QCryptographicHash::Sha256).toHex());

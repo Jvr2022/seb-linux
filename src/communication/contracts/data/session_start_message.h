@@ -2,16 +2,16 @@
 
 #include "message.h"
 
-#include "../../../seb_settings.h"
+#include "../../../settings/AppSettings.h"
 
 namespace seb::communication::contracts::data {
 
 struct SessionStartMessage : Message
 {
-    explicit SessionStartMessage(seb::SebSettings value = {})
+    explicit SessionStartMessage(seb::settings::AppSettings value = {})
         : configuration(std::move(value)) {}
 
-    seb::SebSettings configuration;
+    seb::settings::AppSettings configuration;
 };
 
 }  // namespace seb::communication::contracts::data

@@ -7,24 +7,24 @@
 namespace seb::browser {
 namespace {
 
-QString buildProxyServerValue(const seb::ProxySettings &proxySettings)
+QString buildProxyServerValue(const seb::settings::browser::ProxySettings &proxySettings)
 {
     QStringList parts;
-    for (const seb::ProxyConfiguration &proxy : proxySettings.proxies) {
+    for (const auto &proxy : proxySettings.Proxies) {
         QString protocol;
-        QString address = QStringLiteral("%1:%2").arg(proxy.host).arg(proxy.port);
+        QString address = QStringLiteral("%1:%2").arg(proxy.Host).arg(proxy.Port);
 
-        switch (proxy.protocol) {
-        case seb::ProxyProtocol::Ftp:
+        switch (proxy.Protocol) {
+        case seb::settings::browser::proxy::ProxyProtocol::Ftp:
             protocol = QStringLiteral("ftp");
             break;
-        case seb::ProxyProtocol::Http:
+        case seb::settings::browser::proxy::ProxyProtocol::Http:
             protocol = QStringLiteral("http");
             break;
-        case seb::ProxyProtocol::Https:
+        case seb::settings::browser::proxy::ProxyProtocol::Https:
             protocol = QStringLiteral("https");
             break;
-        case seb::ProxyProtocol::Socks:
+        case seb::settings::browser::proxy::ProxyProtocol::Socks:
             protocol = QStringLiteral("socks5");
             address = QStringLiteral("socks5://%1").arg(address);
             break;
@@ -38,31 +38,31 @@ QString buildProxyServerValue(const seb::ProxySettings &proxySettings)
 
 }  // namespace
 
-void applyWebEngineEnvironment(const seb::SebSettings &settings)
+void applyWebEngineEnvironment(const seb::settings::browser::BrowserSettings &settings)
 {
 #if !SEB_HAS_QTWEBENGINE
     Q_UNUSED(settings);
     return;
 #else
-    if (settings.browser.proxy.policy != seb::ProxyPolicy::Custom) {
+    if (settings.Proxy.Policy != seb::settings::browser::proxy::ProxyPolicy::Custom) {
         return;
     }
 
     QStringList flags = qEnvironmentVariable("QTWEBENGINE_CHROMIUM_FLAGS").split(' ', Qt::SkipEmptyParts);
 
-    if (settings.browser.proxy.autoDetect) {
+    if (settings.Proxy.AutoDetect) {
         flags << QStringLiteral("--proxy-auto-detect");
-    } else if (settings.browser.proxy.autoConfigure && !settings.browser.proxy.autoConfigureUrl.isEmpty()) {
-        flags << QStringLiteral("--proxy-pac-url=%1").arg(settings.browser.proxy.autoConfigureUrl);
+    } else if (settings.Proxy.AutoConfigure && !settings.Proxy.AutoConfigureUrl.isEmpty()) {
+        flags << QStringLiteral("--proxy-pac-url=%1").arg(settings.Proxy.AutoConfigureUrl);
     } else {
-        const QString proxyServer = buildProxyServerValue(settings.browser.proxy);
+        const QString proxyServer = buildProxyServerValue(settings.Proxy);
         if (!proxyServer.isEmpty()) {
             flags << QStringLiteral("--proxy-server=%1").arg(proxyServer);
         }
     }
 
-    if (!settings.browser.proxy.bypassList.isEmpty()) {
-        flags << QStringLiteral("--proxy-bypass-list=%1").arg(settings.browser.proxy.bypassList.join(';'));
+    if (!settings.Proxy.BypassList.isEmpty()) {
+        flags << QStringLiteral("--proxy-bypass-list=%1").arg(settings.Proxy.BypassList.join(';'));
     }
 
     flags.removeDuplicates();

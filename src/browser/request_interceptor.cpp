@@ -4,9 +4,9 @@
 
 namespace seb::browser {
 
-RequestInterceptor::RequestInterceptor(const seb::SebSettings &settings)
+RequestInterceptor::RequestInterceptor(const seb::settings::browser::BrowserSettings &settings)
     : settings_(settings)
-    , filter_(settings.browser.filter)
+    , filter_(settings.Filter)
     , keyGenerator_(settings)
 {
 }
@@ -35,10 +35,10 @@ void RequestInterceptor::interceptRequest(contracts::IRequest &request)
     }
 
     if (shouldAppendHeaders(request)) {
-        if (settings_.browser.sendConfigurationKey && !settings_.browser.configurationKey.isEmpty()) {
+        if (settings_.SendConfigurationKey && !settings_.ConfigurationKey.isEmpty()) {
             request.setHttpHeader("X-SafeExamBrowser-ConfigKeyHash", keyGenerator_.configurationKeyHash(requestUrl));
         }
-        if (settings_.browser.sendBrowserExamKey) {
+        if (settings_.SendBrowserExamKey) {
             request.setHttpHeader("X-SafeExamBrowser-RequestHash", keyGenerator_.requestHash(requestUrl));
         }
     }

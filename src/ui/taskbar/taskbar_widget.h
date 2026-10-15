@@ -1,7 +1,5 @@
 #pragma once
 
-#include "../../seb_settings.h"
-
 #include <QWidget>
 
 namespace seb::shell::taskbar::platform {
@@ -36,7 +34,7 @@ class TaskbarWidget : public QWidget
     Q_OBJECT
 
 public:
-    explicit TaskbarWidget(SebSession &session, const seb::SebSettings &settings, QWidget *parent = nullptr);
+    explicit TaskbarWidget(SebSession &session, QWidget *parent = nullptr);
 
 signals:
     void quitRequested();

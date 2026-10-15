@@ -1,6 +1,6 @@
 #pragma once
 
-#include "seb_settings.h"
+#include "configuration/contracts/session_configuration.h"
 
 #include <functional>
 #include <memory>
@@ -39,7 +39,10 @@ class SebSession : public QObject
 public:
     using ResourceOpener = std::function<bool(const QString &, QWidget *)>;
 
-    explicit SebSession(const seb::SebSettings &settings, ResourceOpener opener, QObject *parent = nullptr);
+    explicit SebSession(
+        const seb::configuration::contracts::SessionConfiguration &configuration,
+        ResourceOpener opener,
+        QObject *parent = nullptr);
     ~SebSession() override;
 
     BrowserWindow *createWindow(const QUrl &url, bool isMainWindow);
@@ -50,7 +53,7 @@ public:
     bool isQuitUrl(const QUrl &url) const;
     bool promptForHomeNavigation(QWidget *parent) const;
     bool requestApplicationQuit(QWidget *parent, const QString &reason) const;
-    const seb::SebSettings &settings() const;
+    const seb::settings::AppSettings &settings() const;
     seb::browser::contracts::IWebProfile *profile() const;
     seb::browser::contracts::IEngineProvider *engineProvider() const;
     QUrl homeUrl() const;
@@ -76,7 +79,7 @@ private:
     QString normalizeUrl(const QUrl &url) const;
     bool promptForPassword(QWidget *parent, const QString &title, const QString &message) const;
 
-    seb::SebSettings settings_;
+    seb::configuration::contracts::SessionConfiguration configuration_;
     QScopedPointer<seb::browser::RequestInterceptor> interceptor_;
     std::unique_ptr<seb::browser::contracts::IEngineProvider> engineProvider_;
     std::unique_ptr<seb::browser::contracts::IWebProfile> profile_;

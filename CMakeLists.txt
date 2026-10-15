@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.21)
 
-project(safe-exam-browser LANGUAGES C CXX)
+project(safe-exam-browser VERSION 0.6.1 LANGUAGES C CXX)
 
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -408,6 +408,7 @@ target_compile_options(safe-exam-browser PRIVATE -Wall -Wextra -Wpedantic)
 target_precompile_headers(safe-exam-browser PRIVATE src/pch.h)
 
 target_compile_definitions(safe-exam-browser PRIVATE
+    SEB_APPLICATION_VERSION="${PROJECT_VERSION}"
     SEB_HAS_QTWEBENGINE=${SEB_HAS_QTWEBENGINE}
     SEB_HAS_WEBKITGTK=${SEB_HAS_WEBKITGTK}
     SEB_HAS_ANY_ENGINE=${SEB_HAS_ANY_ENGINE}

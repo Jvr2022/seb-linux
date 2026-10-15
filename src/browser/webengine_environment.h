@@ -1,9 +1,9 @@
 #pragma once
 
-#include "../seb_settings.h"
+#include "../settings/Browser/BrowserSettings.h"
 
 namespace seb::browser {
 
-void applyWebEngineEnvironment(const seb::SebSettings &settings);
+void applyWebEngineEnvironment(const seb::settings::browser::BrowserSettings &settings);
 
 }  // namespace seb::browser

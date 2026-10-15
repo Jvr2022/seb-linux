@@ -1,6 +1,6 @@
 #pragma once
 
-#include "../seb_settings.h"
+#include "../settings/Browser/BrowserSettings.h"
 #include "key_generator.h"
 #include "request_filter.h"
 
@@ -11,7 +11,7 @@ namespace seb::browser {
 class RequestInterceptor : public contracts::IRequestInterceptor
 {
 public:
-    explicit RequestInterceptor(const seb::SebSettings &settings);
+    explicit RequestInterceptor(const seb::settings::browser::BrowserSettings &settings);
 
     void interceptRequest(contracts::IRequest &request) override;
 
@@ -20,7 +20,7 @@ private:
     static bool sameHost(const QUrl &lhs, const QUrl &rhs);
     static QUrl replaceSebScheme(const QUrl &url);
 
-    seb::SebSettings settings_;
+    seb::settings::browser::BrowserSettings settings_;
     RequestFilter filter_;
     KeyGenerator keyGenerator_;
 };

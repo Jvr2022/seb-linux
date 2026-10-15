@@ -16,30 +16,32 @@ QString wildcardToRegexPattern(const QString &expression)
 
 }  // namespace
 
-RequestFilter::RequestFilter(const seb::FilterSettings &settings)
+RequestFilter::RequestFilter(const seb::settings::browser::FilterSettings &settings)
     : settings_(settings)
 {
-    allowRules_.reserve(settings.rules.size());
-    blockRules_.reserve(settings.rules.size());
-    for (const seb::FilterRuleSettings &rule : settings.rules) {
+    allowRules_.reserve(settings.Rules.size());
+    blockRules_.reserve(settings.Rules.size());
+    for (const auto &rule : settings.Rules) {
         const QRegularExpression expression = compileRule(rule);
         if (expression.isValid()) {
-            if (rule.result == seb::FilterResult::Allow) {
-                allowRules_.push_back({expression, rule.result});
-            } else {
-                blockRules_.push_back({expression, rule.result});
+            if (rule.Result == seb::settings::browser::filter::FilterResult::Allow && rule.Active) {
+                allowRules_.push_back({expression, rule.Result});
+            } else if (rule.Active) {
+                blockRules_.push_back({expression, rule.Result});
             }
         }
     }
 }
 
-QRegularExpression RequestFilter::compileRule(const seb::FilterRuleSettings &rule)
+QRegularExpression RequestFilter::compileRule(
+    const seb::settings::browser::filter::FilterRuleSettings &rule)
 {
-    switch (rule.type) {
-    case seb::FilterRuleType::Regex:
-        return QRegularExpression(rule.expression, QRegularExpression::CaseInsensitiveOption);
-    case seb::FilterRuleType::Simplified:
-        return QRegularExpression(wildcardToRegexPattern(rule.expression), QRegularExpression::CaseInsensitiveOption);
+    switch (rule.Type) {
+    case seb::settings::browser::filter::FilterRuleType::Regex:
+        return QRegularExpression(rule.Expression, QRegularExpression::CaseInsensitiveOption);
+    case seb::settings::browser::filter::FilterRuleType::Simplified:
+        return QRegularExpression(
+            wildcardToRegexPattern(rule.Expression), QRegularExpression::CaseInsensitiveOption);
     }
 
     return {};
@@ -48,7 +50,8 @@ QRegularExpression RequestFilter::compileRule(const seb::FilterRuleSettings &rul
 FilterDecision RequestFilter::evaluate(const QUrl &url, contracts::ResourceType resourceType) const
 {
     const bool mainRequest = isMainRequest(resourceType);
-    if ((mainRequest && !settings_.processMainRequests) || (!mainRequest && !settings_.processContentRequests)) {
+    if ((mainRequest && !settings_.ProcessMainRequests) ||
+        (!mainRequest && !settings_.ProcessContentRequests)) {
         return FilterDecision::NoMatch;
     }
 

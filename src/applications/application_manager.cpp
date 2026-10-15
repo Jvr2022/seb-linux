@@ -7,7 +7,9 @@
 
 namespace seb::applications {
 
-ApplicationManager::ApplicationManager(const seb::ApplicationSettings &settings, QObject *parent)
+ApplicationManager::ApplicationManager(
+    const seb::settings::applications::ApplicationSettings &settings,
+    QObject *parent)
     : QObject(parent)
     , settings_(settings)
 {
@@ -26,7 +28,7 @@ void ApplicationManager::initialize()
     qDeleteAll(applications_);
     applications_.clear();
 
-    for (const auto &settings : settings_.whitelist) {
+    for (const auto &settings : settings_.Whitelist) {
         auto application = ApplicationFactory::tryCreate(settings);
         if (!application) {
             continue;

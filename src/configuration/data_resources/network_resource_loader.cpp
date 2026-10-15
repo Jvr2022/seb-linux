@@ -33,8 +33,16 @@ contracts::LoadStatus NetworkResourceLoader::tryLoad(const QUrl &resource, QByte
         return contracts::LoadStatus::LoadWithBrowser;
     }
 
+    const QString contentType = reply->header(QNetworkRequest::ContentTypeHeader).toString();
     data = reply->readAll();
     reply->deleteLater();
+
+    const QByteArray trimmed = data.trimmed().left(512).toLower();
+    if (contentType.startsWith(QStringLiteral("text/html"), Qt::CaseInsensitive) ||
+        trimmed.startsWith("<!doctype html") || trimmed.startsWith("<html")) {
+        return contracts::LoadStatus::LoadWithBrowser;
+    }
+
     return contracts::LoadStatus::Success;
 }
 

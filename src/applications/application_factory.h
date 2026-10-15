@@ -1,6 +1,6 @@
 #pragma once
 
-#include "../seb_settings.h"
+#include "../settings/Applications/WhitelistApplication.h"
 
 #include <memory>
 
@@ -11,7 +11,7 @@ class ExternalApplication;
 class ApplicationFactory
 {
 public:
-    static std::unique_ptr<ExternalApplication> tryCreate(const seb::WhitelistApplicationSettings &settings);
+    static std::unique_ptr<ExternalApplication> tryCreate(const seb::settings::applications::WhitelistApplication &settings);
 };
 
 }  // namespace seb::applications

@@ -35,7 +35,7 @@
 
 BrowserWindow::BrowserWindow(
     SebSession &session,
-    const seb::WindowSettings &windowSettings,
+    const seb::settings::browser::WindowSettings &windowSettings,
     const QUrl &initialUrl,
     bool isMainWindow)
     : session_(session)
@@ -59,8 +59,8 @@ BrowserWindow::BrowserWindow(
         return true;
     });
 
-    if (isMainWindow_ && session_.settings().taskbar.enableTaskbar) {
-        taskbar_ = new SebTaskbar(session_, session_.settings(), contentContainer_);
+    if (isMainWindow_ && session_.settings().UserInterface.Taskbar.EnableTaskbar) {
+        taskbar_ = new SebTaskbar(session_, contentContainer_);
         contentLayout->addWidget(taskbar_);
     }
     setCentralWidget(contentContainer_);
@@ -141,7 +141,7 @@ bool BrowserWindow::shouldAllowNavigation(const QUrl &url)
     }
 
     if (session_.isQuitUrl(url)) {
-        if (session_.settings().browser.resetOnQuitUrl) {
+        if (session_.settings().Browser.ResetOnQuitUrl) {
             const QUrl home = session_.homeUrl();
             if (home.isValid()) {
                 view_->setUrl(home);
@@ -149,7 +149,7 @@ bool BrowserWindow::shouldAllowNavigation(const QUrl &url)
             return false;
         }
 
-        if (session_.settings().browser.confirmQuitUrl && !session_.confirmQuitUrl(this)) {
+        if (session_.settings().Browser.ConfirmQuitUrl && !session_.confirmQuitUrl(this)) {
             return false;
         }
 
@@ -177,16 +177,6 @@ QString BrowserWindow::taskbarTitle() const
 
 void BrowserWindow::changeEvent(QEvent *event)
 {
-    if (!windowSettings_.allowMinimize &&
-        event->type() == QEvent::WindowStateChange &&
-        isMinimized()) {
-        QTimer::singleShot(0, this, [this] {
-            showNormal();
-            raise();
-            activateWindow();
-        });
-    }
-
     QMainWindow::changeEvent(event);
     notifyTaskbarStateChanged();
 }
@@ -213,7 +203,7 @@ void BrowserWindow::keyPressEvent(QKeyEvent *event)
     const bool ctrl = event->modifiers().testFlag(Qt::ControlModifier);
     const bool shift = event->modifiers().testFlag(Qt::ShiftModifier);
     const bool alt = event->modifiers().testFlag(Qt::AltModifier);
-    const bool devBypass = session_.settings().devBypass;
+    const bool devBypass = false;
 
     if (event->key() == Qt::Key_F11) {
         if (devBypass) {
@@ -231,36 +221,36 @@ void BrowserWindow::keyPressEvent(QKeyEvent *event)
         return;
     }
 
-    if (!windowSettings_.allowReloading &&
+    if (!windowSettings_.AllowReloading &&
         (event->key() == Qt::Key_F5 || (ctrl && event->key() == Qt::Key_R)) &&
         !devBypass) {
         event->accept();
         return;
     }
 
-    if (!windowSettings_.allowBackwardNavigation &&
+    if (!windowSettings_.AllowBackwardNavigation &&
         ((alt && event->key() == Qt::Key_Left) || event->key() == Qt::Key_Backspace) &&
         !devBypass) {
         event->accept();
         return;
     }
 
-    if (!windowSettings_.allowForwardNavigation && (alt && event->key() == Qt::Key_Right) && !devBypass) {
+    if (!windowSettings_.AllowForwardNavigation && (alt && event->key() == Qt::Key_Right) && !devBypass) {
         event->accept();
         return;
     }
 
-    if (!session_.settings().browser.allowPrint && ctrl && event->key() == Qt::Key_P && !devBypass) {
+    if (!session_.settings().Browser.AllowPrint && ctrl && event->key() == Qt::Key_P && !devBypass) {
         event->accept();
         return;
     }
 
-    if (!session_.settings().browser.allowFind && ctrl && event->key() == Qt::Key_F && !devBypass) {
+    if (!session_.settings().Browser.AllowFind && ctrl && event->key() == Qt::Key_F && !devBypass) {
         event->accept();
         return;
     }
 
-    if (!session_.settings().browser.allowPageZoom &&
+    if (!session_.settings().Browser.AllowPageZoom &&
         ctrl &&
         (event->key() == Qt::Key_Plus || event->key() == Qt::Key_Equal || event->key() == Qt::Key_Minus ||
          event->key() == Qt::Key_0) &&
@@ -269,7 +259,7 @@ void BrowserWindow::keyPressEvent(QKeyEvent *event)
         return;
     }
 
-    if (!windowSettings_.allowDeveloperConsole && event->key() == Qt::Key_F12 && !devBypass) {
+    if (!windowSettings_.AllowDeveloperConsole && event->key() == Qt::Key_F12 && !devBypass) {
         event->accept();
         return;
     }
@@ -306,44 +296,33 @@ bool BrowserWindow::eventFilter(QObject *watched, QEvent *event)
 
 void BrowserWindow::applyWindowFlags()
 {
-    setWindowFlag(Qt::WindowStaysOnTopHint, windowSettings_.alwaysOnTop);
-    setWindowFlag(Qt::FramelessWindowHint, windowSettings_.frameless);
-    if (!windowSettings_.allowMinimize) {
-        setWindowFlag(Qt::WindowMinimizeButtonHint, false);
-    }
+    setWindowFlag(Qt::WindowMinimizeButtonHint, true);
 }
 
 void BrowserWindow::applyWindowGeometry()
 {
     const QScreen *screen = QGuiApplication::primaryScreen();
     const QRect available = screen ? screen->availableGeometry() : QRect(100, 100, 1280, 800);
-    const QRect screenGeometry = screen ? screen->geometry() : available;
 
-    if (windowSettings_.fullScreenMode) {
+    if (windowSettings_.FullScreenMode) {
         resize(available.size());
         showFullScreen();
-        return;
-    }
-
-    if (windowSettings_.frameless && windowSettings_.alwaysOnTop) {
-        setGeometry(screenGeometry);
-        showMaximized();
         return;
     }
 
     int width = available.width();
     int height = available.height();
 
-    if (windowSettings_.absoluteWidth > 0) {
-        width = windowSettings_.absoluteWidth;
-    } else if (windowSettings_.relativeWidth > 0) {
-        width = (available.width() * windowSettings_.relativeWidth) / 100;
+    if (windowSettings_.AbsoluteWidth.has_value()) {
+        width = *windowSettings_.AbsoluteWidth;
+    } else if (windowSettings_.RelativeWidth.has_value()) {
+        width = (available.width() * *windowSettings_.RelativeWidth) / 100;
     }
 
-    if (windowSettings_.absoluteHeight > 0) {
-        height = windowSettings_.absoluteHeight;
-    } else if (windowSettings_.relativeHeight > 0) {
-        height = (available.height() * windowSettings_.relativeHeight) / 100;
+    if (windowSettings_.AbsoluteHeight.has_value()) {
+        height = *windowSettings_.AbsoluteHeight;
+    } else if (windowSettings_.RelativeHeight.has_value()) {
+        height = (available.height() * *windowSettings_.RelativeHeight) / 100;
     }
 
     width = qMin(width, available.width());
@@ -351,14 +330,14 @@ void BrowserWindow::applyWindowGeometry()
     resize(width, height);
 
     int x = available.x();
-    switch (windowSettings_.position) {
-    case seb::WindowPosition::Left:
+    switch (windowSettings_.Position) {
+    case seb::settings::browser::WindowPosition::Left:
         x = available.left();
         break;
-    case seb::WindowPosition::Center:
+    case seb::settings::browser::WindowPosition::Center:
         x = available.left() + (available.width() - width) / 2;
         break;
-    case seb::WindowPosition::Right:
+    case seb::settings::browser::WindowPosition::Right:
         x = available.right() - width + 1;
         break;
     }
@@ -370,10 +349,10 @@ void BrowserWindow::applyWindowGeometry()
 void BrowserWindow::configureToolbar()
 {
     const bool showToolbar =
-        windowSettings_.showToolbar ||
-        windowSettings_.allowAddressBar ||
-        windowSettings_.showHomeButton ||
-        windowSettings_.showReloadButton;
+        windowSettings_.ShowToolbar ||
+        windowSettings_.AllowAddressBar ||
+        windowSettings_.ShowHomeButton ||
+        windowSettings_.ShowReloadButton;
 
     if (!showToolbar) {
         return;
@@ -383,33 +362,33 @@ void BrowserWindow::configureToolbar()
     toolbar_->setMovable(false);
 
     auto *backAction = toolbar_->addAction(QStringLiteral("Back"));
-    backAction->setEnabled(windowSettings_.allowBackwardNavigation);
+    backAction->setEnabled(windowSettings_.AllowBackwardNavigation);
     connect(backAction, &QAction::triggered, this, [this] {
-        if (windowSettings_.allowBackwardNavigation) {
+        if (windowSettings_.AllowBackwardNavigation) {
             view_->back();
         }
     });
 
     auto *forwardAction = toolbar_->addAction(QStringLiteral("Forward"));
-    forwardAction->setEnabled(windowSettings_.allowForwardNavigation);
+    forwardAction->setEnabled(windowSettings_.AllowForwardNavigation);
     connect(forwardAction, &QAction::triggered, this, [this] {
-        if (windowSettings_.allowForwardNavigation) {
+        if (windowSettings_.AllowForwardNavigation) {
             view_->forward();
         }
     });
 
-    if (windowSettings_.showReloadButton) {
+    if (windowSettings_.ShowReloadButton) {
         auto *reloadAction = toolbar_->addAction(QStringLiteral("Reload"));
-        reloadAction->setEnabled(windowSettings_.allowReloading);
+        reloadAction->setEnabled(windowSettings_.AllowReloading);
         connect(reloadAction, &QAction::triggered, this, &BrowserWindow::reloadPage);
     }
 
-    if (windowSettings_.showHomeButton && session_.homeUrl().isValid()) {
+    if (windowSettings_.ShowHomeButton && session_.homeUrl().isValid()) {
         auto *homeAction = toolbar_->addAction(QStringLiteral("Home"));
         connect(homeAction, &QAction::triggered, this, &BrowserWindow::navigateHome);
     }
 
-    if (windowSettings_.allowAddressBar) {
+    if (windowSettings_.AllowAddressBar) {
         addressBar_ = new QLineEdit(toolbar_);
         addressBar_->setClearButtonEnabled(true);
         addressBar_->setPlaceholderText(QStringLiteral("Enter exam URL"));
@@ -436,7 +415,7 @@ void BrowserWindow::configureShortcuts()
     backAction->setShortcut(QKeySequence::Back);
     addAction(backAction);
     connect(backAction, &QAction::triggered, this, [this] {
-        if (windowSettings_.allowBackwardNavigation) {
+        if (windowSettings_.AllowBackwardNavigation) {
             view_->back();
         }
     });
@@ -445,7 +424,7 @@ void BrowserWindow::configureShortcuts()
     forwardAction->setShortcut(QKeySequence::Forward);
     addAction(forwardAction);
     connect(forwardAction, &QAction::triggered, this, [this] {
-        if (windowSettings_.allowForwardNavigation) {
+        if (windowSettings_.AllowForwardNavigation) {
             view_->forward();
         }
     });
@@ -459,12 +438,12 @@ void BrowserWindow::configureShortcuts()
     devToolsAction->setShortcut(QKeySequence(Qt::Key_F12));
     addAction(devToolsAction);
     connect(devToolsAction, &QAction::triggered, this, [this] {
-        if (windowSettings_.allowDeveloperConsole && view_) {
+        if (windowSettings_.AllowDeveloperConsole && view_) {
             view_->openDevTools();
         }
     });
 
-    if (windowSettings_.allowAddressBar && addressBar_) {
+    if (windowSettings_.AllowAddressBar && addressBar_) {
         auto *focusAddressBar = new QAction(this);
         focusAddressBar->setShortcut(QKeySequence(Qt::CTRL | Qt::Key_L));
         addAction(focusAddressBar);
@@ -477,7 +456,7 @@ void BrowserWindow::configureShortcuts()
 
 void BrowserWindow::findInPage()
 {
-    if (!session_.settings().browser.allowFind) {
+    if (!session_.settings().Browser.AllowFind) {
         return;
     }
 
@@ -557,11 +536,11 @@ void BrowserWindow::handleNewWindowRequest(const QUrl &target, bool &handled)
 
 void BrowserWindow::reloadPage()
 {
-    if (!windowSettings_.allowReloading) {
+    if (!windowSettings_.AllowReloading) {
         return;
     }
 
-    if (windowSettings_.showReloadWarning && !session_.confirmReload(this)) {
+    if (windowSettings_.ShowReloadWarning && !session_.confirmReload(this)) {
         return;
     }
 

@@ -4,14 +4,14 @@
 
 #include <QHBoxLayout>
 
-SebTaskbar::SebTaskbar(SebSession &session, const seb::SebSettings &settings, QWidget *parent)
+SebTaskbar::SebTaskbar(SebSession &session, QWidget *parent)
     : QWidget(parent)
 {
     auto *layout = new QHBoxLayout(this);
     layout->setContentsMargins(0, 0, 0, 0);
     layout->setSpacing(0);
 
-    taskbarWidget_ = new seb::ui::taskbar::TaskbarWidget(session, settings, this);
+    taskbarWidget_ = new seb::ui::taskbar::TaskbarWidget(session, this);
     connect(taskbarWidget_, &seb::ui::taskbar::TaskbarWidget::quitRequested, this, &SebTaskbar::quitRequested);
     layout->addWidget(taskbarWidget_);
 }

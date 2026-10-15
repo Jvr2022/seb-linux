@@ -1,14 +1,11 @@
 #include "app_controller.h"
 #include "security/security_service.h"
 #include "browser/webengine_environment.h"
-#include "seb_settings.h"
 
 #include <QApplication>
 #include <QCommandLineOption>
 #include <QCommandLineParser>
 #include <QIcon>
-#include <QInputDialog>
-#include <QLineEdit>
 #include <QMessageBox>
 #include <QTextStream>
 #include <QUrl>
@@ -141,94 +138,6 @@ bool hasArgument(int argc, char *argv[], const QString &value)
     return false;
 }
 
-static void appendPkexecEnvironmentVariable(QStringList &args, const char *name)
-{
-    const QByteArray value = qgetenv(name);
-    if (!value.isEmpty()) {
-        args << (QString(name) + QLatin1Char('=') + QString::fromLocal8Bit(value));
-    }
-}
-
-static int runNonDetachedPkexecChild(QProcess &child)
-{
-    // Do not detach. Forward outputs to parent.
-    child.setProcessChannelMode(QProcess::ForwardedChannels);
-
-    child.start();
-    if (!child.waitForStarted()) {
-        qWarning() << "pkexec child failed to start:" << child.errorString();
-        return 1;
-    }
-
-    if (!child.waitForFinished(-1 /* no timeout */)) {
-        qWarning() << "pkexec child failed:" << child.errorString();
-        return 1;
-    }
-
-    if (child.exitStatus() != QProcess::NormalExit) {
-        qWarning() << "pkexec child crashed";
-        return 1;
-    }
-
-    const int exitCode = child.exitCode();
-    qDebug() << "pkexec child finished with exit code" << exitCode;
-    return exitCode;
-}
-
-void applyProtectedWindowSettings(seb::WindowSettings &settings, bool fullScreen)
-{
-    settings.absoluteHeight = 0;
-    settings.absoluteWidth = 0;
-    settings.relativeHeight = 100;
-    settings.relativeWidth = 100;
-    settings.allowAddressBar = false;
-    settings.allowBackwardNavigation = false;
-    settings.allowDeveloperConsole = false;
-    settings.allowForwardNavigation = false;
-    settings.allowMinimize = false;
-    settings.allowReloading = false;
-    settings.alwaysOnTop = true;
-    settings.frameless = true;
-    settings.fullScreenMode = fullScreen;
-    settings.showHomeButton = false;
-    settings.showReloadButton = false;
-    settings.showReloadWarning = false;
-    settings.showToolbar = false;
-    settings.position = seb::WindowPosition::Center;
-}
-
-void applyProtectedSessionSettings(
-    seb::SebSettings &settings,
-    bool fullScreen,
-    bool allowConfiguredApps,
-    bool allowTermination)
-{
-    applyProtectedWindowSettings(settings.browser.mainWindow, fullScreen);
-    applyProtectedWindowSettings(settings.browser.additionalWindow, false);
-    settings.browser.additionalWindow.relativeWidth = 100;
-    settings.browser.popupPolicy = seb::PopupPolicy::AllowSameWindow;
-    settings.browser.allowConfigurationDownloads = false;
-    settings.browser.allowCustomDownAndUploadLocation = false;
-    settings.browser.allowDownloads = false;
-    settings.browser.allowFind = false;
-    settings.browser.allowPageZoom = false;
-    settings.browser.allowPrint = false;
-    settings.browser.allowSpellChecking = false;
-    settings.browser.allowUploads = false;
-    settings.taskbar.showApplicationInfo = false;
-    settings.taskbar.showApplicationLog = false;
-    settings.taskbar.showAudio = false;
-    settings.taskbar.showKeyboardLayout = false;
-    settings.taskbar.showNetwork = false;
-    settings.security.allowTermination = allowTermination;
-
-    if (!allowConfiguredApps) {
-        settings.applications.whitelist.clear();
-        settings.applications.blacklist.clear();
-        settings.taskbar.showProctoringNotification = false;
-    }
-}
-
 QString xkbValueAfterColon(const QString &line, const QString &key)
 {
     const QString trimmed = line.trimmed();
@@ -343,18 +252,10 @@ void applyKeyboardLayoutEnvironment()
 
 void applyEarlyEnvironment(int argc, char *argv[])
 {
-    seb::SebSettings settings = seb::defaultSettings();
     const QString configPath = findConfigPath(argc, argv);
     const bool hasResource = !configPath.isEmpty();
     const bool isExamAntiCheat = hasArgument(argc, argv, QStringLiteral("--anti-cheat"));
     const bool isMenuLockdown = hasArgument(argc, argv, QStringLiteral("--menu-lockdown"));
-    if (!configPath.isEmpty()) {
-        const seb::LoadResult loaded = seb::loadSettingsFromFile(configPath);
-        if (loaded.ok) {
-            settings = loaded.settings;
-        }
-    }
-
     if (isExamAntiCheat || isMenuLockdown) {
         if (isMenuLockdown || (isExamAntiCheat && hasResource)) {
             if (!setup_barebones_vt()) {
@@ -370,61 +271,6 @@ void applyEarlyEnvironment(int argc, char *argv[])
 #endif
     }
 
-    seb::browser::applyWebEngineEnvironment(settings);
-}
-
-void applyCommandLineOverrides(const QCommandLineParser &parser, seb::SebSettings &settings)
-{
-    if (parser.isSet("url")) {
-        settings.browser.startUrl = parser.value("url").trimmed();
-    }
-
-    if (parser.isSet("show-toolbar")) {
-        settings.browser.mainWindow.showToolbar = true;
-    }
-
-    if (parser.isSet("allow-address-bar")) {
-        settings.browser.mainWindow.allowAddressBar = true;
-        settings.browser.mainWindow.showToolbar = true;
-    }
-
-    if (parser.isSet("allow-navigation")) {
-        settings.browser.mainWindow.allowBackwardNavigation = true;
-        settings.browser.mainWindow.allowForwardNavigation = true;
-    }
-
-    if (parser.isSet("allow-reload")) {
-        settings.browser.mainWindow.allowReloading = true;
-        settings.browser.mainWindow.showReloadButton = true;
-    }
-
-    if (parser.isSet("allow-devtools")) {
-        settings.browser.mainWindow.allowDeveloperConsole = true;
-    }
-
-    if (parser.isSet("windowed")) {
-        settings.browser.mainWindow.fullScreenMode = false;
-    }
-    if (parser.isSet("fullscreen")){
-        settings.browser.mainWindow.fullScreenMode = true;
-    }
-    if (parser.isSet("always-on-top")) {
-        settings.browser.mainWindow.alwaysOnTop = true;
-    }
-
-    if (parser.isSet("disable-minimize")) {
-        settings.browser.mainWindow.allowMinimize = false;
-    }
-
-    if (parser.isSet("disable-quit")) {
-        settings.security.allowTermination = false;
-    }
-
-#if defined(QT_DEBUG) || defined(SEB_DEV_BYPASS_OPTION)
-    if (parser.isSet("dev-bypass")) {
-        settings.devBypass = true;
-    }
-#endif
 }
 
 }  // namespace
@@ -439,7 +285,7 @@ int main(int argc, char *argv[])
     app.setWindowIcon(appIcon);
     app.setDesktopFileName(QStringLiteral("safe-exam-browser"));
     QCoreApplication::setApplicationName(QStringLiteral("Safe Exam Browser"));
-    QCoreApplication::setApplicationVersion(QStringLiteral("0.1.0"));
+    QCoreApplication::setApplicationVersion(QStringLiteral(SEB_APPLICATION_VERSION));
 
     QCommandLineParser parser;
     parser.setApplicationDescription(QStringLiteral(
@@ -469,10 +315,6 @@ int main(int argc, char *argv[])
         QStringLiteral("Enable the developer tools shortcut (F12).")));
     parser.addOption(QCommandLineOption(QStringLiteral("windowed"), QStringLiteral("Force the main window to stay windowed.")));
     parser.addOption(QCommandLineOption(QStringLiteral("fullscreen"), QStringLiteral("Force the main window to be fullscreen.")));
-    parser.addOption(QCommandLineOption(QStringLiteral("always-on-top"), QStringLiteral("Keep the main window above other windows.")));
-    parser.addOption(QCommandLineOption(
-        QStringLiteral("disable-minimize"),
-        QStringLiteral("Prevent minimizing the main exam window.")));
     parser.addOption(QCommandLineOption(
         QStringLiteral("disable-quit"),
         QStringLiteral("Disable manual termination even if the configuration allows it.")));
@@ -490,7 +332,6 @@ int main(int argc, char *argv[])
 
     parser.process(app);
 
-    seb::SebSettings settings = seb::defaultSettings();
     QTextStream err(stderr);
 
 #if !SEB_HAS_QTWEBENGINE
@@ -503,169 +344,22 @@ int main(int argc, char *argv[])
         ? parser.value("config")
         : (parser.positionalArguments().isEmpty() ? QString() : parser.positionalArguments().constFirst());
 
-    QString userPassword;
-    bool usedPassword = false;
-
-    QStringList warnings;
-    if (!resource.isEmpty()) {
-        const seb::ResourceLoadResult loaded = seb::loadSettingsFromResource(resource, [&userPassword, &usedPassword](bool hashed) {
-            if (qEnvironmentVariableIsSet("SEB_PASSWORD")) {
-                userPassword = QString::fromUtf8(qgetenv("SEB_PASSWORD"));
-                usedPassword = true;
-                return userPassword;
-            }
-
-            bool accepted = false;
-            const QString password = QInputDialog::getText(
-                nullptr,
-                QStringLiteral("SEB Password Required"),
-                hashed
-                    ? QStringLiteral("Enter the administrator password for this client-configuration SEB file.")
-                    : QStringLiteral("Enter the password for this SEB configuration file."),
-                QLineEdit::Password,
-                QString(),
-                &accepted);
-            if (accepted) {
-                userPassword = password;
-                usedPassword = true;
-            }
-            return accepted ? password : QString();
-        });
-        if (!loaded.ok) {
-            err << loaded.error << Qt::endl;
-            return 1;
+    AppController controller;
+    QString launchError;
+    if (!controller.launch(resource, &launchError)) {
+        if (!launchError.isEmpty()) {
+            err << launchError << Qt::endl;
         }
-
-        settings = loaded.settings;
-        warnings = loaded.warnings;
+        return launchError == QStringLiteral("Client configuration saved successfully.") ? 0 : 1;
     }
 
-    applyCommandLineOverrides(parser, settings);
-
-    const bool launchedWithoutExam = resource.isEmpty();
-    const bool menuLockdown = parser.isSet("menu-lockdown");
-    const bool examAntiCheat = parser.isSet("anti-cheat");
+    bool devBypass = false;
 #if defined(QT_DEBUG) || defined(SEB_DEV_BYPASS_OPTION)
-    bool devBypass = settings.devBypass || parser.isSet("dev-bypass");
-#else
-    bool devBypass = settings.devBypass;
+    devBypass = parser.isSet("dev-bypass");
 #endif
 #ifdef SEB_DEV_BYPASS_DEFAULT
     devBypass = true;
 #endif
-    
-    if (!devBypass && !parser.isSet("anti-cheat") && !menuLockdown) {
-        if (launchedWithoutExam) {
-            const auto answer = QMessageBox::question(
-                nullptr,
-                QStringLiteral("Administrator Permission Required"),
-                QStringLiteral(
-                    "To continue using Safe Exam Browser from the start menu, administrator permission is required "
-                    "so the app can apply lockdown protections.\n\nDo you want to continue?"),
-                QMessageBox::Yes | QMessageBox::Cancel,
-                QMessageBox::Yes);
-            if (answer != QMessageBox::Yes) {
-                return 0;
-            }
-
-            QStringList args = QCoreApplication::arguments();
-            args.removeFirst();
-            args.prepend(QStringLiteral("--menu-lockdown"));
-
-            QProcess child;
-            child.setProgram(QStringLiteral("pkexec"));
-
-            QStringList pkexecArgs;
-            pkexecArgs << QStringLiteral("--keep-cwd");
-            pkexecArgs << QStringLiteral("env");
-            appendPkexecEnvironmentVariable(pkexecArgs, "DISPLAY");
-            appendPkexecEnvironmentVariable(pkexecArgs, "WAYLAND_DISPLAY");
-            appendPkexecEnvironmentVariable(pkexecArgs, "XAUTHORITY");
-            appendPkexecEnvironmentVariable(pkexecArgs, "XDG_RUNTIME_DIR");
-            appendPkexecEnvironmentVariable(pkexecArgs, "XDG_SESSION_TYPE");
-            appendPkexecEnvironmentVariable(pkexecArgs, "DBUS_SESSION_BUS_ADDRESS");
-            appendPkexecEnvironmentVariable(pkexecArgs, "QT_QPA_PLATFORM");
-            appendPkexecEnvironmentVariable(pkexecArgs, "XKB_DEFAULT_LAYOUT");
-            appendPkexecEnvironmentVariable(pkexecArgs, "XKB_DEFAULT_VARIANT");
-            appendPkexecEnvironmentVariable(pkexecArgs, "XKB_DEFAULT_MODEL");
-            appendPkexecEnvironmentVariable(pkexecArgs, "XKB_DEFAULT_OPTIONS");
-            pkexecArgs << QCoreApplication::applicationFilePath();
-            pkexecArgs << args;
-
-            child.setArguments(pkexecArgs);
-            return runNonDetachedPkexecChild(child);
-        }
-
-        const bool requiresLockedExamShell =
-            settings.browser.mainWindow.fullScreenMode && settings.browser.mainWindow.alwaysOnTop;
-        if (requiresLockedExamShell) {
-            const auto answer = QMessageBox::question(
-                nullptr,
-                QStringLiteral("Administrator Permission Required"),
-                QStringLiteral(
-                    "To continue using Safe Exam Browser, administrator permission is required so the app can "
-                    "apply exam locking and anti-cheat protections.\n\nDo you want to continue?"),
-                QMessageBox::Yes | QMessageBox::Cancel,
-                QMessageBox::Yes);
-            if (answer != QMessageBox::Yes) {
-                return 0;
-            }
-
-            QStringList args = QCoreApplication::arguments();
-            args.removeFirst(); // Remove executable path
-            if (!args.contains(QStringLiteral("--anti-cheat"))) {
-                args.prepend(QStringLiteral("--anti-cheat"));
-            }
-            
-            QProcess child;
-            child.setProgram(QStringLiteral("pkexec"));
-            
-            QStringList pkexecArgs;
-            pkexecArgs << QStringLiteral("--keep-cwd");
-            pkexecArgs << QStringLiteral("env");
-            appendPkexecEnvironmentVariable(pkexecArgs, "DISPLAY");
-            appendPkexecEnvironmentVariable(pkexecArgs, "WAYLAND_DISPLAY");
-            appendPkexecEnvironmentVariable(pkexecArgs, "XAUTHORITY");
-            appendPkexecEnvironmentVariable(pkexecArgs, "XDG_RUNTIME_DIR");
-            appendPkexecEnvironmentVariable(pkexecArgs, "XDG_SESSION_TYPE");
-            appendPkexecEnvironmentVariable(pkexecArgs, "DBUS_SESSION_BUS_ADDRESS");
-            appendPkexecEnvironmentVariable(pkexecArgs, "QT_QPA_PLATFORM");
-            appendPkexecEnvironmentVariable(pkexecArgs, "XKB_DEFAULT_LAYOUT");
-            appendPkexecEnvironmentVariable(pkexecArgs, "XKB_DEFAULT_VARIANT");
-            appendPkexecEnvironmentVariable(pkexecArgs, "XKB_DEFAULT_MODEL");
-            appendPkexecEnvironmentVariable(pkexecArgs, "XKB_DEFAULT_OPTIONS");
-            if (usedPassword) {
-                pkexecArgs << (QStringLiteral("SEB_PASSWORD=") + userPassword);
-            }
-            pkexecArgs << QCoreApplication::applicationFilePath();
-            pkexecArgs << args;
-            
-            child.setArguments(pkexecArgs);
-            return runNonDetachedPkexecChild(child);
-        }
-    }
-
-    if (menuLockdown && launchedWithoutExam && !devBypass) {
-        applyProtectedSessionSettings(settings, false, false, true);
-    } else if (examAntiCheat && !devBypass) {
-        applyProtectedSessionSettings(settings, true, true, false);
-    } else if (!launchedWithoutExam &&
-               settings.browser.mainWindow.fullScreenMode &&
-               settings.browser.mainWindow.alwaysOnTop &&
-               !devBypass) {
-        applyProtectedSessionSettings(settings, true, true, false);
-    }
-
-    if (devBypass) {
-        seb::applyDevBypassOverrides(settings);
-    }
-
-    AppController controller;
-    QString launchError;
-    if (!controller.launchResolved(settings, warnings, &launchError)) {
-        err << launchError << Qt::endl;
-        return 1;
-    }
 
     seb::security::SecurityService security;
     if (!devBypass) {
@@ -677,7 +371,7 @@ int main(int argc, char *argv[])
             err << "Error: A debugger is attached." << Qt::endl;
             return 1;
         }
-        
+
         QObject::connect(&security, &seb::security::SecurityService::secureViolationDetected, [&app](const QString &reason) {
             qCritical() << "Security Violation:" << reason;
             app.quit();

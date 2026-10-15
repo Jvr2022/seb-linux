@@ -1,7 +1,7 @@
 #pragma once
 
 #include "contracts/application.h"
-#include "../seb_settings.h"
+#include "../settings/Applications/WhitelistApplication.h"
 
 #include <QObject>
 #include <QStringList>
@@ -16,7 +16,9 @@ class ExternalApplication : public QObject, public contracts::IApplication
     Q_OBJECT
 
 public:
-    explicit ExternalApplication(const seb::WhitelistApplicationSettings &settings, QObject *parent = nullptr);
+    explicit ExternalApplication(
+        const seb::settings::applications::WhitelistApplication &settings,
+        QObject *parent = nullptr);
     ~ExternalApplication() override;
 
     bool autoStart() const override;
@@ -40,7 +42,7 @@ private:
     void handleInstanceTerminated(qint64 processId);
     QStringList arguments() const;
 
-    seb::WhitelistApplicationSettings settings_;
+    seb::settings::applications::WhitelistApplication settings_;
     QString resolvedExecutablePath_;
     QList<ExternalApplicationInstance *> instances_;
 };

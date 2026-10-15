@@ -17,7 +17,7 @@ public:
     bool disconnect() override { return BaseProxy::disconnect(); }
 
     contracts::proxies::CommunicationResult runSystemConfigurationUpdate() override;
-    contracts::proxies::CommunicationResult startSession(const seb::SebSettings &configuration) override;
+    contracts::proxies::CommunicationResult startSession(const seb::settings::AppSettings &configuration) override;
     contracts::proxies::CommunicationResult stopSession(const QUuid &sessionId) override;
 };
 

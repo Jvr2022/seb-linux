@@ -15,7 +15,7 @@ contracts::proxies::CommunicationResult ServiceProxy::runSystemConfigurationUpda
     return contracts::proxies::CommunicationResult(isAcknowledged(send(contracts::data::SimpleMessagePurport::UpdateSystemConfiguration).get()));
 }
 
-contracts::proxies::CommunicationResult ServiceProxy::startSession(const seb::SebSettings &configuration)
+contracts::proxies::CommunicationResult ServiceProxy::startSession(const seb::settings::AppSettings &configuration)
 {
     contracts::data::SessionStartMessage message(configuration);
     return contracts::proxies::CommunicationResult(isAcknowledged(send(message).get()));

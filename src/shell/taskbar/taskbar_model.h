@@ -1,7 +1,5 @@
 #pragma once
 
-#include "../../seb_settings.h"
-
 namespace seb::shell::taskbar {
 
 struct TaskbarModel

@@ -1,6 +1,6 @@
 #pragma once
 
-#include "seb_settings.h"
+#include "settings/Browser/WindowSettings.h"
 
 #include <QMainWindow>
 
@@ -41,7 +41,7 @@ class BrowserWindow : public QMainWindow
 public:
     BrowserWindow(
         SebSession &session,
-        const seb::WindowSettings &windowSettings,
+        const seb::settings::browser::WindowSettings &windowSettings,
         const QUrl &initialUrl,
         bool isMainWindow);
     ~BrowserWindow() override;
@@ -74,7 +74,7 @@ private:
     void notifyTaskbarStateChanged();
 
     SebSession &session_;
-    seb::WindowSettings windowSettings_;
+    seb::settings::browser::WindowSettings windowSettings_;
     std::unique_ptr<seb::browser::contracts::IWebView> view_;
     QWidget *contentContainer_ = nullptr;
     QToolBar *toolbar_ = nullptr;

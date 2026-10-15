@@ -1,7 +1,5 @@
 #pragma once
 
-#include "../seb_settings.h"
-
 #include <QWidget>
 
 QT_BEGIN_NAMESPACE
@@ -19,7 +17,7 @@ class SebTaskbar : public QWidget
     Q_OBJECT
 
 public:
-    explicit SebTaskbar(SebSession &session, const seb::SebSettings &settings, QWidget *parent = nullptr);
+    explicit SebTaskbar(SebSession &session, QWidget *parent = nullptr);
 
     void setCurrentUrl(const QUrl &url);
     void setWindowTitleText(const QString &title);

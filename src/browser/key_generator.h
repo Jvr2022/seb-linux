@@ -1,6 +1,6 @@
 #pragma once
 
-#include "../seb_settings.h"
+#include "../settings/Browser/BrowserSettings.h"
 
 #include <QString>
 
@@ -13,7 +13,7 @@ namespace seb::browser {
 class KeyGenerator
 {
 public:
-    explicit KeyGenerator(const seb::SebSettings &settings);
+    explicit KeyGenerator(const seb::settings::browser::BrowserSettings &settings);
 
     QByteArray configurationKeyHash(const QUrl &url) const;
     QByteArray requestHash(const QUrl &url) const;
@@ -25,7 +25,7 @@ private:
     QString executableHash() const;
     QString normalizeUrl(const QUrl &url) const;
 
-    seb::SebSettings settings_;
+    seb::settings::browser::BrowserSettings settings_;
     mutable QString browserExamKey_;
     mutable QString executableHash_;
 };

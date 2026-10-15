@@ -10,6 +10,10 @@ namespace seb::configuration::configuration_data {
 
 contracts::AppConfig DataValues::initializeAppConfig() const
 {
+    if (appConfig_.has_value()) {
+        return *appConfig_;
+    }
+
     contracts::AppConfig config;
     const QString appData = QStandardPaths::writableLocation(QStandardPaths::AppDataLocation);
     const QString tempDir = QDir::tempPath() + QStringLiteral("/seb-linux");
@@ -24,11 +28,12 @@ contracts::AppConfig DataValues::initializeAppConfig() const
     config.clientLogFilePath = appData + QStringLiteral("/client.log");
     config.configurationFileExtension = QStringLiteral(".seb");
     config.configurationFileMimeType = QStringLiteral("application/seb");
-    config.programBuildVersion = QStringLiteral("1.0.0");
+    const QString version = QCoreApplication::applicationVersion();
+    config.programBuildVersion = version;
     config.programCopyright = QStringLiteral("JVR2022");
     config.programDataFilePath = appData + QStringLiteral("/program.seb");
     config.programTitle = QStringLiteral("Safe Exam Browser");
-    config.programInformationalVersion = QStringLiteral("1.0.0");
+    config.programInformationalVersion = version;
     config.runtimeAddress = QStringLiteral("local://safeexambrowser/runtime");
     config.runtimeId = QUuid::createUuid();
     config.runtimeLogFilePath = appData + QStringLiteral("/runtime.log");
@@ -38,7 +43,8 @@ contracts::AppConfig DataValues::initializeAppConfig() const
     config.serviceLogFilePath = appData + QStringLiteral("/service.log");
     config.sessionCacheFilePath = appData + QStringLiteral("/session.cache");
     config.temporaryDirectory = tempDir;
-    return config;
+    appConfig_ = config;
+    return *appConfig_;
 }
 
 contracts::SessionConfiguration DataValues::initializeSessionConfiguration() const

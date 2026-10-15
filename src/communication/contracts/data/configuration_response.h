@@ -2,13 +2,13 @@
 
 #include "response.h"
 
-#include "../../../seb_settings.h"
+#include "../../../settings/AppSettings.h"
 
 namespace seb::communication::contracts::data {
 
 struct ConfigurationResponse : Response
 {
-    seb::SebSettings configuration;
+    seb::settings::AppSettings configuration;
 };
 
 }  // namespace seb::communication::contracts::data

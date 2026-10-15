@@ -2,13 +2,13 @@
 
 #include "communication_event_args.h"
 
-#include "../../../seb_settings.h"
+#include "../../../settings/AppSettings.h"
 
 namespace seb::communication::contracts::events {
 
 struct ClientConfigurationEventArgs : CommunicationEventArgs
 {
-    seb::SebSettings clientConfiguration;
+    seb::settings::AppSettings clientConfiguration;
 };
 
 }  // namespace seb::communication::contracts::events
