@@ -17,9 +17,11 @@ void ProctoringDataMapper::map(const QString &key, const QVariant &value, seb::s
     else if (key == keys::Proctoring::ScreenProctoring::GroupId) screen.GroupId = string(value, screen.GroupId);
     else if (key == keys::Proctoring::ScreenProctoring::ImageDownscaling) screen.ImageDownscaling = real(value, screen.ImageDownscaling);
     else if (key == keys::Proctoring::ScreenProctoring::ImageFormat && isString(value)) {
-        const QString format = normalized(value);
-        if (format == QStringLiteral("png")) screen.ImageFormat = seb::settings::proctoring::ImageFormat::Png;
-        else if (format == QStringLiteral("jpeg") || format == QStringLiteral("jpg")) screen.ImageFormat = seb::settings::proctoring::ImageFormat::Jpeg;
+        const QString format = string(value).trimmed();
+        if (format.compare(QStringLiteral("bmp"), Qt::CaseInsensitive) == 0) screen.ImageFormat = seb::settings::proctoring::ImageFormat::Bmp;
+        else if (format.compare(QStringLiteral("gif"), Qt::CaseInsensitive) == 0) screen.ImageFormat = seb::settings::proctoring::ImageFormat::Gif;
+        else if (format.compare(QStringLiteral("jpg"), Qt::CaseInsensitive) == 0) screen.ImageFormat = seb::settings::proctoring::ImageFormat::Jpg;
+        else if (format.compare(QStringLiteral("png"), Qt::CaseInsensitive) == 0) screen.ImageFormat = seb::settings::proctoring::ImageFormat::Png;
     }
     else if (key == keys::Proctoring::ScreenProctoring::ImageQuantization && isInteger(value)) {
         switch (integer(value)) {

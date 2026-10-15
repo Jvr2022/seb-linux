@@ -20,13 +20,21 @@ void ApplicationDataMapper::map(const QString &key, const QVariant &value, seb::
         if (key == keys::Applications::Blacklist) {
             const bool isActive = isBoolean(raw.value(keys::Applications::Active)) &&
                                   boolean(raw.value(keys::Applications::Active));
-            if (!isActive || !isWindowsProcess) continue;
-
             seb::settings::applications::BlacklistApplication application;
             application.AutoTerminate = boolean(raw.value(keys::Applications::AutoTerminate), application.AutoTerminate);
             application.ExecutableName = string(raw.value(keys::Applications::ExecutableName));
             application.OriginalName = string(raw.value(keys::Applications::OriginalName));
-            settings.Applications.Blacklist.push_back(application);
+            for (auto existing = settings.Applications.Blacklist.begin();
+                 existing != settings.Applications.Blacklist.end();) {
+                const bool sameExecutable = existing->ExecutableName.compare(application.ExecutableName, Qt::CaseInsensitive) == 0;
+                const bool sameOriginal = existing->OriginalName.compare(application.OriginalName, Qt::CaseInsensitive) == 0;
+                if (sameExecutable && sameOriginal) {
+                    settings.Applications.Blacklist.erase(existing);
+                    break;
+                }
+                ++existing;
+            }
+            if (isActive) settings.Applications.Blacklist.push_back(application);
         } else {
             const bool isActive = isBoolean(raw.value(keys::Applications::Active)) &&
                                   boolean(raw.value(keys::Applications::Active));

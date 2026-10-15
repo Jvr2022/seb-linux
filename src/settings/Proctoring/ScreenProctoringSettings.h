@@ -16,12 +16,12 @@ struct ScreenProctoringSettings
     bool Enabled = false;
     QString EncryptionSecret;
     QString GroupId;
-    seb::settings::proctoring::ImageFormat ImageFormat = seb::settings::proctoring::ImageFormat::Jpeg;
+    seb::settings::proctoring::ImageFormat ImageFormat = seb::settings::proctoring::ImageFormat::Jpg;
     double ImageDownscaling = 0.0;
     int IntervalMaximum = 0;
     int IntervalMinimum = 0;
     MetaDataSettings MetaData;
-    seb::settings::proctoring::ImageQuantization ImageQuantization = seb::settings::proctoring::ImageQuantization::Medium;
+    seb::settings::proctoring::ImageQuantization ImageQuantization = seb::settings::proctoring::ImageQuantization::Grayscale4bpp;
     QString ServiceUrl;
 };
 

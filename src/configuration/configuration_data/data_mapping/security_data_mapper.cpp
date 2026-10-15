@@ -38,7 +38,6 @@ void SecurityDataMapper::map(const QString &key, const QVariant &value, seb::set
             if (parts.size() > 4) item.Build = parts.at(4).toInt();
             item.IsMinimumRestriction = restriction.contains(QStringLiteral("min"), Qt::CaseInsensitive);
             item.RequiresAllianceEdition = restriction.contains(QStringLiteral("AE"), Qt::CaseInsensitive);
-            item.MinimumVersion = restriction;
             security.VersionRestrictions.push_back(item);
         }
     }
@@ -55,8 +54,8 @@ void SecurityDataMapper::mapGlobal(const QVariantMap &data, seb::settings::AppSe
         const bool newDesktop = boolean(data.value(keys::Security::KioskModeCreateNewDesktop));
         const bool killShell = boolean(data.value(keys::Security::KioskModeDisableExplorerShell));
         if (killShell) settings.Security.KioskMode = seb::settings::security::KioskMode::DisableExplorerShell;
-        else if (newDesktop) settings.Security.KioskMode = seb::settings::security::KioskMode::CreateNewDesktop;
-        else if (hasNewDesktop && hasKillShell) settings.Security.KioskMode = seb::settings::security::KioskMode::None;
+        if (newDesktop) settings.Security.KioskMode = seb::settings::security::KioskMode::CreateNewDesktop;
+        else if (hasNewDesktop && hasKillShell && !killShell) settings.Security.KioskMode = seb::settings::security::KioskMode::None;
     }
     if (data.contains(keys::Security::AllowApplicationLog) && helpers::isBoolean(data.value(keys::Security::AllowApplicationLog))) {
         settings.Security.AllowApplicationLogAccess = helpers::boolean(data.value(keys::Security::AllowApplicationLog));

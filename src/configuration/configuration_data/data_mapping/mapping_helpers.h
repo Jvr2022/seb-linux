@@ -1,5 +1,7 @@
 #pragma once
 
+#include <optional>
+
 #include <QMetaType>
 #include <QRegularExpression>
 #include <QStringList>
@@ -77,18 +79,18 @@ inline QStringList strings(const QVariant &value)
     return result;
 }
 
-inline void dimension(const QVariant &value, int &absolute, int &relative)
+inline void dimension(const QVariant &value, std::optional<int> &absolute, std::optional<int> &relative)
 {
     if (!isString(value)) return;
     const QString text = string(value).trimmed();
     if (text.endsWith(QLatin1Char('%'))) {
         bool ok = false;
         const int parsed = text.left(text.size() - 1).toInt(&ok);
-        if (ok) { relative = parsed; absolute = 0; }
+        if (ok) { relative = parsed; absolute.reset(); }
     } else {
         bool ok = false;
         const int parsed = text.toInt(&ok);
-        if (ok) { absolute = parsed; relative = 0; }
+        if (ok) { absolute = parsed; relative.reset(); }
     }
 }
 

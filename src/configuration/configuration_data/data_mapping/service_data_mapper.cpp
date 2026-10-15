@@ -27,7 +27,7 @@ void ServiceDataMapper::map(const QString &key, const QVariant &value, seb::sett
         case 0: service.Policy = seb::settings::service::ServicePolicy::Optional; break;
         case 1: service.Policy = seb::settings::service::ServicePolicy::Warn; break;
         case 2: service.Policy = seb::settings::service::ServicePolicy::Mandatory; break;
-        default: service.Policy = seb::settings::service::ServicePolicy::Mandatory; break;
+        default: service.Policy = seb::settings::service::ServicePolicy::Optional; break;
         }
     } else if (key == keys::Service::SetVmwareConfiguration) service.SetVmwareConfiguration = boolean(value, service.SetVmwareConfiguration);
 }

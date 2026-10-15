@@ -1,5 +1,7 @@
 #pragma once
 
+#include <optional>
+
 #include "WindowPosition.h"
 #include "UrlPolicy.h"
 
@@ -7,10 +9,10 @@ namespace seb::settings::browser {
 
 struct WindowSettings
 {
-    int AbsoluteHeight = 0;
-    int AbsoluteWidth = 0;
-    int RelativeHeight = 100;
-    int RelativeWidth = 100;
+    std::optional<int> AbsoluteHeight;
+    std::optional<int> AbsoluteWidth;
+    std::optional<int> RelativeHeight;
+    std::optional<int> RelativeWidth;
     bool AllowAddressBar = false;
     bool AllowBackwardNavigation = false;
     bool AllowDeveloperConsole = false;

@@ -17,7 +17,14 @@ void mapWindow(seb::settings::browser::WindowSettings &window, const QString &ke
     else if (key == (!additional ? keys::Browser::MainWindow::ShowReloadWarning : keys::Browser::AdditionalWindow::ShowReloadWarning)) window.ShowReloadWarning = boolean(value, window.ShowReloadWarning);
     else if (key == (!additional ? keys::Browser::MainWindow::WindowHeight : keys::Browser::AdditionalWindow::WindowHeight)) dimension(value, window.AbsoluteHeight, window.RelativeHeight);
     else if (key == (!additional ? keys::Browser::MainWindow::WindowWidth : keys::Browser::AdditionalWindow::WindowWidth)) dimension(value, window.AbsoluteWidth, window.RelativeWidth);
-    else if (key == (!additional ? keys::Browser::MainWindow::WindowPosition : keys::Browser::AdditionalWindow::WindowPosition) && isInteger(value)) window.Position = static_cast<seb::settings::browser::WindowPosition>(integer(value, static_cast<int>(window.Position)));
+    else if (key == (!additional ? keys::Browser::MainWindow::WindowPosition : keys::Browser::AdditionalWindow::WindowPosition) && isInteger(value)) {
+        switch (integer(value)) {
+        case 0: window.Position = seb::settings::browser::WindowPosition::Left; break;
+        case 1: window.Position = seb::settings::browser::WindowPosition::Center; break;
+        case 2: window.Position = seb::settings::browser::WindowPosition::Right; break;
+        default: break;
+        }
+    }
     else if (key == (!additional ? keys::Browser::MainWindow::UrlPolicy : keys::Browser::AdditionalWindow::UrlPolicy) && isInteger(value)) {
         switch (integer(value)) {
         case 0: window.UrlPolicy = seb::settings::browser::UrlPolicy::Never; break;
@@ -43,7 +50,7 @@ void mapFilter(seb::settings::browser::FilterSettings &filter, const QVariant &v
         if (isBoolean(raw.value(QStringLiteral("regex")))) {
             rule.Type = boolean(raw.value(QStringLiteral("regex"))) ? seb::settings::browser::filter::FilterRuleType::Regex : seb::settings::browser::filter::FilterRuleType::Simplified;
         }
-        if (rule.Active && !rule.Expression.isEmpty()) filter.Rules.push_back(rule);
+        if (rule.Active) filter.Rules.push_back(rule);
     }
 }
 }

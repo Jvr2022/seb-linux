@@ -1,6 +1,5 @@
 #pragma once
 
-#include <QString>
 #include <optional>
 
 namespace seb::settings::security {
@@ -13,8 +12,6 @@ struct VersionRestriction
     std::optional<int> Build;
     bool IsMinimumRestriction = false;
     bool RequiresAllianceEdition = false;
-    QString MinimumVersion;
-    QString MaximumVersion;
 };
 
 }  // namespace seb::settings::security
