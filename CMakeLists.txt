@@ -329,6 +329,7 @@ set(SEB_HEADERS
     src/configuration/cryptography/public_key_symmetric_encryption.h
     src/configuration/data_compression/gzip_compressor.h
     src/configuration/data_formats/binary_block.h
+    src/configuration/data_formats/internal_keys.h
     src/configuration/data_formats/binary_parser.h
     src/configuration/data_formats/binary_serializer.h
     src/configuration/data_formats/xml_element.h

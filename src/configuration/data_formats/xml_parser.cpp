@@ -1,7 +1,7 @@
 #include "xml_parser.h"
 
 #include "xml_element.h"
-#include "../configuration_data/keys.h"
+#include "internal_keys.h"
 
 #include <QByteArray>
 #include <QDateTime>
@@ -272,7 +272,7 @@ contracts::data_formats::ParseResult XmlParser::tryParse(
     result.rawData = root.toMap();
     // Temporary compatibility for the existing settings bridge/serializer. The
     // dictionary above remains the parser's actual result; this is source metadata.
-    result.rawData.insert(configuration_data::keys::Meta::RawSebData, source);
+    result.rawData.insert(internal_keys::RawSebData, source);
     result.status = contracts::LoadStatus::Success;
     return result;
 }

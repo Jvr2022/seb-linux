@@ -10,7 +10,7 @@ void SecurityDataMapper::map(const QString &key, const QVariant &value, seb::set
     using namespace helpers;
     auto &security = settings.Security;
     if (key == keys::Security::AdminPasswordHash) security.AdminPasswordHash = string(value);
-    else if (key == keys::Security::AllowApplicationLogAccess) security.AllowApplicationLogAccess = boolean(value, security.AllowApplicationLogAccess);
+    else if (key == keys::Security::AllowApplicationLog) security.AllowApplicationLogAccess = boolean(value, security.AllowApplicationLogAccess);
     else if (key == keys::Security::AllowReconfiguration) security.AllowReconfiguration = boolean(value, security.AllowReconfiguration);
     else if (key == keys::Security::AllowStickyKeys) security.AllowStickyKeys = boolean(value, security.AllowStickyKeys);
     else if (key == keys::Security::AllowTermination) security.AllowTermination = boolean(value, security.AllowTermination);
@@ -54,8 +54,8 @@ void SecurityDataMapper::mapGlobal(const QVariantMap &data, seb::settings::AppSe
         else if (newDesktop) settings.Security.KioskMode = seb::settings::security::KioskMode::CreateNewDesktop;
         else if (hasNewDesktop && hasKillShell) settings.Security.KioskMode = seb::settings::security::KioskMode::None;
     }
-    if (data.contains(keys::Security::AllowApplicationLogAccess)) {
-        settings.Security.AllowApplicationLogAccess = helpers::boolean(data.value(keys::Security::AllowApplicationLogAccess));
+    if (data.contains(keys::Security::AllowApplicationLog)) {
+        settings.Security.AllowApplicationLogAccess = helpers::boolean(data.value(keys::Security::AllowApplicationLog));
     }
     settings.UserInterface.ActionCenter.ShowApplicationLog = settings.Security.AllowApplicationLogAccess;
     if (!settings.Security.AllowApplicationLogAccess) settings.UserInterface.Taskbar.ShowApplicationLog = false;

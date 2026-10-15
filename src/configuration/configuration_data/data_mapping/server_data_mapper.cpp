@@ -8,11 +8,10 @@ void ServerDataMapper::map(const QString &key, const QVariant &value, seb::setti
 {
     using namespace helpers;
     auto &server = settings.Server;
-    if (key == keys::Server::Enabled) server.Enabled = boolean(value, server.Enabled);
+    if (key == keys::Server::Configuration) server.Enabled = boolean(value, server.Enabled);
     else if (key == keys::Server::ApiEndpoint) server.ApiEndpoint = string(value);
-    else if (key == keys::Server::Url) server.Url = string(value);
-    else if (key == keys::Server::Port) server.Port = integer(value, server.Port);
-    else if (key == keys::Server::ClientId) server.ClientId = string(value);
+    else if (key == keys::Server::ServerUrl) server.Url = string(value);
+    else if (key == keys::Server::ClientName) server.ClientId = string(value);
     else if (key == keys::Server::ClientSecret) server.ClientSecret = string(value);
     else if (key == keys::Server::Institution) server.Institution = string(value);
     else if (key == keys::Server::FallbackPasswordHash) server.FallbackPasswordHash = string(value);

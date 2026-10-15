@@ -17,8 +17,8 @@ void ServiceDataMapper::map(const QString &key, const QVariant &value, seb::sett
     else if (key == keys::Service::EnableRemoteConnections) service.DisableRemoteConnections = !boolean(value, true);
     else if (key == keys::Service::EnableSignout) service.DisableSignout = !boolean(value, true);
     else if (key == keys::Service::EnableTaskManager) service.DisableTaskManager = !boolean(value, true);
-    else if (key == keys::Service::DisableUserLock) service.DisableUserLock = !boolean(value, true);
-    else if (key == keys::Service::DisableUserSwitch) service.DisableUserSwitch = !boolean(value, true);
+    else if (key == keys::Service::EnableUserLock) service.DisableUserLock = !boolean(value, true);
+    else if (key == keys::Service::EnableUserSwitch) service.DisableUserSwitch = !boolean(value, true);
     else if (key == keys::Service::EnableVmwareOverlay) service.DisableVmwareOverlay = !boolean(value, true);
     else if (key == keys::Service::EnableWindowsUpdate) service.DisableWindowsUpdate = !boolean(value, true);
     else if (key == keys::Service::IgnoreService) service.IgnoreService = boolean(value, service.IgnoreService);

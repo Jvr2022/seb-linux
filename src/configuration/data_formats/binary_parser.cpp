@@ -1,7 +1,7 @@
 #include "binary_parser.h"
 
 #include "binary_block.h"
-#include "../configuration_data/keys.h"
+#include "internal_keys.h"
 #include "../contracts/cryptography/password_parameters.h"
 #include "../contracts/cryptography/public_key_parameters.h"
 
@@ -87,7 +87,7 @@ contracts::data_formats::ParseResult BinaryParser::tryParse(
     if (prefix == BinaryBlock::PlainData) {
         auto result = parsePlainPayload(data, compressor_, xmlParser_);
         if (result.status == contracts::LoadStatus::Success) {
-            result.rawData.insert(configuration_data::keys::Meta::RawSebData, source);
+            result.rawData.insert(internal_keys::RawSebData, source);
         }
         return result;
     }
@@ -110,7 +110,7 @@ contracts::data_formats::ParseResult BinaryParser::tryParse(
         }
         auto result = parsePlainPayload(decrypted, compressor_, xmlParser_);
         if (result.status == contracts::LoadStatus::Success) {
-            result.rawData.insert(configuration_data::keys::Meta::RawSebData, source);
+            result.rawData.insert(internal_keys::RawSebData, source);
         }
         result.encryption = std::make_shared<contracts::cryptography::PasswordParameters>(parameters);
         return result;
@@ -126,7 +126,7 @@ contracts::data_formats::ParseResult BinaryParser::tryParse(
 
     auto result = tryParse(decrypted, password);
     if (result.status == contracts::LoadStatus::Success) {
-        result.rawData.insert(configuration_data::keys::Meta::RawSebData, source);
+        result.rawData.insert(internal_keys::RawSebData, source);
     }
     auto parameters = std::make_shared<contracts::cryptography::PublicKeyParameters>();
     parameters->certificate = certificate;

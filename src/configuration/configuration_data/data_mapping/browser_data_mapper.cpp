@@ -60,45 +60,39 @@ void BrowserDataMapper::map(const QString &key, const QVariant &value, seb::sett
     else if (key == keys::Browser::AllowDownloads) browser.AllowDownloads = boolean(value, browser.AllowDownloads);
     else if (key == keys::Browser::AllowFind) browser.AllowFind = boolean(value, browser.AllowFind);
     else if (key == keys::Browser::AllowPageZoom) browser.AllowPageZoom = boolean(value, browser.AllowPageZoom);
-    else if (key == keys::Browser::AllowPdfReader) browser.AllowPdfReader = boolean(value, browser.AllowPdfReader);
-    else if (key == keys::Browser::DownloadPdfFiles) browser.AllowPdfReader = !boolean(value, !browser.AllowPdfReader);
     else if (key == keys::Browser::AllowDeveloperConsole) { browser.MainWindow.AllowDeveloperConsole = boolean(value, browser.MainWindow.AllowDeveloperConsole); browser.AdditionalWindow.AllowDeveloperConsole = browser.MainWindow.AllowDeveloperConsole; }
     else if (key == keys::Browser::AllowPdfReaderToolbar) browser.AllowPdfReaderToolbar = boolean(value, browser.AllowPdfReaderToolbar);
     else if (key == keys::Browser::AllowPrint) browser.AllowPrint = boolean(value, browser.AllowPrint);
     else if (key == keys::Browser::AllowSpellChecking) browser.AllowSpellChecking = boolean(value, browser.AllowSpellChecking);
     else if (key == keys::Browser::AllowUploads) browser.AllowUploads = boolean(value, browser.AllowUploads);
-    else if (key == keys::Browser::BrowserExamKeySalt) browser.BrowserExamKeySalt = value.toByteArray();
-    else if (key == keys::Browser::CustomBrowserExamKey) browser.CustomBrowserExamKey = string(value);
-    else if (key == keys::Browser::CustomUserAgent) browser.CustomUserAgent = string(value);
+    else if (key == keys::Browser::ExamKeySalt) browser.BrowserExamKeySalt = value.toByteArray();
+    else if (key == keys::Browser::CustomUserAgentDesktop) browser.CustomUserAgent = string(value);
     else if (key == keys::Browser::DeleteCacheOnShutdown) browser.DeleteCacheOnShutdown = boolean(value, browser.DeleteCacheOnShutdown);
     else if (key == keys::Browser::DeleteCookiesOnShutdown) browser.DeleteCookiesOnShutdown = boolean(value, browser.DeleteCookiesOnShutdown);
     else if (key == keys::Browser::DeleteCookiesOnStartup) browser.DeleteCookiesOnStartup = boolean(value, browser.DeleteCookiesOnStartup);
-    else if (key == keys::Browser::DownAndUploadDirectory) browser.DownAndUploadDirectory = string(value);
+    else if (key == keys::Browser::DownloadDirectory) browser.DownAndUploadDirectory = string(value);
     else if (key == keys::Browser::EnableBrowser) browser.EnableBrowser = boolean(value, browser.EnableBrowser);
-    else if (key == keys::Browser::FilterRules) mapFilter(browser.Filter, value);
-    else if (key == keys::Browser::HomeNavigationMessage) browser.HomeNavigationMessage = string(value);
-    else if (key == keys::Browser::HomeNavigationRequiresPassword) browser.HomeNavigationRequiresPassword = boolean(value, browser.HomeNavigationRequiresPassword);
-    else if (key == keys::Browser::HomePasswordHash) browser.HomePasswordHash = string(value);
-    else if (key == keys::Browser::HomeUrl) browser.HomeUrl = string(value);
+    else if (key == keys::Browser::Filter::FilterRules) mapFilter(browser.Filter, value);
+    else if (key == keys::Browser::HomeButtonMessage) browser.HomeNavigationMessage = string(value);
+    else if (key == keys::Browser::HomeButtonRequiresPassword) browser.HomeNavigationRequiresPassword = boolean(value, browser.HomeNavigationRequiresPassword);
+    else if (key == keys::Browser::HomeButtonUrl) browser.HomeUrl = string(value);
     else if (key == keys::Browser::QuitUrl) browser.QuitUrl = string(value);
-    else if (key == keys::Browser::QuitUrlConfirm) browser.ConfirmQuitUrl = boolean(value, browser.ConfirmQuitUrl);
-    else if (key == keys::Browser::QuitUrlRestart) browser.ResetOnQuitUrl = boolean(value, browser.ResetOnQuitUrl);
-    else if (key == keys::Browser::SendBrowserExamKey || key == keys::Browser::SendCustomHeaders) { browser.SendBrowserExamKey = boolean(value, browser.SendBrowserExamKey); browser.SendConfigurationKey = browser.SendBrowserExamKey; }
-    else if (key == keys::Browser::SendConfigurationKey) browser.SendConfigurationKey = boolean(value, browser.SendConfigurationKey);
+    else if (key == keys::Browser::QuitUrlConfirmation) browser.ConfirmQuitUrl = boolean(value, browser.ConfirmQuitUrl);
+    else if (key == keys::Browser::ResetOnQuitUrl) browser.ResetOnQuitUrl = boolean(value, browser.ResetOnQuitUrl);
+    else if (key == keys::Browser::SendCustomHeaders) { browser.SendBrowserExamKey = boolean(value, browser.SendBrowserExamKey); browser.SendConfigurationKey = browser.SendBrowserExamKey; }
     else if (key == keys::Browser::ShowFileSystemElementPath) browser.ShowFileSystemElementPath = boolean(value, browser.ShowFileSystemElementPath);
     else if (key == keys::Browser::StartUrl) browser.StartUrl = string(value);
-    else if (key == keys::Browser::StartUrlQuery) { browser.UseQueryParameter = boolean(value, browser.UseQueryParameter); browser.StartUrlQuery = string(value); }
+    else if (key == keys::Browser::UseStartUrlQuery) { browser.UseQueryParameter = boolean(value, browser.UseQueryParameter); browser.StartUrlQuery = string(value); }
     else if (key == keys::Browser::UserAgentSuffix) browser.UserAgentSuffix = string(value);
-    else if (key == keys::Browser::UserAgentMode) browser.UserAgentMode = string(value);
-    else if (key == keys::Browser::UseCustomUserAgent) browser.UseCustomUserAgent = boolean(value, browser.UseCustomUserAgent);
-    else if (key == keys::Browser::UseStartUrlAsHomeUrl) browser.UseStartUrlAsHomeUrl = boolean(value, browser.UseStartUrlAsHomeUrl);
-    else if (key == keys::Browser::UseTemporaryDownAndUploadDirectory) browser.UseTemporaryDownAndUploadDirectory = boolean(value, browser.UseTemporaryDownAndUploadDirectory);
+    else if (key == keys::Browser::UserAgentModeDesktop) browser.UserAgentMode = string(value);
+    else if (key == keys::Browser::HomeButtonUseStartUrl) browser.UseStartUrlAsHomeUrl = boolean(value, browser.UseStartUrlAsHomeUrl);
+    else if (key == keys::Browser::UseTemporaryDownUploadDirectory) browser.UseTemporaryDownAndUploadDirectory = boolean(value, browser.UseTemporaryDownAndUploadDirectory);
     else if (key == keys::Browser::ShowReloadButton) { browser.MainWindow.ShowReloadButton = boolean(value, browser.MainWindow.ShowReloadButton); browser.AdditionalWindow.ShowReloadButton = browser.MainWindow.ShowReloadButton; }
     else if (key == keys::Browser::ShowToolbar) { browser.MainWindow.ShowToolbar = boolean(value, browser.MainWindow.ShowToolbar); browser.AdditionalWindow.ShowToolbar = browser.MainWindow.ShowToolbar; }
-    else if (key == keys::Browser::Filter::ProcessContentRequests) browser.Filter.ProcessContentRequests = boolean(value, browser.Filter.ProcessContentRequests);
-    else if (key == keys::Browser::Filter::ProcessMainRequests) browser.Filter.ProcessMainRequests = boolean(value, browser.Filter.ProcessMainRequests);
-    else if (key == keys::Browser::ProxyPolicy) browser.Proxy.Policy = integer(value) == 1 ? seb::settings::browser::proxy::ProxyPolicy::Custom : seb::settings::browser::proxy::ProxyPolicy::System;
-    else if (key == keys::Browser::ProxySettings) {
+    else if (key == keys::Browser::Filter::EnableContentRequestFilter) browser.Filter.ProcessContentRequests = boolean(value, browser.Filter.ProcessContentRequests);
+    else if (key == keys::Browser::Filter::EnableMainRequestFilter) browser.Filter.ProcessMainRequests = boolean(value, browser.Filter.ProcessMainRequests);
+    else if (key == keys::Browser::Proxy::Policy) browser.Proxy.Policy = integer(value) == 1 ? seb::settings::browser::proxy::ProxyPolicy::Custom : seb::settings::browser::proxy::ProxyPolicy::System;
+    else if (key == keys::Browser::Proxy::Settings) {
         const QVariantMap proxy = value.toMap();
         browser.Proxy.AutoConfigure = boolean(proxy.value(keys::Browser::Proxy::AutoConfigure));
         browser.Proxy.AutoDetect = boolean(proxy.value(keys::Browser::Proxy::AutoDetect));
@@ -124,9 +118,9 @@ void BrowserDataMapper::map(const QString &key, const QVariant &value, seb::sett
 void BrowserDataMapper::mapGlobal(const QVariantMap &data, seb::settings::AppSettings &settings) const
 {
     using namespace helpers;
-    if (data.contains(keys::Browser::NewBrowserWindowByLinkPolicy)) {
-        const int policy = integer(data.value(keys::Browser::NewBrowserWindowByLinkPolicy), 0);
-        const bool foreign = boolean(data.value(keys::Browser::NewBrowserWindowByLinkBlockForeign));
+    if (data.contains(keys::Browser::PopupPolicy)) {
+        const int policy = integer(data.value(keys::Browser::PopupPolicy), 0);
+        const bool foreign = boolean(data.value(keys::Browser::PopupBlockForeignHost));
         switch (policy) {
         case 2: settings.Browser.PopupPolicy = foreign ? seb::settings::browser::PopupPolicy::AllowSameHost : seb::settings::browser::PopupPolicy::Allow; break;
         case 1: settings.Browser.PopupPolicy = foreign ? seb::settings::browser::PopupPolicy::AllowSameHostAndWindow : seb::settings::browser::PopupPolicy::AllowSameWindow; break;
@@ -134,18 +128,18 @@ void BrowserDataMapper::mapGlobal(const QVariantMap &data, seb::settings::AppSet
         default: break;
         }
     }
-    const bool processMain = boolean(data.value(keys::Browser::Filter::ProcessMainRequests));
-    const bool processContent = boolean(data.value(keys::Browser::Filter::ProcessContentRequests));
+    const bool processMain = boolean(data.value(keys::Browser::Filter::EnableMainRequestFilter));
+    const bool processContent = boolean(data.value(keys::Browser::Filter::EnableContentRequestFilter));
     settings.Browser.Filter.ProcessMainRequests = processMain;
     settings.Browser.Filter.ProcessContentRequests = processMain && processContent;
     const bool mobile = integer(data.value(keys::Browser::UserAgentModeMobile), 0) != 0;
-    const bool desktop = integer(data.value(keys::Browser::UserAgentMode), 0) != 0;
+    const bool desktop = integer(data.value(keys::Browser::UserAgentModeDesktop), 0) != 0;
     if (mobile && settings.UserInterface.Mode == seb::settings::userinterface::UserInterfaceMode::Mobile) {
         settings.Browser.UseCustomUserAgent = true;
         settings.Browser.CustomUserAgent = data.value(keys::Browser::CustomUserAgentMobile).toString();
     } else if (desktop) {
         settings.Browser.UseCustomUserAgent = true;
-        settings.Browser.CustomUserAgent = data.value(keys::Browser::UseCustomUserAgent).toString();
+        settings.Browser.CustomUserAgent = data.value(keys::Browser::CustomUserAgentDesktop).toString();
     }
 }
 
