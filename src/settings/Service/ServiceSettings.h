@@ -9,7 +9,7 @@ struct ServiceSettings
     bool DisableUserLock = false;
     bool DisableUserSwitch = false;
     bool IgnoreService = true;
-    ServicePolicy Policy = ServicePolicy::Ignore;
+    ServicePolicy Policy = ServicePolicy::Mandatory;
     bool SetVmwareConfiguration = false;
     bool DisableChromeNotifications = true;
     bool DisableEaseOfAccessOptions = true;

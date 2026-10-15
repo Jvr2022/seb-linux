@@ -59,6 +59,8 @@ seb::settings::AppSettings DataValues::loadDefaultSettings() const
     settings.Browser.DeleteCookiesOnShutdown = true;
     settings.Browser.DeleteCookiesOnStartup = true;
     settings.Browser.PopupPolicy = seb::settings::browser::PopupPolicy::Allow;
+    settings.Browser.MainWindow.RelativeHeight = 100;
+    settings.Browser.MainWindow.RelativeWidth = 100;
     settings.Browser.AdditionalWindow.RelativeHeight = 100;
     settings.Browser.AdditionalWindow.RelativeWidth = 50;
     settings.Browser.AdditionalWindow.Position = seb::settings::browser::WindowPosition::Right;

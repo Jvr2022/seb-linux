@@ -5,9 +5,6 @@ enum class PopupPolicy {
     AllowSameHost,
     AllowSameHostAndWindow,
     AllowSameWindow,
-    Block,
-    SameWindow = AllowSameWindow,
-    SameHost = AllowSameHost,
-    All = Allow
+    Block
 };
 }

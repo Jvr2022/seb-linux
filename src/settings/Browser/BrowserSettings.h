@@ -39,7 +39,7 @@ struct BrowserSettings
     QString HomePasswordHash;
     QString HomeUrl;
     WindowSettings MainWindow;
-    seb::settings::browser::PopupPolicy PopupPolicy = seb::settings::browser::PopupPolicy::All;
+    seb::settings::browser::PopupPolicy PopupPolicy = seb::settings::browser::PopupPolicy::Allow;
     ProxySettings Proxy;
     QString QuitUrl;
     bool ResetOnQuitUrl = false;
