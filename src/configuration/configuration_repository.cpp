@@ -2,6 +2,7 @@
 
 #include "configuration_data/data_mapper.h"
 #include "configuration_data/data_processor.h"
+#include "configuration_data/data_validator.h"
 #include "configuration_data/data_values.h"
 #include "contracts/cryptography/i_certificate_store.h"
 #include "contracts/data_formats/i_data_parser.h"
@@ -36,6 +37,12 @@ configuration_data::DataProcessor &dataProcessor()
 {
     static configuration_data::DataProcessor processor;
     return processor;
+}
+
+configuration_data::DataValidator &dataValidator()
+{
+    static configuration_data::DataValidator validator;
+    return validator;
 }
 
 configuration_data::DataValues &dataValues()
@@ -136,6 +143,11 @@ contracts::LoadStatus ConfigurationRepository::tryLoadSettings(
 
     QVariantMap settingsData = rawData;
     settingsData.remove(data_formats::internal_keys::RawSebData);
+
+    if (!dataValidator().validate(settingsData)) {
+        return contracts::LoadStatus::InvalidData;
+    }
+
     dataMapper().map(settingsData, settings);
     dataProcessor().process(settingsData, settings);
     return contracts::LoadStatus::Success;

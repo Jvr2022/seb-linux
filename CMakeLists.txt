@@ -99,6 +99,7 @@ set(SEB_SOURCES
     src/communication/proxies/service_proxy.cpp
     src/configuration/configuration_data/data_mapper.cpp
     src/configuration/configuration_data/data_processor.cpp
+    src/configuration/configuration_data/data_validator.cpp
     src/configuration/configuration_data/data_values.cpp
     src/configuration/configuration_data/data_mapping/application_data_mapper.cpp
     src/configuration/configuration_data/data_mapping/audio_data_mapper.cpp
@@ -278,6 +279,7 @@ set(SEB_HEADERS
     src/configuration/Properties/AssemblyInfo.h
     src/configuration/configuration_data/data_mapper.h
     src/configuration/configuration_data/data_processor.h
+    src/configuration/configuration_data/data_validator.h
     src/configuration/configuration_data/data_values.h
     src/configuration/configuration_data/data_mapping/application_data_mapper.h
     src/configuration/configuration_data/data_mapping/audio_data_mapper.h
