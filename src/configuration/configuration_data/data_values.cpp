@@ -64,7 +64,10 @@ seb::settings::AppSettings DataValues::loadDefaultSettings() const
     settings.Browser.AdditionalWindow.Position = seb::settings::browser::WindowPosition::Right;
     settings.Browser.AdditionalWindow.UrlPolicy = seb::settings::browser::UrlPolicy::Never;
     settings.Browser.AdditionalWindow.ShowToolbar = false;
+    settings.Browser.AdditionalWindow.AllowBackwardNavigation = true;
+    settings.Browser.AdditionalWindow.AllowForwardNavigation = true;
     settings.Browser.MainWindow.ShowReloadWarning = true;
+    settings.Browser.MainWindow.ShowToolbar = false;
     settings.Browser.MainWindow.UrlPolicy = seb::settings::browser::UrlPolicy::Never;
     settings.Display.AllowedDisplays = 1;
     settings.Display.AlwaysOn = true;
@@ -90,7 +93,11 @@ seb::settings::AppSettings DataValues::loadDefaultSettings() const
     settings.Proctoring.ScreenProctoring.IntervalMaximum = 5000;
     settings.Proctoring.ScreenProctoring.IntervalMinimum = 1000;
     settings.Proctoring.ScreenProctoring.ImageFormat = seb::settings::proctoring::ImageFormat::Png;
+    settings.Proctoring.ScreenProctoring.ImageDownscaling = 1.0;
     settings.Proctoring.ScreenProctoring.Quantization = seb::settings::proctoring::ImageQuantization::Grayscale4bpp;
+    settings.Proctoring.ScreenProctoring.MetaData.CaptureApplicationData = true;
+    settings.Proctoring.ScreenProctoring.MetaData.CaptureBrowserData = true;
+    settings.Proctoring.ScreenProctoring.MetaData.CaptureWindowTitle = true;
     settings.Service.DisableUserLock = true;
     settings.Service.DisableUserSwitch = true;
     settings.Service.Policy = seb::settings::service::ServicePolicy::Mandatory;
