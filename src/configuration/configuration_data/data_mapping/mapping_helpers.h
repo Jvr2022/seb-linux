@@ -9,35 +9,57 @@ namespace seb::configuration::configuration_data::data_mapping::helpers {
 
 inline bool boolean(const QVariant &value, bool fallback = false)
 {
-    if (!value.isValid() || value.isNull()) return fallback;
-    if (value.metaType().id() == QMetaType::Bool) return value.toBool();
-    const QString text = value.toString().trimmed().toLower();
-    if (text == QStringLiteral("true") || text == QStringLiteral("yes") || text == QStringLiteral("1")) return true;
-    if (text == QStringLiteral("false") || text == QStringLiteral("no") || text == QStringLiteral("0")) return false;
-    bool ok = false;
-    const int integer = value.toInt(&ok);
-    return ok ? integer != 0 : fallback;
+    return value.metaType().id() == QMetaType::Bool ? value.toBool() : fallback;
 }
 
 inline int integer(const QVariant &value, int fallback = 0)
 {
-    bool ok = false;
-    const int result = value.toInt(&ok);
-    if (ok) return result;
-    const int parsed = value.toString().trimmed().toInt(&ok);
-    return ok ? parsed : fallback;
+    return value.metaType().id() == QMetaType::Int ? value.toInt() : fallback;
 }
 
 inline double real(const QVariant &value, double fallback = 0.0)
 {
-    bool ok = false;
-    const double result = value.toDouble(&ok);
-    return ok ? result : fallback;
+    return value.metaType().id() == QMetaType::Double ? value.toDouble() : fallback;
 }
 
-inline QString string(const QVariant &value)
+inline bool isBoolean(const QVariant &value)
 {
-    return value.isValid() && !value.isNull() ? value.toString() : QString();
+    return value.metaType().id() == QMetaType::Bool;
+}
+
+inline bool isInteger(const QVariant &value)
+{
+    return value.metaType().id() == QMetaType::Int;
+}
+
+inline bool isReal(const QVariant &value)
+{
+    return value.metaType().id() == QMetaType::Double;
+}
+
+inline bool isString(const QVariant &value)
+{
+    return value.metaType().id() == QMetaType::QString;
+}
+
+inline bool isByteArray(const QVariant &value)
+{
+    return value.metaType().id() == QMetaType::QByteArray;
+}
+
+inline bool isList(const QVariant &value)
+{
+    return value.metaType().id() == QMetaType::QVariantList;
+}
+
+inline bool isMap(const QVariant &value)
+{
+    return value.metaType().id() == QMetaType::QVariantMap;
+}
+
+inline QString string(const QVariant &value, const QString &fallback = QString())
+{
+    return isString(value) ? value.toString() : fallback;
 }
 
 inline QString normalized(const QVariant &value)
@@ -47,17 +69,17 @@ inline QString normalized(const QVariant &value)
 
 inline QStringList strings(const QVariant &value)
 {
-    if (value.metaType().id() == QMetaType::QStringList) return value.toStringList();
+    if (!isList(value)) return {};
     QStringList result;
     for (const QVariant &item : value.toList()) {
-        const QString text = item.toString();
-        if (!text.isEmpty()) result.push_back(text);
+        if (isString(item)) result.push_back(item.toString());
     }
     return result;
 }
 
 inline void dimension(const QVariant &value, int &absolute, int &relative)
 {
+    if (!isString(value)) return;
     const QString text = string(value).trimmed();
     if (text.endsWith(QLatin1Char('%'))) {
         bool ok = false;

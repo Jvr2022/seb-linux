@@ -23,7 +23,7 @@ contracts::AppConfig DataValues::initializeAppConfig() const
     config.clientId = QUuid::createUuid();
     config.clientLogFilePath = appData + QStringLiteral("/client.log");
     config.configurationFileExtension = QStringLiteral(".seb");
-    config.configurationFileMimeType = QStringLiteral("application/x-seb");
+    config.configurationFileMimeType = QStringLiteral("application/seb");
     config.programBuildVersion = QStringLiteral("1.0.0");
     config.programCopyright = QStringLiteral("JVR2022");
     config.programDataFilePath = appData + QStringLiteral("/program.seb");

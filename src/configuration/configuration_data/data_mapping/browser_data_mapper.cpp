@@ -13,12 +13,12 @@ void mapWindow(seb::settings::browser::WindowSettings &window, const QString &ke
     if (key == (!additional ? keys::Browser::MainWindow::AllowAddressBar : keys::Browser::AdditionalWindow::AllowAddressBar)) window.AllowAddressBar = boolean(value, window.AllowAddressBar);
     else if (key == (!additional ? keys::Browser::MainWindow::AllowNavigation : keys::Browser::AdditionalWindow::AllowNavigation)) { window.AllowBackwardNavigation = boolean(value, window.AllowBackwardNavigation); window.AllowForwardNavigation = window.AllowBackwardNavigation; }
     else if (key == (!additional ? keys::Browser::MainWindow::AllowReload : keys::Browser::AdditionalWindow::AllowReload)) window.AllowReloading = boolean(value, window.AllowReloading);
-    else if (!additional && key == keys::Browser::MainWindow::WindowMode) window.FullScreenMode = integer(value) == 1;
+    else if (!additional && key == keys::Browser::MainWindow::WindowMode && isInteger(value)) window.FullScreenMode = integer(value) == 1;
     else if (key == (!additional ? keys::Browser::MainWindow::ShowReloadWarning : keys::Browser::AdditionalWindow::ShowReloadWarning)) window.ShowReloadWarning = boolean(value, window.ShowReloadWarning);
     else if (key == (!additional ? keys::Browser::MainWindow::WindowHeight : keys::Browser::AdditionalWindow::WindowHeight)) dimension(value, window.AbsoluteHeight, window.RelativeHeight);
     else if (key == (!additional ? keys::Browser::MainWindow::WindowWidth : keys::Browser::AdditionalWindow::WindowWidth)) dimension(value, window.AbsoluteWidth, window.RelativeWidth);
-    else if (key == (!additional ? keys::Browser::MainWindow::WindowPosition : keys::Browser::AdditionalWindow::WindowPosition)) window.Position = static_cast<seb::settings::browser::WindowPosition>(integer(value, static_cast<int>(window.Position)));
-    else if (key == (!additional ? keys::Browser::MainWindow::UrlPolicy : keys::Browser::AdditionalWindow::UrlPolicy)) {
+    else if (key == (!additional ? keys::Browser::MainWindow::WindowPosition : keys::Browser::AdditionalWindow::WindowPosition) && isInteger(value)) window.Position = static_cast<seb::settings::browser::WindowPosition>(integer(value, static_cast<int>(window.Position)));
+    else if (key == (!additional ? keys::Browser::MainWindow::UrlPolicy : keys::Browser::AdditionalWindow::UrlPolicy) && isInteger(value)) {
         switch (integer(value)) {
         case 0: window.UrlPolicy = seb::settings::browser::UrlPolicy::Never; break;
         case 1: window.UrlPolicy = seb::settings::browser::UrlPolicy::LoadError; break;
@@ -30,13 +30,19 @@ void mapWindow(seb::settings::browser::WindowSettings &window, const QString &ke
 
 void mapFilter(seb::settings::browser::FilterSettings &filter, const QVariant &value)
 {
+    if (!isList(value)) return;
     for (const QVariant &entry : value.toList()) {
+        if (!isMap(entry)) continue;
         const QVariantMap raw = entry.toMap();
         seb::settings::browser::filter::FilterRuleSettings rule;
-        rule.Active = boolean(raw.value(QStringLiteral("active")), true);
+        rule.Active = isBoolean(raw.value(QStringLiteral("active"))) && boolean(raw.value(QStringLiteral("active")));
         rule.Expression = string(raw.value(QStringLiteral("expression")));
-        rule.Result = integer(raw.value(QStringLiteral("action"))) == 1 ? seb::settings::browser::filter::FilterResult::Allow : seb::settings::browser::filter::FilterResult::Block;
-        rule.Type = boolean(raw.value(QStringLiteral("regex"))) ? seb::settings::browser::filter::FilterRuleType::Regex : seb::settings::browser::filter::FilterRuleType::Simplified;
+        if (isInteger(raw.value(QStringLiteral("action")))) {
+            rule.Result = integer(raw.value(QStringLiteral("action"))) == 1 ? seb::settings::browser::filter::FilterResult::Allow : seb::settings::browser::filter::FilterResult::Block;
+        }
+        if (isBoolean(raw.value(QStringLiteral("regex")))) {
+            rule.Type = boolean(raw.value(QStringLiteral("regex"))) ? seb::settings::browser::filter::FilterRuleType::Regex : seb::settings::browser::filter::FilterRuleType::Simplified;
+        }
         if (rule.Active && !rule.Expression.isEmpty()) filter.Rules.push_back(rule);
     }
 }
@@ -57,36 +63,36 @@ void BrowserDataMapper::map(const QString &key, const QVariant &value, seb::sett
     else if (key == keys::Browser::AllowPrint) browser.AllowPrint = boolean(value, browser.AllowPrint);
     else if (key == keys::Browser::AllowSpellChecking) browser.AllowSpellChecking = boolean(value, browser.AllowSpellChecking);
     else if (key == keys::Browser::AllowUploads) browser.AllowUploads = boolean(value, browser.AllowUploads);
-    else if (key == keys::Browser::ExamKeySalt) browser.BrowserExamKeySalt = value.toByteArray();
+    else if (key == keys::Browser::ExamKeySalt && isByteArray(value)) browser.BrowserExamKeySalt = value.toByteArray();
     else if (key == keys::Browser::DeleteCacheOnShutdown) browser.DeleteCacheOnShutdown = boolean(value, browser.DeleteCacheOnShutdown);
     else if (key == keys::Browser::DeleteCookiesOnShutdown) browser.DeleteCookiesOnShutdown = boolean(value, browser.DeleteCookiesOnShutdown);
     else if (key == keys::Browser::DeleteCookiesOnStartup) browser.DeleteCookiesOnStartup = boolean(value, browser.DeleteCookiesOnStartup);
-    else if (key == keys::Browser::DownloadDirectory) browser.DownAndUploadDirectory = string(value);
+    else if (key == keys::Browser::DownloadDirectory) browser.DownAndUploadDirectory = string(value, browser.DownAndUploadDirectory);
     else if (key == keys::Browser::EnableBrowser) browser.EnableBrowser = boolean(value, browser.EnableBrowser);
     else if (key == keys::Browser::Filter::FilterRules) mapFilter(browser.Filter, value);
-    else if (key == keys::Browser::HomeButtonMessage) browser.HomeNavigationMessage = string(value);
+    else if (key == keys::Browser::HomeButtonMessage) browser.HomeNavigationMessage = string(value, browser.HomeNavigationMessage);
     else if (key == keys::Browser::HomeButtonRequiresPassword) browser.HomeNavigationRequiresPassword = boolean(value, browser.HomeNavigationRequiresPassword);
-    else if (key == keys::Browser::HomeButtonUrl) browser.HomeUrl = string(value);
-    else if (key == keys::Browser::QuitUrl) browser.QuitUrl = string(value);
+    else if (key == keys::Browser::HomeButtonUrl) browser.HomeUrl = string(value, browser.HomeUrl);
+    else if (key == keys::Browser::QuitUrl) browser.QuitUrl = string(value, browser.QuitUrl);
     else if (key == keys::Browser::QuitUrlConfirmation) browser.ConfirmQuitUrl = boolean(value, browser.ConfirmQuitUrl);
     else if (key == keys::Browser::ResetOnQuitUrl) browser.ResetOnQuitUrl = boolean(value, browser.ResetOnQuitUrl);
     else if (key == keys::Browser::SendCustomHeaders) { browser.SendBrowserExamKey = boolean(value, browser.SendBrowserExamKey); browser.SendConfigurationKey = browser.SendBrowserExamKey; }
     else if (key == keys::Browser::ShowFileSystemElementPath) browser.ShowFileSystemElementPath = boolean(value, browser.ShowFileSystemElementPath);
-    else if (key == keys::Browser::StartUrl) browser.StartUrl = string(value);
-    else if (key == keys::Browser::UseStartUrlQuery) { browser.UseQueryParameter = boolean(value, browser.UseQueryParameter); browser.StartUrlQuery = string(value); }
-    else if (key == keys::Browser::UserAgentSuffix) browser.UserAgentSuffix = string(value);
+    else if (key == keys::Browser::StartUrl) browser.StartUrl = string(value, browser.StartUrl);
+    else if (key == keys::Browser::UseStartUrlQuery) browser.UseQueryParameter = boolean(value, browser.UseQueryParameter);
+    else if (key == keys::Browser::UserAgentSuffix) browser.UserAgentSuffix = string(value, browser.UserAgentSuffix);
     else if (key == keys::Browser::HomeButtonUseStartUrl) browser.UseStartUrlAsHomeUrl = boolean(value, browser.UseStartUrlAsHomeUrl);
     else if (key == keys::Browser::UseTemporaryDownUploadDirectory) browser.UseTemporaryDownAndUploadDirectory = boolean(value, browser.UseTemporaryDownAndUploadDirectory);
     else if (key == keys::Browser::ShowReloadButton) { browser.MainWindow.ShowReloadButton = boolean(value, browser.MainWindow.ShowReloadButton); browser.AdditionalWindow.ShowReloadButton = browser.MainWindow.ShowReloadButton; }
     else if (key == keys::Browser::ShowToolbar) { browser.MainWindow.ShowToolbar = boolean(value, browser.MainWindow.ShowToolbar); browser.AdditionalWindow.ShowToolbar = browser.MainWindow.ShowToolbar; }
     else if (key == keys::Browser::Filter::EnableContentRequestFilter) browser.Filter.ProcessContentRequests = boolean(value, browser.Filter.ProcessContentRequests);
     else if (key == keys::Browser::Filter::EnableMainRequestFilter) browser.Filter.ProcessMainRequests = boolean(value, browser.Filter.ProcessMainRequests);
-    else if (key == keys::Browser::Proxy::Policy) browser.Proxy.Policy = integer(value) == 1 ? seb::settings::browser::proxy::ProxyPolicy::Custom : seb::settings::browser::proxy::ProxyPolicy::System;
-    else if (key == keys::Browser::Proxy::Settings) {
+    else if (key == keys::Browser::Proxy::Policy && isInteger(value)) browser.Proxy.Policy = integer(value) == 1 ? seb::settings::browser::proxy::ProxyPolicy::Custom : seb::settings::browser::proxy::ProxyPolicy::System;
+    else if (key == keys::Browser::Proxy::Settings && isMap(value)) {
         const QVariantMap proxy = value.toMap();
         browser.Proxy.AutoConfigure = boolean(proxy.value(keys::Browser::Proxy::AutoConfigure));
         browser.Proxy.AutoDetect = boolean(proxy.value(keys::Browser::Proxy::AutoDetect));
-        browser.Proxy.AutoConfigureUrl = string(proxy.value(keys::Browser::Proxy::AutoConfigureUrl));
+        browser.Proxy.AutoConfigureUrl = string(proxy.value(keys::Browser::Proxy::AutoConfigureUrl), browser.Proxy.AutoConfigureUrl);
         browser.Proxy.BypassList = strings(proxy.value(keys::Browser::Proxy::BypassList));
         const auto appendProxy = [&](const QString &enable, const QString &host, const QString &port, const QString &password, const QString &requiresAuth, const QString &username, seb::settings::browser::proxy::ProxyProtocol protocol) {
             if (!boolean(proxy.value(enable))) return;
@@ -108,7 +114,7 @@ void BrowserDataMapper::map(const QString &key, const QVariant &value, seb::sett
 void BrowserDataMapper::mapGlobal(const QVariantMap &data, seb::settings::AppSettings &settings) const
 {
     using namespace helpers;
-    if (data.contains(keys::Browser::PopupPolicy)) {
+    if (data.contains(keys::Browser::PopupPolicy) && isInteger(data.value(keys::Browser::PopupPolicy))) {
         const int policy = integer(data.value(keys::Browser::PopupPolicy), 0);
         const bool foreign = boolean(data.value(keys::Browser::PopupBlockForeignHost));
         switch (policy) {
@@ -126,10 +132,14 @@ void BrowserDataMapper::mapGlobal(const QVariantMap &data, seb::settings::AppSet
     const bool desktop = integer(data.value(keys::Browser::UserAgentModeDesktop), 0) != 0;
     if (mobile && settings.UserInterface.Mode == seb::settings::userinterface::UserInterfaceMode::Mobile) {
         settings.Browser.UseCustomUserAgent = true;
-        settings.Browser.CustomUserAgent = data.value(keys::Browser::CustomUserAgentMobile).toString();
+        if (isString(data.value(keys::Browser::CustomUserAgentMobile))) {
+            settings.Browser.CustomUserAgent = data.value(keys::Browser::CustomUserAgentMobile).toString();
+        }
     } else if (desktop) {
         settings.Browser.UseCustomUserAgent = true;
-        settings.Browser.CustomUserAgent = data.value(keys::Browser::CustomUserAgentDesktop).toString();
+        if (isString(data.value(keys::Browser::CustomUserAgentDesktop))) {
+            settings.Browser.CustomUserAgent = data.value(keys::Browser::CustomUserAgentDesktop).toString();
+        }
     }
 }
 

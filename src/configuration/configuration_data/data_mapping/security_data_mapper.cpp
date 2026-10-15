@@ -9,23 +9,25 @@ void SecurityDataMapper::map(const QString &key, const QVariant &value, seb::set
 {
     using namespace helpers;
     auto &security = settings.Security;
-    if (key == keys::Security::AdminPasswordHash) security.AdminPasswordHash = string(value);
+    if (key == keys::Security::AdminPasswordHash) security.AdminPasswordHash = string(value, security.AdminPasswordHash);
     else if (key == keys::Security::AllowApplicationLog) security.AllowApplicationLogAccess = boolean(value, security.AllowApplicationLogAccess);
     else if (key == keys::Security::AllowReconfiguration) security.AllowReconfiguration = boolean(value, security.AllowReconfiguration);
     else if (key == keys::Security::AllowStickyKeys) security.AllowStickyKeys = boolean(value, security.AllowStickyKeys);
     else if (key == keys::Security::AllowTermination) security.AllowTermination = boolean(value, security.AllowTermination);
-    else if (key == keys::Security::AllowVirtualMachine) security.VirtualMachinePolicy = boolean(value) ? seb::settings::security::VirtualMachinePolicy::Allow : seb::settings::security::VirtualMachinePolicy::Deny;
+    else if (key == keys::Security::AllowVirtualMachine && isBoolean(value)) security.VirtualMachinePolicy = boolean(value) ? seb::settings::security::VirtualMachinePolicy::Allow : seb::settings::security::VirtualMachinePolicy::Deny;
     else if (key == keys::Security::AllowWindowCapture) security.AllowWindowCapture = boolean(value, security.AllowWindowCapture);
-    else if (key == keys::Security::ClipboardPolicy) {
+    else if (key == keys::Security::ClipboardPolicy && isInteger(value)) {
         const int policy = integer(value);
         security.ClipboardPolicy = policy == 0 ? seb::settings::security::ClipboardPolicy::Allow : policy == 1 ? seb::settings::security::ClipboardPolicy::Block : seb::settings::security::ClipboardPolicy::Isolated;
     } else if (key == keys::Security::DisableSessionChangeLockScreen) security.DisableSessionChangeLockScreen = boolean(value, security.DisableSessionChangeLockScreen);
-    else if (key == keys::Security::QuitPasswordHash) security.QuitPasswordHash = string(value);
-    else if (key == keys::Security::ReconfigurationUrl) security.ReconfigurationUrl = string(value);
+    else if (key == keys::Security::QuitPasswordHash) security.QuitPasswordHash = string(value, security.QuitPasswordHash);
+    else if (key == keys::Security::ReconfigurationUrl) security.ReconfigurationUrl = string(value, security.ReconfigurationUrl);
     else if (key == keys::Security::VerifyCursorConfiguration) security.VerifyCursorConfiguration = boolean(value, security.VerifyCursorConfiguration);
     else if (key == keys::Security::VerifySessionIntegrity) security.VerifySessionIntegrity = boolean(value, security.VerifySessionIntegrity);
     else if (key == keys::Security::VersionRestrictions) {
+        if (!isList(value)) return;
         for (const QVariant &entry : value.toList()) {
+            if (!isString(entry)) continue;
             seb::settings::security::VersionRestriction item;
             const QString restriction = string(entry);
             const QStringList parts = restriction.split(QLatin1Char('.'));
@@ -45,8 +47,10 @@ void SecurityDataMapper::map(const QString &key, const QVariant &value, seb::set
 void SecurityDataMapper::mapGlobal(const QVariantMap &data, seb::settings::AppSettings &settings) const
 {
     using namespace helpers;
-    const bool hasNewDesktop = data.contains(keys::Security::KioskModeCreateNewDesktop);
-    const bool hasKillShell = data.contains(keys::Security::KioskModeDisableExplorerShell);
+    const bool hasNewDesktop = data.contains(keys::Security::KioskModeCreateNewDesktop) &&
+                               isBoolean(data.value(keys::Security::KioskModeCreateNewDesktop));
+    const bool hasKillShell = data.contains(keys::Security::KioskModeDisableExplorerShell) &&
+                              isBoolean(data.value(keys::Security::KioskModeDisableExplorerShell));
     if (hasNewDesktop || hasKillShell) {
         const bool newDesktop = boolean(data.value(keys::Security::KioskModeCreateNewDesktop));
         const bool killShell = boolean(data.value(keys::Security::KioskModeDisableExplorerShell));
@@ -54,7 +58,7 @@ void SecurityDataMapper::mapGlobal(const QVariantMap &data, seb::settings::AppSe
         else if (newDesktop) settings.Security.KioskMode = seb::settings::security::KioskMode::CreateNewDesktop;
         else if (hasNewDesktop && hasKillShell) settings.Security.KioskMode = seb::settings::security::KioskMode::None;
     }
-    if (data.contains(keys::Security::AllowApplicationLog)) {
+    if (data.contains(keys::Security::AllowApplicationLog) && helpers::isBoolean(data.value(keys::Security::AllowApplicationLog))) {
         settings.Security.AllowApplicationLogAccess = helpers::boolean(data.value(keys::Security::AllowApplicationLog));
     }
     settings.UserInterface.ActionCenter.ShowApplicationLog = settings.Security.AllowApplicationLogAccess;
