@@ -16,6 +16,16 @@ bool isOriginatorVersion(const QString &key)
     return key.compare(QStringLiteral("originatorVersion"), Qt::CaseInsensitive) == 0;
 }
 
+bool sebKeyLessThan(const QString &left, const QString &right)
+{
+    const int foldedComparison = QString::compare(
+        left.toCaseFolded(), right.toCaseFolded(), Qt::CaseSensitive);
+    if (foldedComparison != 0) {
+        return foldedComparison < 0;
+    }
+    return QString::compare(left, right, Qt::CaseSensitive) < 0;
+}
+
 void appendValue(QByteArray &output, const QVariant &value);
 
 bool hasSerializableEntries(const QVariantMap &map)
@@ -80,9 +90,7 @@ void appendMap(QByteArray &output, const QVariantMap &map)
             !hasSerializableEntries(it.value().toMap())) continue;
         keys.push_back(it.key());
     }
-    std::sort(keys.begin(), keys.end(), [](const QString &left, const QString &right) {
-        return QString::compare(left, right, Qt::CaseSensitive) < 0;
-    });
+    std::sort(keys.begin(), keys.end(), sebKeyLessThan);
 
     output.append('{');
     for (qsizetype index = 0; index < keys.size(); ++index) {
