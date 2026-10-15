@@ -14,16 +14,12 @@ void mapWindow(seb::settings::browser::WindowSettings &window, const QString &ke
     if (key == prefix + QStringLiteral("AllowAddressBar")) window.AllowAddressBar = boolean(value, window.AllowAddressBar);
     else if (key == prefix + QStringLiteral("AllowNavigation") || (!additional && key == keys::Browser::MainWindow::AllowNavigation) || (additional && key == keys::Browser::AdditionalWindow::AllowNavigation)) { window.AllowBackwardNavigation = boolean(value, window.AllowBackwardNavigation); window.AllowForwardNavigation = window.AllowBackwardNavigation; }
     else if (key == prefix + QStringLiteral("AllowReload")) window.AllowReloading = boolean(value, window.AllowReloading);
-    else if (key == prefix + QStringLiteral("AllowMinimize")) window.AllowMinimize = boolean(value, window.AllowMinimize);
     else if (key == prefix + QStringLiteral("AllowDeveloperConsole")) window.AllowDeveloperConsole = boolean(value, window.AllowDeveloperConsole);
-    else if (key == prefix + QStringLiteral("AlwaysOnTop")) window.AlwaysOnTop = boolean(value, window.AlwaysOnTop);
     else if (key == prefix + QStringLiteral("Fullscreen") || (!additional && key == keys::Browser::MainWindow::WindowMode)) window.FullScreenMode = integer(value) == 1;
     else if (key == prefix + QStringLiteral("ShowHomeButton")) window.ShowHomeButton = boolean(value, window.ShowHomeButton);
-    else if (key == prefix + QStringLiteral("ShowMenuBar")) window.ShowMenuBar = boolean(value, window.ShowMenuBar);
     else if (key == prefix + QStringLiteral("ShowReloadButton")) window.ShowReloadButton = boolean(value, window.ShowReloadButton);
     else if (key == prefix + QStringLiteral("ShowReloadWarning")) window.ShowReloadWarning = boolean(value, window.ShowReloadWarning);
     else if (key == prefix + QStringLiteral("ShowToolbar")) window.ShowToolbar = boolean(value, window.ShowToolbar);
-    else if (key == prefix + QStringLiteral("ShowTitleBar")) window.ShowTitleBar = boolean(value, window.ShowTitleBar);
     else if (key == prefix + QStringLiteral("Height") || (!additional && key == keys::Browser::MainWindow::WindowHeight) || (additional && key == keys::Browser::AdditionalWindow::WindowHeight)) dimension(value, window.AbsoluteHeight, window.RelativeHeight);
     else if (key == prefix + QStringLiteral("Width") || (!additional && key == keys::Browser::MainWindow::WindowWidth) || (additional && key == keys::Browser::AdditionalWindow::WindowWidth)) dimension(value, window.AbsoluteWidth, window.RelativeWidth);
     else if (key == (!additional ? keys::Browser::MainWindow::WindowPosition : keys::Browser::AdditionalWindow::WindowPosition)) window.Position = static_cast<seb::settings::browser::WindowPosition>(integer(value, static_cast<int>(window.Position)));
