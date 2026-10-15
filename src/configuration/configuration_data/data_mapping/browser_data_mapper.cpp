@@ -10,18 +10,13 @@ using namespace helpers;
 
 void mapWindow(seb::settings::browser::WindowSettings &window, const QString &key, const QVariant &value, bool additional)
 {
-    const QString prefix = additional ? QStringLiteral("newBrowserWindow") : QStringLiteral("browserWindow");
-    if (key == prefix + QStringLiteral("AllowAddressBar")) window.AllowAddressBar = boolean(value, window.AllowAddressBar);
-    else if (key == prefix + QStringLiteral("AllowNavigation") || (!additional && key == keys::Browser::MainWindow::AllowNavigation) || (additional && key == keys::Browser::AdditionalWindow::AllowNavigation)) { window.AllowBackwardNavigation = boolean(value, window.AllowBackwardNavigation); window.AllowForwardNavigation = window.AllowBackwardNavigation; }
-    else if (key == prefix + QStringLiteral("AllowReload")) window.AllowReloading = boolean(value, window.AllowReloading);
-    else if (key == prefix + QStringLiteral("AllowDeveloperConsole")) window.AllowDeveloperConsole = boolean(value, window.AllowDeveloperConsole);
-    else if (key == prefix + QStringLiteral("Fullscreen") || (!additional && key == keys::Browser::MainWindow::WindowMode)) window.FullScreenMode = integer(value) == 1;
-    else if (key == prefix + QStringLiteral("ShowHomeButton")) window.ShowHomeButton = boolean(value, window.ShowHomeButton);
-    else if (key == prefix + QStringLiteral("ShowReloadButton")) window.ShowReloadButton = boolean(value, window.ShowReloadButton);
-    else if (key == prefix + QStringLiteral("ShowReloadWarning")) window.ShowReloadWarning = boolean(value, window.ShowReloadWarning);
-    else if (key == prefix + QStringLiteral("ShowToolbar")) window.ShowToolbar = boolean(value, window.ShowToolbar);
-    else if (key == prefix + QStringLiteral("Height") || (!additional && key == keys::Browser::MainWindow::WindowHeight) || (additional && key == keys::Browser::AdditionalWindow::WindowHeight)) dimension(value, window.AbsoluteHeight, window.RelativeHeight);
-    else if (key == prefix + QStringLiteral("Width") || (!additional && key == keys::Browser::MainWindow::WindowWidth) || (additional && key == keys::Browser::AdditionalWindow::WindowWidth)) dimension(value, window.AbsoluteWidth, window.RelativeWidth);
+    if (key == (!additional ? keys::Browser::MainWindow::AllowAddressBar : keys::Browser::AdditionalWindow::AllowAddressBar)) window.AllowAddressBar = boolean(value, window.AllowAddressBar);
+    else if (key == (!additional ? keys::Browser::MainWindow::AllowNavigation : keys::Browser::AdditionalWindow::AllowNavigation)) { window.AllowBackwardNavigation = boolean(value, window.AllowBackwardNavigation); window.AllowForwardNavigation = window.AllowBackwardNavigation; }
+    else if (key == (!additional ? keys::Browser::MainWindow::AllowReload : keys::Browser::AdditionalWindow::AllowReload)) window.AllowReloading = boolean(value, window.AllowReloading);
+    else if (!additional && key == keys::Browser::MainWindow::WindowMode) window.FullScreenMode = integer(value) == 1;
+    else if (key == (!additional ? keys::Browser::MainWindow::ShowReloadWarning : keys::Browser::AdditionalWindow::ShowReloadWarning)) window.ShowReloadWarning = boolean(value, window.ShowReloadWarning);
+    else if (key == (!additional ? keys::Browser::MainWindow::WindowHeight : keys::Browser::AdditionalWindow::WindowHeight)) dimension(value, window.AbsoluteHeight, window.RelativeHeight);
+    else if (key == (!additional ? keys::Browser::MainWindow::WindowWidth : keys::Browser::AdditionalWindow::WindowWidth)) dimension(value, window.AbsoluteWidth, window.RelativeWidth);
     else if (key == (!additional ? keys::Browser::MainWindow::WindowPosition : keys::Browser::AdditionalWindow::WindowPosition)) window.Position = static_cast<seb::settings::browser::WindowPosition>(integer(value, static_cast<int>(window.Position)));
     else if (key == (!additional ? keys::Browser::MainWindow::UrlPolicy : keys::Browser::AdditionalWindow::UrlPolicy)) {
         switch (integer(value)) {
@@ -56,13 +51,13 @@ void BrowserDataMapper::map(const QString &key, const QVariant &value, seb::sett
     else if (key == keys::Browser::AllowDownloads) browser.AllowDownloads = boolean(value, browser.AllowDownloads);
     else if (key == keys::Browser::AllowFind) browser.AllowFind = boolean(value, browser.AllowFind);
     else if (key == keys::Browser::AllowPageZoom) browser.AllowPageZoom = boolean(value, browser.AllowPageZoom);
+    else if (key == keys::Browser::DownloadPdfFiles) browser.AllowPdfReader = !boolean(value, !browser.AllowPdfReader);
     else if (key == keys::Browser::AllowDeveloperConsole) { browser.MainWindow.AllowDeveloperConsole = boolean(value, browser.MainWindow.AllowDeveloperConsole); browser.AdditionalWindow.AllowDeveloperConsole = browser.MainWindow.AllowDeveloperConsole; }
     else if (key == keys::Browser::AllowPdfReaderToolbar) browser.AllowPdfReaderToolbar = boolean(value, browser.AllowPdfReaderToolbar);
     else if (key == keys::Browser::AllowPrint) browser.AllowPrint = boolean(value, browser.AllowPrint);
     else if (key == keys::Browser::AllowSpellChecking) browser.AllowSpellChecking = boolean(value, browser.AllowSpellChecking);
     else if (key == keys::Browser::AllowUploads) browser.AllowUploads = boolean(value, browser.AllowUploads);
     else if (key == keys::Browser::ExamKeySalt) browser.BrowserExamKeySalt = value.toByteArray();
-    else if (key == keys::Browser::CustomUserAgentDesktop) browser.CustomUserAgent = string(value);
     else if (key == keys::Browser::DeleteCacheOnShutdown) browser.DeleteCacheOnShutdown = boolean(value, browser.DeleteCacheOnShutdown);
     else if (key == keys::Browser::DeleteCookiesOnShutdown) browser.DeleteCookiesOnShutdown = boolean(value, browser.DeleteCookiesOnShutdown);
     else if (key == keys::Browser::DeleteCookiesOnStartup) browser.DeleteCookiesOnStartup = boolean(value, browser.DeleteCookiesOnStartup);
@@ -80,7 +75,6 @@ void BrowserDataMapper::map(const QString &key, const QVariant &value, seb::sett
     else if (key == keys::Browser::StartUrl) browser.StartUrl = string(value);
     else if (key == keys::Browser::UseStartUrlQuery) { browser.UseQueryParameter = boolean(value, browser.UseQueryParameter); browser.StartUrlQuery = string(value); }
     else if (key == keys::Browser::UserAgentSuffix) browser.UserAgentSuffix = string(value);
-    else if (key == keys::Browser::UserAgentModeDesktop) browser.UserAgentMode = string(value);
     else if (key == keys::Browser::HomeButtonUseStartUrl) browser.UseStartUrlAsHomeUrl = boolean(value, browser.UseStartUrlAsHomeUrl);
     else if (key == keys::Browser::UseTemporaryDownUploadDirectory) browser.UseTemporaryDownAndUploadDirectory = boolean(value, browser.UseTemporaryDownAndUploadDirectory);
     else if (key == keys::Browser::ShowReloadButton) { browser.MainWindow.ShowReloadButton = boolean(value, browser.MainWindow.ShowReloadButton); browser.AdditionalWindow.ShowReloadButton = browser.MainWindow.ShowReloadButton; }
