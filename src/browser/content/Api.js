@@ -9,36 +9,61 @@
 (function () {
     'use strict';
 
-    if (typeof QWebChannel !== 'function' || !window.qt || !qt.webChannelTransport) {
-        return;
-    }
+    var callbacks = Object.create(null);
+    var nextRequestId = 0;
 
-    new QWebChannel(qt.webChannelTransport, function (channel) {
-        var bridge = channel.objects.sebSecurityApi;
-        if (!bridge) {
+    var updateKeys = function (callback) {
+        var requestId = String(++nextRequestId);
+        if (typeof callback === 'function') {
+            callbacks[requestId] = callback;
+        }
+
+        document.dispatchEvent(new CustomEvent(
+            'seb-security-request',
+            { detail: requestId }
+        ));
+    };
+
+    document.addEventListener('seb-security-response', function (event) {
+        var response;
+        try {
+            response = JSON.parse(String(event.detail || '{}'));
+        } catch (error) {
             return;
         }
 
-        var updateKeys = function (callback) {
-            bridge.keysForUrl(window.location.href, function (keys) {
-                window.SafeExamBrowser.security.browserExamKey = keys.browserExamKey || '';
-                window.SafeExamBrowser.security.configKey = keys.configKey || '';
-                if (typeof callback === 'function') {
-                    callback();
-                }
-            });
-        };
+        if (!response || !response.id) {
+            return;
+        }
 
-        window.SafeExamBrowser = {
-            version: bridge.version,
-            security: {
-                browserExamKey: '',
-                configKey: '',
-                updateKeys: updateKeys
-            }
-        };
+        window.SafeExamBrowser.security.browserExamKey =
+            response.browserExamKey || '';
+        window.SafeExamBrowser.security.configKey =
+            response.configKey || '';
 
-        updateKeys();
-        window.addEventListener('popstate', updateKeys);
+        var callback = callbacks[response.id];
+        delete callbacks[response.id];
+        if (typeof callback === 'function') {
+            callback();
+        }
     });
+
+    window.SafeExamBrowser = {
+        version: window.__sebVersion || 'SEB_Linux',
+        security: {
+            browserExamKey: '',
+            configKey: '',
+            updateKeys: updateKeys
+        }
+    };
+
+    updateKeys();
+    document.addEventListener('seb-security-bridge-ready', updateKeys);
+    window.addEventListener('popstate', updateKeys);
+
+    try {
+        delete window.__sebVersion;
+    } catch (error) {
+        window.__sebVersion = undefined;
+    }
 }());

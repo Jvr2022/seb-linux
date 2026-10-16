@@ -5,7 +5,9 @@
 #include "configuration/contracts/app_config.h"
 #include "configuration/contracts/cryptography/i_key_generator.h"
 #include "settings/Browser/BrowserSettings.h"
+#include <QJsonArray>
 #include <QFile>
+#include <QJsonDocument>
 #include <QVariantMap>
 #include <QWebChannel>
 #include <QWebEnginePage>
@@ -20,27 +22,19 @@ namespace seb::browser {
 
 namespace {
 
-class SebSecurityApi final : public QObject
+class SebSecurityBridge final : public QObject
 {
     Q_OBJECT
-    Q_PROPERTY(QString version READ version CONSTANT)
 
 public:
-    SebSecurityApi(
+    SebSecurityBridge(
         seb::configuration::contracts::cryptography::IKeyGenerator *keyGenerator,
         const seb::settings::browser::BrowserSettings &settings,
-        const seb::configuration::contracts::AppConfig &appConfig,
         QObject *parent)
         : QObject(parent)
         , keyGenerator_(keyGenerator)
         , settings_(settings)
-        , appConfig_(appConfig)
     {
-    }
-
-    QString version() const
-    {
-        return QStringLiteral("SEB_Linux_") + appConfig_.programBuildVersion;
     }
 
     Q_INVOKABLE QVariantMap keysForUrl(const QString &url) const
@@ -67,8 +61,16 @@ public:
 private:
     seb::configuration::contracts::cryptography::IKeyGenerator *keyGenerator_ = nullptr;
     seb::settings::browser::BrowserSettings settings_;
-    seb::configuration::contracts::AppConfig appConfig_;
 };
+
+QString javaScriptString(const QString &value)
+{
+    QJsonArray array;
+    array.append(value);
+    const QByteArray encoded =
+        QJsonDocument(array).toJson(QJsonDocument::Compact);
+    return QString::fromUtf8(encoded.mid(1, encoded.size() - 2));
+}
 
 }  // namespace
 
@@ -219,13 +221,16 @@ void QtWebEngineWebView::initializeSebApi(
     auto *page = view_->page();
     webChannel_ = new QWebChannel(page);
     webChannel_->registerObject(
-        QStringLiteral("sebSecurityApi"),
-        new SebSecurityApi(keyGenerator, settings, appConfig, webChannel_));
-    page->setWebChannel(webChannel_, QWebEngineScript::MainWorld);
+        QStringLiteral("sebSecurityBridge"),
+        new SebSecurityBridge(keyGenerator, settings, webChannel_));
+    page->setWebChannel(webChannel_, QWebEngineScript::ApplicationWorld);
 
     QFile channelSource(QStringLiteral(":/browser/content/qwebchannel.js"));
+    QFile bridgeSource(QStringLiteral(":/browser/content/ApiBridge.js"));
     QFile apiSource(QStringLiteral(":/browser/content/Api.js"));
-    if (!channelSource.open(QIODevice::ReadOnly) || !apiSource.open(QIODevice::ReadOnly)) {
+    if (!channelSource.open(QIODevice::ReadOnly) ||
+        !bridgeSource.open(QIODevice::ReadOnly) ||
+        !apiSource.open(QIODevice::ReadOnly)) {
         qWarning() << "Unable to load the Qt WebChannel JavaScript bridge.";
         return;
     }
@@ -238,13 +243,27 @@ void QtWebEngineWebView::initializeSebApi(
         }
     };
     removeScript(QStringLiteral("seb-qwebchannel"));
+    removeScript(QStringLiteral("seb-security-bridge"));
     removeScript(QStringLiteral("seb-security-api"));
+
+    QWebEngineScript bridgeScript;
+    bridgeScript.setName(QStringLiteral("seb-security-bridge"));
+    bridgeScript.setSourceCode(
+        QString::fromUtf8(channelSource.readAll()) +
+        QLatin1Char('\n') +
+        QString::fromUtf8(bridgeSource.readAll()));
+    bridgeScript.setInjectionPoint(QWebEngineScript::DocumentCreation);
+    bridgeScript.setWorldId(QWebEngineScript::ApplicationWorld);
+    bridgeScript.setRunsOnSubFrames(true);
+    scripts.insert(bridgeScript);
 
     QWebEngineScript apiScript;
     apiScript.setName(QStringLiteral("seb-security-api"));
+    const QString version =
+        QStringLiteral("SEB_Linux_") + appConfig.programBuildVersion;
     apiScript.setSourceCode(
-        QString::fromUtf8(channelSource.readAll()) +
-        QLatin1Char('\n') +
+        QStringLiteral("window.__sebVersion = %1;\n")
+            .arg(javaScriptString(version)) +
         QString::fromUtf8(apiSource.readAll()));
     apiScript.setInjectionPoint(QWebEngineScript::DocumentCreation);
     apiScript.setWorldId(QWebEngineScript::MainWorld);
