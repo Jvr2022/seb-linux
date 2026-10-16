@@ -7,9 +7,11 @@
 
 namespace seb::browser {
 
-std::unique_ptr<contracts::IWebProfile> QtWebEngineProvider::createProfile(QObject *parent)
+std::unique_ptr<contracts::IWebProfile> QtWebEngineProvider::createProfile(
+    QObject *parent,
+    const QString &storageName)
 {
-    return std::make_unique<QtWebEngineProfile>(parent);
+    return std::make_unique<QtWebEngineProfile>(storageName, parent);
 }
 
 std::unique_ptr<contracts::IWebView> QtWebEngineProvider::createWebView(contracts::IWebProfile *profile, QWidget *parent)

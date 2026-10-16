@@ -42,7 +42,9 @@ public:
     explicit SebSession(
         const seb::configuration::contracts::SessionConfiguration &configuration,
         ResourceOpener opener,
-        QObject *parent = nullptr);
+        QObject *parent = nullptr,
+        seb::browser::contracts::IEngineProvider *sharedEngineProvider = nullptr,
+        seb::browser::contracts::IWebProfile *sharedProfile = nullptr);
     ~SebSession() override;
 
     BrowserWindow *createWindow(const QUrl &url, bool isMainWindow);
@@ -82,8 +84,10 @@ private:
     seb::configuration::contracts::SessionConfiguration configuration_;
     QScopedPointer<seb::browser::RequestInterceptor> interceptor_;
     std::unique_ptr<seb::browser::contracts::IEngineProvider> engineProvider_;
-    std::unique_ptr<seb::browser::contracts::IWebProfile> profile_;
     std::unique_ptr<QTemporaryDir> profileDirectory_;
+    std::unique_ptr<seb::browser::contracts::IWebProfile> profile_;
+    seb::browser::contracts::IEngineProvider *engineProviderPtr_ = nullptr;
+    seb::browser::contracts::IWebProfile *profilePtr_ = nullptr;
     std::unique_ptr<QTemporaryDir> downloadDirectory_;
     std::unique_ptr<QTemporaryDir> configurationDownloadDirectory_;
     std::unique_ptr<seb::applications::ApplicationManager> applicationManager_;

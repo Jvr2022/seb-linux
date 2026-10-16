@@ -81,7 +81,9 @@ QString getCachedSebVersion()
 SebSession::SebSession(
     const seb::configuration::contracts::SessionConfiguration &configuration,
     ResourceOpener opener,
-    QObject *parent)
+    QObject *parent,
+    seb::browser::contracts::IEngineProvider *sharedEngineProvider,
+    seb::browser::contracts::IWebProfile *sharedProfile)
     : QObject(parent)
     , configuration_(configuration)
     , opener_(std::move(opener))
@@ -92,8 +94,40 @@ SebSession::SebSession(
         settings.Browser.DeleteCookiesOnShutdown ||
         settings.Browser.DeleteCookiesOnStartup;
 
-    engineProvider_ = seb::browser::createEngineProvider();
-    if (!engineProvider_) {
+    if (sharedEngineProvider && sharedProfile) {
+        engineProviderPtr_ = sharedEngineProvider;
+        profilePtr_ = sharedProfile;
+    } else {
+        engineProvider_ = seb::browser::createEngineProvider();
+        if (!engineProvider_) {
+            QMessageBox msgBox;
+            msgBox.setIcon(QMessageBox::Critical);
+            msgBox.setWindowTitle(tr("Unsupported Device"));
+            msgBox.setText(tr("Safe Exam Browser is not supported on your device."));
+            msgBox.setInformativeText(tr("If you want support please open a GitHub issue with details about your system configuration."));
+            QPushButton *issueButton = msgBox.addButton(tr("Open GitHub Issue"), QMessageBox::ActionRole);
+            msgBox.addButton(QMessageBox::Close);
+            msgBox.exec();
+
+            if (msgBox.clickedButton() == issueButton) {
+                QDesktopServices::openUrl(QUrl(QStringLiteral("https://github.com/Jvr2022/seb-linux/issues")));
+            }
+            std::exit(1);
+        }
+
+        if (useTemporaryProfile) {
+            profileDirectory_ = std::make_unique<QTemporaryDir>(
+                QDir::tempPath() + QStringLiteral("/seb-linux-profile-XXXXXX"));
+        }
+
+        const QString storageName = QStringLiteral("seb-session-") +
+            QUuid::createUuid().toString(QUuid::WithoutBraces);
+        profile_ = engineProvider_->createProfile(this, storageName);
+        engineProviderPtr_ = engineProvider_.get();
+        profilePtr_ = profile_.get();
+    }
+
+    if (!profilePtr_) {
         QMessageBox msgBox;
         msgBox.setIcon(QMessageBox::Critical);
         msgBox.setWindowTitle(tr("Unsupported Device"));
@@ -108,9 +142,8 @@ SebSession::SebSession(
         }
         std::exit(1);
     }
-    profile_ = engineProvider_->createProfile(this);
 
-    connect(profile_.get(), &seb::browser::contracts::IWebProfile::downloadFinished,
+    connect(profilePtr_, &seb::browser::contracts::IWebProfile::downloadFinished,
             this, [this](const QString &path) {
                 if (!configuration_.isBrowserResource || path.isEmpty() ||
                     !path.endsWith(QStringLiteral(".seb"), Qt::CaseInsensitive)) {
@@ -121,41 +154,39 @@ SebSession::SebSession(
             });
 
     if (configuration_.reuseBrowserProfile && !configuration_.browserProfilePath.isEmpty()) {
-        profile_->setPersistentStoragePath(configuration_.browserProfilePath);
-        profile_->setCachePath(configuration_.browserProfilePath + QStringLiteral("/cache"));
-    } else if (useTemporaryProfile) {
-        profileDirectory_ = std::make_unique<QTemporaryDir>(
-            QDir::tempPath() + QStringLiteral("/seb-linux-profile-XXXXXX"));
-        profile_->setPersistentStoragePath(profileDirectory_->path());
-        profile_->setCachePath(profileDirectory_->path() + QStringLiteral("/cache"));
+        profilePtr_->setPersistentStoragePath(configuration_.browserProfilePath);
+        profilePtr_->setCachePath(configuration_.browserProfilePath + QStringLiteral("/cache"));
+    } else if (useTemporaryProfile && profileDirectory_) {
+        profilePtr_->setPersistentStoragePath(profileDirectory_->path());
+        profilePtr_->setCachePath(profileDirectory_->path() + QStringLiteral("/cache"));
     } else {
         const QString baseDir = QStandardPaths::writableLocation(QStandardPaths::AppDataLocation);
-        profile_->setPersistentStoragePath(baseDir + QStringLiteral("/profile"));
-        profile_->setCachePath(baseDir + QStringLiteral("/cache"));
+        profilePtr_->setPersistentStoragePath(baseDir + QStringLiteral("/profile"));
+        profilePtr_->setCachePath(baseDir + QStringLiteral("/cache"));
     }
 
     if (settings.Browser.UseTemporaryDownAndUploadDirectory) {
         downloadDirectory_ = std::make_unique<QTemporaryDir>(
             QDir::tempPath() + QStringLiteral("/seb-linux-downloads-XXXXXX"));
-        profile_->setDownloadPath(downloadDirectory_->path());
+        profilePtr_->setDownloadPath(downloadDirectory_->path());
     } else {
-        profile_->setDownloadPath(defaultDownloadDirectory());
+        profilePtr_->setDownloadPath(defaultDownloadDirectory());
     }
 
-    profile_->setPdfViewerEnabled(settings.Browser.AllowPdfReader);
-    profile_->setSpellCheckEnabled(settings.Browser.AllowSpellChecking);
-    profile_->setSpellCheckLanguages(QStringList{QLocale::system().bcp47Name()});
-    profile_->setHttpUserAgent(buildUserAgent());
-    profile_->setDevBypass(false);
+    profilePtr_->setPdfViewerEnabled(settings.Browser.AllowPdfReader);
+    profilePtr_->setSpellCheckEnabled(settings.Browser.AllowSpellChecking);
+    profilePtr_->setSpellCheckLanguages(QStringList{QLocale::system().bcp47Name()});
+    profilePtr_->setHttpUserAgent(buildUserAgent());
+    profilePtr_->setDevBypass(false);
 
     interceptor_.reset(new seb::browser::RequestInterceptor(settings.Browser));
-    profile_->setUrlRequestInterceptor(interceptor_.data());
+    profilePtr_->setUrlRequestInterceptor(interceptor_.data());
 
-    connect(profile_.get(), &seb::browser::contracts::IWebProfile::downloadRequested,
+    connect(profilePtr_, &seb::browser::contracts::IWebProfile::downloadRequested,
             this, &SebSession::handleDownloadRequested);
 
     if (settings.Browser.DeleteCookiesOnStartup) {
-        profile_->deleteAllCookies();
+        profilePtr_->deleteAllCookies();
     }
 
     applicationManager_ = std::make_unique<seb::applications::ApplicationManager>(settings.Applications, this);
@@ -307,12 +338,12 @@ const seb::settings::AppSettings &SebSession::settings() const
 
 seb::browser::contracts::IWebProfile *SebSession::profile() const
 {
-    return profile_.get();
+    return profilePtr_;
 }
 
 seb::browser::contracts::IEngineProvider *SebSession::engineProvider() const
 {
-    return engineProvider_.get();
+    return engineProviderPtr_;
 }
 
 QUrl SebSession::homeUrl() const

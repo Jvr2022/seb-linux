@@ -68,10 +68,14 @@ private:
 
 }  // namespace
 
-QtWebEngineProfile::QtWebEngineProfile(QObject *parent)
+QtWebEngineProfile::QtWebEngineProfile(
+    const QString &storageName,
+    QObject *parent)
     : IWebProfile(parent)
 {
-    profile_ = new QWebEngineProfile(this);
+    profile_ = storageName.isEmpty()
+        ? new QWebEngineProfile(this)
+        : new QWebEngineProfile(storageName, this);
 
     // Forward native download requests to the abstraction
     connect(profile_, &QWebEngineProfile::downloadRequested, this, [this](auto *download) {

@@ -13,7 +13,9 @@ class QtWebEngineProfile : public contracts::IWebProfile
     Q_OBJECT
 
 public:
-    explicit QtWebEngineProfile(QObject *parent = nullptr);
+    explicit QtWebEngineProfile(
+        const QString &storageName = QString(),
+        QObject *parent = nullptr);
     ~QtWebEngineProfile() override = default;
 
     QWebEngineProfile *nativeProfile() const { return profile_; }

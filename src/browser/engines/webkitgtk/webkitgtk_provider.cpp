@@ -11,8 +11,11 @@
 
 namespace seb::browser {
 
-std::unique_ptr<contracts::IWebProfile> WebKitGtkProvider::createProfile(QObject *parent)
+std::unique_ptr<contracts::IWebProfile> WebKitGtkProvider::createProfile(
+    QObject *parent,
+    const QString &storageName)
 {
+    Q_UNUSED(storageName);
     return std::make_unique<WebKitGtkProfile>(parent);
 }
 

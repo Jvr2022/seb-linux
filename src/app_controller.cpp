@@ -1,7 +1,10 @@
 #include "app_controller.h"
 
 #include "browser_window.h"
+#include "browser/engines/engine_factory.h"
 #include "browser/webengine_environment.h"
+#include "browser/contracts/i_engine_provider.h"
+#include "browser/contracts/i_webprofile.h"
 #include "configuration/cryptography/hash_algorithm.h"
 #include "seb_session.h"
 #include "ui/runtime_window.h"
@@ -187,6 +190,27 @@ bool AppController::ensureBrowserProfile()
     return browserProfileDirectory_ && browserProfileDirectory_->isValid();
 }
 
+bool AppController::ensureBrowserProfileContext()
+{
+    if (browserEngineProvider_ && browserProfile_) {
+        return true;
+    }
+
+    if (!ensureBrowserProfile()) {
+        return false;
+    }
+
+    browserEngineProvider_ = seb::browser::createEngineProvider();
+    if (!browserEngineProvider_) {
+        return false;
+    }
+
+    const QString storageName = QStringLiteral("seb-browser-resource-") +
+        QUuid::createUuid().toString(QUuid::WithoutBraces);
+    browserProfile_ = browserEngineProvider_->createProfile(this, storageName);
+    return browserProfile_ != nullptr;
+}
+
 bool AppController::launch(const QString &resource, QString *error)
 {
     const bool isReconfiguration = session_ != nullptr;
@@ -255,7 +279,7 @@ bool AppController::launch(const QString &resource, QString *error)
             settings,
             passwordUsed,
             currentAdminPasswordHash,
-            false,
+            !hasRequestedResource,
             status,
             passwordAborted);
 
@@ -272,11 +296,19 @@ bool AppController::launch(const QString &resource, QString *error)
             sessionConfiguration_.isBrowserResource = true;
             if (sessionConfiguration_.browserProfilePath.isEmpty()) {
                 if (!previousBrowserResource) {
+                    browserProfile_.reset();
+                    browserEngineProvider_.reset();
                     browserProfileDirectory_.reset();
                 }
                 if (!ensureBrowserProfile()) {
                     if (error) {
                         *error = QStringLiteral("Could not create temporary browser profile storage.");
+                    }
+                    return false;
+                }
+                if (!ensureBrowserProfileContext()) {
+                    if (error) {
+                        *error = QStringLiteral("Could not create a persistent browser profile.");
                     }
                     return false;
                 }
@@ -436,7 +468,9 @@ bool AppController::applySettings(
             QMessageBox::critical(parent, QStringLiteral("Failed to Open SEB Resource"), error);
             return false;
         },
-        this);
+        this,
+        configuration.reuseBrowserProfile ? browserEngineProvider_.get() : nullptr,
+        configuration.reuseBrowserProfile ? browserProfile_.get() : nullptr);
 
     BrowserWindow *nextWindow = nextSession->createWindow(nextSession->initialUrl(), true);
     runtimeWindow_->setStatusText(QStringLiteral("Opening secure browser window"));

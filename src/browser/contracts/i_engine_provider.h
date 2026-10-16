@@ -21,7 +21,9 @@ class IEngineProvider
 public:
     virtual ~IEngineProvider() = default;
 
-    virtual std::unique_ptr<IWebProfile> createProfile(QObject *parent) = 0;
+    virtual std::unique_ptr<IWebProfile> createProfile(
+        QObject *parent,
+        const QString &storageName = QString()) = 0;
     virtual std::unique_ptr<IWebView> createWebView(IWebProfile *profile, QWidget *parent) = 0;
 };
 
