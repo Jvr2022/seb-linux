@@ -81,6 +81,7 @@ QtWebEngineProfile::QtWebEngineProfile(
     // Forward native download requests to the abstraction
     connect(profile_, &QWebEngineProfile::downloadRequested, this, [this](auto *download) {
         contracts::DownloadRequest request;
+        request.id = QUuid::createUuid();
         request.url = download->url();
         request.suggestedFileName = download->downloadFileName();
         request.mimeType = download->mimeType();
@@ -95,16 +96,27 @@ QtWebEngineProfile::QtWebEngineProfile(
             if (!request.targetFileName.isEmpty()) {
                 download->setDownloadFileName(request.targetFileName);
             }
-            connect(download, &QWebEngineDownloadRequest::isFinishedChanged, this, [this, download]() {
+            const QUuid requestId = request.id;
+            const QUrl requestUrl = request.url;
+            auto emitted = std::make_shared<bool>(false);
+            connect(download, &QWebEngineDownloadRequest::isFinishedChanged, this, [this, download, requestId, requestUrl, emitted]() {
+                if (*emitted) {
+                    return;
+                }
                 if (download->state() == QWebEngineDownloadRequest::DownloadInProgress) {
                     return;
                 }
+                *emitted = true;
+                contracts::DownloadResult result;
+                result.id = requestId;
+                result.url = requestUrl;
                 if (download->state() == QWebEngineDownloadRequest::DownloadCompleted) {
-                    emit this->downloadFinished(
-                        QDir(download->downloadDirectory()).filePath(download->downloadFileName()));
+                    result.localPath = QDir(download->downloadDirectory()).filePath(download->downloadFileName());
+                    result.success = true;
                 } else {
-                    emit this->downloadFinished(QString());
+                    result.success = false;
                 }
+                emit this->downloadFinished(result);
             });
             download->accept();
         }

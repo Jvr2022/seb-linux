@@ -107,30 +107,30 @@ SebSession::SebSession(
     }
 
     connect(profilePtr_, &seb::browser::contracts::IWebProfile::downloadFinished,
-            this, [this](const QString &path) {
-                if (!reconfigurationDownloadInProgress_) {
+            this, [this](const seb::browser::contracts::DownloadResult &result) {
+                if (!reconfigurationDownloadId_ ||
+                    result.id != *reconfigurationDownloadId_) {
                     return;
                 }
-                if (path.isEmpty()) {
-                    reconfigurationDownloadInProgress_ = false;
+                reconfigurationDownloadId_.reset();
+                if (!result.success || result.localPath.isEmpty()) {
                     return;
                 }
 
                 const QString directory = configurationDownloadDirectory_
                     ? configurationDownloadDirectory_->path()
                     : QString();
-                const QString cleanPath = QDir::cleanPath(path);
+                const QString cleanPath = QDir::cleanPath(result.localPath);
                 const QString cleanDirectory = QDir::cleanPath(directory);
                 const bool insideDirectory =
                     !cleanDirectory.isEmpty() &&
                     (cleanPath == cleanDirectory ||
                      cleanPath.startsWith(cleanDirectory + QDir::separator()));
-                reconfigurationDownloadInProgress_ = false;
                 if (!insideDirectory ||
-                    !path.endsWith(QStringLiteral(".seb"), Qt::CaseInsensitive)) {
+                    !result.localPath.endsWith(QStringLiteral(".seb"), Qt::CaseInsensitive)) {
                     return;
                 }
-                openSebResource(QUrl::fromLocalFile(path), QApplication::activeWindow());
+                openSebResource(QUrl::fromLocalFile(result.localPath), QApplication::activeWindow());
             });
 
     if (configuration_.reuseBrowserProfile && !configuration_.browserProfilePath.isEmpty()) {
@@ -406,7 +406,19 @@ QString SebSession::downAndUploadDirectory() const
 
 bool SebSession::isReconfigurationInProgress() const
 {
-    return reconfigurationDownloadInProgress_;
+    return reconfigurationDownloadId_.has_value();
+}
+
+bool SebSession::isMainNavigationAllowed(const QUrl &url) const
+{
+    if (!interceptor_) {
+        return true;
+    }
+
+    return interceptor_->evaluate(
+               url,
+               seb::browser::contracts::ResourceType::MainFrame) !=
+           seb::browser::FilterDecision::Block;
 }
 
 bool SebSession::openSebResource(const QUrl &url, QWidget *parent) const
@@ -472,6 +484,10 @@ void SebSession::activateWindow(BrowserWindow *window)
 
 void SebSession::handleDownloadRequested(seb::browser::contracts::DownloadRequest &request)
 {
+    if (request.id.isNull()) {
+        request.id = QUuid::createUuid();
+    }
+
     QString fileName = QFileInfo(request.suggestedFileName).fileName();
     if (fileName.isEmpty() || fileName == QStringLiteral(".") || fileName == QStringLiteral("..")) {
         fileName = QStringLiteral("download");
@@ -493,7 +509,7 @@ void SebSession::handleDownloadRequested(seb::browser::contracts::DownloadReques
 
     if (sebConfig) {
         if (!isConfigurationReconfigurationAllowed(request.url) ||
-            reconfigurationDownloadInProgress_) {
+            reconfigurationDownloadId_.has_value()) {
             qWarning() << "Blocked SEB configuration download:" << request.url;
             return;
         }
@@ -507,7 +523,7 @@ void SebSession::handleDownloadRequested(seb::browser::contracts::DownloadReques
             return;
         }
 
-        reconfigurationDownloadInProgress_ = true;
+        reconfigurationDownloadId_ = request.id;
         request.targetDirectory = configurationDownloadDirectory_->path();
         request.targetFileName = fileName;
         request.accepted = true;

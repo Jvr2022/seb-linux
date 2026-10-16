@@ -4,11 +4,13 @@
 
 #include <functional>
 #include <memory>
+#include <optional>
 
 #include <QList>
 #include <QObject>
 #include <QScopedPointer>
 #include <QString>
+#include <QUuid>
 #include <QUrl>
 
 namespace seb::browser {
@@ -69,6 +71,7 @@ public:
     QUrl initialUrl() const;
     QString downAndUploadDirectory() const;
     bool isReconfigurationInProgress() const;
+    bool isMainNavigationAllowed(const QUrl &url) const;
     bool openSebResource(const QUrl &url, QWidget *parent) const;
     QList<BrowserWindow *> browserWindows() const;
     QList<seb::applications::ExternalApplication *> externalApplications() const;
@@ -100,7 +103,7 @@ private:
     seb::browser::contracts::IWebProfile *profilePtr_ = nullptr;
     std::unique_ptr<QTemporaryDir> downloadDirectory_;
     std::unique_ptr<QTemporaryDir> configurationDownloadDirectory_;
-    bool reconfigurationDownloadInProgress_ = false;
+    std::optional<QUuid> reconfigurationDownloadId_;
     std::unique_ptr<seb::applications::ApplicationManager> applicationManager_;
     ResourceOpener opener_;
     QList<BrowserWindow *> browserWindows_;

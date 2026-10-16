@@ -16,11 +16,13 @@ public:
         seb::configuration::contracts::cryptography::IKeyGenerator &keyGenerator);
 
     void interceptRequest(contracts::IRequest &request) override;
+    FilterDecision evaluate(
+        const QUrl &url,
+        contracts::ResourceType resourceType) const;
 
 private:
     bool shouldAppendHeaders(const contracts::IRequest &request) const;
     static bool sameHost(const QUrl &lhs, const QUrl &rhs);
-    static QUrl replaceSebScheme(const QUrl &url);
 
     seb::settings::browser::BrowserSettings settings_;
     RequestFilter filter_;

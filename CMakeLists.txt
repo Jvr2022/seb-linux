@@ -26,6 +26,7 @@ endif()
 
 option(SEB_FORCE_QTWEBENGINE "Force the Qt WebEngine backend" OFF)
 option(SEB_FORCE_WEBKITGTK "Force the WebKitGTK backend" OFF)
+option(SEB_ENABLE_WEBKITGTK_COMPAT "Enable the non-production WebKitGTK compatibility backend" OFF)
 option(SEB_DEV_BYPASS "Enable the persistent developer bypass" OFF)
 
 if(SEB_FORCE_QTWEBENGINE AND SEB_FORCE_WEBKITGTK)
@@ -62,13 +63,21 @@ elseif(SEB_FORCE_WEBKITGTK)
     if(NOT webkitgtk_available)
         message(FATAL_ERROR "SEB_FORCE_WEBKITGTK was requested, but webkit2gtk-4.1 and gtk+-3.0 were not found.")
     endif()
+    set(SEB_ENABLE_WEBKITGTK_COMPAT ON)
     set(SEB_HAS_WEBKITGTK 1)
 elseif(qtwebengine_available)
     set(SEB_HAS_QTWEBENGINE 1)
-elseif(webkitgtk_available)
+elseif(SEB_ENABLE_WEBKITGTK_COMPAT AND webkitgtk_available)
     set(SEB_HAS_WEBKITGTK 1)
 else()
-    message(WARNING "No supported browser engine found (QtWebEngine/WebKitGTK missing). The app will show an error on startup.")
+    message(FATAL_ERROR
+        "Qt6 WebEngineCore and WebEngineWidgets are required for production builds. "
+        "Install the Qt WebEngine development packages, or explicitly configure "
+        "-DSEB_ENABLE_WEBKITGTK_COMPAT=ON for the non-production WebKitGTK compatibility backend.")
+endif()
+
+if(SEB_HAS_WEBKITGTK)
+    message(WARNING "Building with WebKitGTK compatibility support; this backend is not production-qualified for v1.")
 endif()
 
 math(EXPR SEB_HAS_ANY_ENGINE "${SEB_HAS_QTWEBENGINE} | ${SEB_HAS_WEBKITGTK}")

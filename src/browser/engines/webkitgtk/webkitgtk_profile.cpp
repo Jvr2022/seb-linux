@@ -15,6 +15,7 @@
 
 #include <QByteArray>
 #include <QDir>
+#include <QPointer>
 #include <QVector>
 
 namespace seb::browser {
@@ -27,6 +28,13 @@ public:
     QString userAgent;
     QString acceptLanguage;
     contracts::IRequestInterceptor *urlRequestInterceptor = nullptr;
+};
+
+struct DownloadContext
+{
+    QPointer<WebKitGtkProfile> owner;
+    QUuid id;
+    QUrl url;
 };
 
 WebKitGtkProfile::WebKitGtkProfile(QObject *parent)
@@ -47,6 +55,7 @@ WebKitGtkProfile::WebKitGtkProfile(QObject *parent)
         WebKitURIResponse *response = webkit_download_get_response(download);
 
         contracts::DownloadRequest request;
+        request.id = QUuid::createUuid();
         if (uriRequest) {
             const gchar *uri = webkit_uri_request_get_uri(uriRequest);
             if (uri) {
@@ -78,12 +87,25 @@ WebKitGtkProfile::WebKitGtkProfile(QObject *parent)
             download,
             QUrl::fromLocalFile(path).toString(QUrl::FullyEncoded).toUtf8().constData());
 
+        auto *downloadContext = new DownloadContext;
+        downloadContext->owner = profile;
+        downloadContext->id = request.id;
+        downloadContext->url = request.url;
         g_signal_connect(download, "finished", G_CALLBACK(+[](WebKitDownload *finished, gpointer data) {
-            auto *owner = static_cast<WebKitGtkProfile *>(data);
+            auto *context = static_cast<DownloadContext *>(data);
             const gchar *destination = webkit_download_get_destination(finished);
-            emit owner->downloadFinished(
-                destination ? QUrl(QString::fromUtf8(destination)).toLocalFile() : QString());
-        }), profile);
+            if (context->owner) {
+                contracts::DownloadResult result;
+                result.id = context->id;
+                result.url = context->url;
+                result.localPath = destination
+                    ? QUrl(QString::fromUtf8(destination)).toLocalFile()
+                    : QString();
+                result.success = !result.localPath.isEmpty();
+                emit context->owner->downloadFinished(result);
+            }
+            delete context;
+        }), downloadContext);
     }), this);
 }
 

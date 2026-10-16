@@ -18,10 +18,27 @@ bool ConfigurationResourceDetector::isConfigurationResource(
 
 QUrl ConfigurationResourceDetector::downloadUrl(const QUrl &url)
 {
+    const QString encoded = url.toString(QUrl::FullyEncoded);
+    const bool isDataConfiguration = encoded.contains(
+        QStringLiteral("application/seb"),
+        Qt::CaseInsensitive);
+    const QString scheme = url.scheme();
+
+    if (isDataConfiguration &&
+        (scheme.compare(QStringLiteral("seb"), Qt::CaseInsensitive) == 0 ||
+         scheme.compare(QStringLiteral("sebs"), Qt::CaseInsensitive) == 0)) {
+        const qsizetype separator = encoded.indexOf(QStringLiteral("://"));
+        if (separator >= 0) {
+            return QUrl(
+                QStringLiteral("data:") +
+                encoded.mid(separator + 3));
+        }
+    }
+
     QUrl converted(url);
-    if (url.scheme().compare(QStringLiteral("seb"), Qt::CaseInsensitive) == 0) {
+    if (scheme.compare(QStringLiteral("seb"), Qt::CaseInsensitive) == 0) {
         converted.setScheme(QStringLiteral("http"));
-    } else if (url.scheme().compare(QStringLiteral("sebs"), Qt::CaseInsensitive) == 0) {
+    } else if (scheme.compare(QStringLiteral("sebs"), Qt::CaseInsensitive) == 0) {
         converted.setScheme(QStringLiteral("https"));
     }
     return converted;

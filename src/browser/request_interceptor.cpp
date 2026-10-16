@@ -1,7 +1,5 @@
 #include "request_interceptor.h"
 
-#include "browser/configuration_resource_detector.h"
-
 #include <QUrl>
 
 namespace seb::browser {
@@ -24,11 +22,6 @@ void RequestInterceptor::interceptRequest(contracts::IRequest &request)
 
     if (requestUrl.scheme() == QStringLiteral("mailto")) {
         request.block(true);
-        return;
-    }
-
-    if (ConfigurationResourceDetector::isConfigurationResource(requestUrl)) {
-        request.redirect(replaceSebScheme(requestUrl));
         return;
     }
 
@@ -57,6 +50,13 @@ void RequestInterceptor::interceptRequest(contracts::IRequest &request)
     }
 }
 
+FilterDecision RequestInterceptor::evaluate(
+    const QUrl &url,
+    contracts::ResourceType resourceType) const
+{
+    return filter_.evaluate(url, resourceType);
+}
+
 bool RequestInterceptor::shouldAppendHeaders(const contracts::IRequest &request) const
 {
     const auto type = request.resourceType();
@@ -72,17 +72,5 @@ bool RequestInterceptor::sameHost(const QUrl &lhs, const QUrl &rhs)
 {
     return lhs.isValid() && rhs.isValid() && lhs.host().compare(rhs.host(), Qt::CaseInsensitive) == 0;
 }
-
-QUrl RequestInterceptor::replaceSebScheme(const QUrl &url)
-{
-    QUrl replaced(url);
-    if (url.scheme() == QStringLiteral("seb")) {
-        replaced.setScheme(QStringLiteral("http"));
-    } else if (url.scheme() == QStringLiteral("sebs")) {
-        replaced.setScheme(QStringLiteral("https"));
-    }
-    return replaced;
-}
-
 
 }  // namespace seb::browser

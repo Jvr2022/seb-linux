@@ -44,9 +44,8 @@ public:
     virtual void clearHttpCache() = 0;
 
 signals:
-    // Simple download abstraction. A full download interceptor would have its own class.
     void downloadRequested(DownloadRequest &request);
-    void downloadFinished(const QString &localPath);
+    void downloadFinished(const DownloadResult &result);
 };
 
 }  // namespace seb::browser::contracts
