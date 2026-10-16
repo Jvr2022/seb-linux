@@ -32,6 +32,10 @@ class IWebProfile;
 class IEngineProvider;
 }
 
+namespace seb::configuration::contracts::cryptography {
+class IKeyGenerator;
+}
+
 class SebSession : public QObject
 {
     Q_OBJECT
@@ -56,6 +60,8 @@ public:
     bool promptForHomeNavigation(QWidget *parent) const;
     bool requestApplicationQuit(QWidget *parent, const QString &reason) const;
     const seb::settings::AppSettings &settings() const;
+    const seb::configuration::contracts::SessionConfiguration &configuration() const;
+    seb::configuration::contracts::cryptography::IKeyGenerator *keyGenerator() const;
     seb::browser::contracts::IWebProfile *profile() const;
     seb::browser::contracts::IEngineProvider *engineProvider() const;
     QUrl homeUrl() const;
@@ -82,6 +88,7 @@ private:
     bool promptForPassword(QWidget *parent, const QString &title, const QString &message) const;
 
     seb::configuration::contracts::SessionConfiguration configuration_;
+    std::unique_ptr<seb::configuration::contracts::cryptography::IKeyGenerator> keyGenerator_;
     QScopedPointer<seb::browser::RequestInterceptor> interceptor_;
     std::unique_ptr<seb::browser::contracts::IEngineProvider> engineProvider_;
     std::unique_ptr<QTemporaryDir> profileDirectory_;

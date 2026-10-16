@@ -1,12 +1,32 @@
 #include "data_values.h"
 
 #include <QCoreApplication>
+#include <QCryptographicHash>
 #include <QDateTime>
 #include <QDir>
+#include <QFile>
 #include <QStandardPaths>
 #include <QUuid>
 
 namespace seb::configuration::configuration_data {
+
+namespace {
+
+QString calculateExecutableHash(const QString &path)
+{
+    QFile executable(path);
+    if (!executable.open(QIODevice::ReadOnly)) {
+        return {};
+    }
+
+    return QString::fromLatin1(
+        QCryptographicHash::hash(
+            executable.readAll(),
+            QCryptographicHash::Sha256)
+            .toHex());
+}
+
+}  // namespace
 
 contracts::AppConfig DataValues::initializeAppConfig() const
 {
@@ -24,6 +44,7 @@ contracts::AppConfig DataValues::initializeAppConfig() const
     config.browserLogFilePath = appData + QStringLiteral("/browser.log");
     config.clientAddress = QStringLiteral("local://safeexambrowser/client");
     config.clientExecutablePath = QCoreApplication::applicationFilePath();
+    config.codeSignatureHash = calculateExecutableHash(config.clientExecutablePath);
     config.clientId = QUuid::createUuid();
     config.clientLogFilePath = appData + QStringLiteral("/client.log");
     config.configurationFileExtension = QStringLiteral(".seb");

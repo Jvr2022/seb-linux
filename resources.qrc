@@ -1,6 +1,7 @@
 <RCC>
     <qresource prefix="/">
         <file alias="browser/content/Api.js">src/browser/content/Api.js</file>
+        <file alias="browser/content/qwebchannel.js">src/browser/content/qwebchannel.js</file>
         <file alias="browser/content/BlockedContent.html">src/browser/content/BlockedContent.html</file>
         <file alias="browser/content/BlockedPage.html">src/browser/content/BlockedPage.html</file>
         <file alias="browser/content/Clipboard.js">src/browser/content/Clipboard.js</file>

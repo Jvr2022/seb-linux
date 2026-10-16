@@ -35,6 +35,7 @@ set(qtwebengine_available FALSE)
 find_package(Qt6 QUIET COMPONENTS WebEngineCore WebEngineWidgets)
 if(Qt6WebEngineCore_FOUND AND Qt6WebEngineWidgets_FOUND)
     set(qtwebengine_available TRUE)
+    find_package(Qt6 REQUIRED COMPONENTS WebChannel)
 endif()
 
 set(webkitgtk_available FALSE)
@@ -144,7 +145,6 @@ set(SEB_SOURCES
     src/browser/engines/webkitgtk/webkitgtk_profile.cpp
     src/browser/engines/webkitgtk/webkitgtk_provider.cpp
     src/browser/engines/webkitgtk/webkitgtk_view.cpp
-    src/browser/key_generator.cpp
     src/browser/request_filter.cpp
     src/browser/request_interceptor.cpp
     src/browser/engines/engine_factory.cpp
@@ -352,7 +352,6 @@ set(SEB_HEADERS
     src/browser/engines/webkitgtk/webkitgtk_profile.h
     src/browser/engines/webkitgtk/webkitgtk_provider.h
     src/browser/engines/webkitgtk/webkitgtk_view.h
-    src/browser/key_generator.h
     src/browser/request_filter.h
     src/browser/request_interceptor.h
     src/browser/engines/engine_factory.h
@@ -418,7 +417,7 @@ target_link_libraries(safe-exam-browser PRIVATE
 )
 
 if(SEB_HAS_QTWEBENGINE)
-    target_link_libraries(safe-exam-browser PRIVATE Qt6::WebEngineCore Qt6::WebEngineWidgets)
+    target_link_libraries(safe-exam-browser PRIVATE Qt6::WebEngineCore Qt6::WebEngineWidgets Qt6::WebChannel)
 endif()
 
 if(SEB_HAS_WEBKITGTK)

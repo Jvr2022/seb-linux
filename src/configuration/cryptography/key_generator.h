@@ -3,6 +3,8 @@
 #include "../contracts/app_config.h"
 #include "../contracts/cryptography/i_key_generator.h"
 
+#include <QMutex>
+
 namespace seb::configuration::cryptography {
 
 class KeyGenerator : public contracts::cryptography::IKeyGenerator
@@ -20,6 +22,7 @@ private:
     static QString hashBytes(const QByteArray &data);
 
     contracts::AppConfig appConfig_;
+    mutable QMutex mutex_;
     QString browserExamKey_;
 };
 

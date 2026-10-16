@@ -51,6 +51,10 @@ BrowserWindow::BrowserWindow(
 
     view_ = session_.engineProvider()->createWebView(session_.profile(), contentContainer_);
     contentLayout->addWidget(view_->widget(), 1);
+    view_->initializeSebApi(
+        session_.keyGenerator(),
+        session_.settings().Browser,
+        session_.configuration().appConfig);
 
     view_->setNavigationRequestDelegate([this](const QUrl &url, bool isMainFrame) {
         if (isMainFrame && !this->shouldAllowNavigation(url)) {

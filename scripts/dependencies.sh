@@ -13,6 +13,7 @@ if command -v apt >/dev/null; then
     libqt6svg6-dev \
     qt6-base-dev \
     qt6-tools-dev-tools \
+    qt6-webchannel-dev \
     qt6-webengine-dev \
     libwebkit2gtk-4.1-dev \
     libgtk-3-dev \

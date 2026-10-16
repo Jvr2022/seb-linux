@@ -2,8 +2,19 @@
 
 #include <QCryptographicHash>
 #include <QMessageAuthenticationCode>
+#include <QMutexLocker>
 
 namespace seb::configuration::cryptography {
+
+namespace {
+
+QString urlWithoutFragment(const QString &url)
+{
+    const qsizetype fragment = url.indexOf(QLatin1Char('#'));
+    return fragment < 0 ? url : url.left(fragment);
+}
+
+}  // namespace
 
 KeyGenerator::KeyGenerator(const contracts::AppConfig &appConfig)
     : appConfig_(appConfig)
@@ -17,20 +28,22 @@ QString KeyGenerator::calculateAppSignatureKey(const QString &connectionToken, c
 
 QString KeyGenerator::calculateBrowserExamKeyHash(const QString &configurationKey, const QByteArray &salt, const QString &url)
 {
-    const QString urlWithoutFragment = url.section('#', 0, 0);
-    const QString key = browserExamKey_.isEmpty() ? computeBrowserExamKey(configurationKey, salt) : browserExamKey_;
-    return hashBytes((urlWithoutFragment + key).toUtf8());
+    QMutexLocker locker(&mutex_);
+    const QString key = browserExamKey_.isEmpty()
+        ? computeBrowserExamKey(configurationKey, salt)
+        : browserExamKey_;
+    return hashBytes((urlWithoutFragment(url) + key).toUtf8());
 }
 
 QString KeyGenerator::calculateConfigurationKeyHash(const QString &configurationKey, const QString &url)
 {
-    const QString urlWithoutFragment = url.section('#', 0, 0);
-    return hashBytes((urlWithoutFragment + configurationKey).toUtf8());
+    return hashBytes((urlWithoutFragment(url) + configurationKey).toUtf8());
 }
 
 void KeyGenerator::useCustomBrowserExamKey(const QString &browserExamKey)
 {
     if (!browserExamKey.isEmpty()) {
+        QMutexLocker locker(&mutex_);
         browserExamKey_ = browserExamKey;
     }
 }

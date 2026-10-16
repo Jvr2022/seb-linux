@@ -5,6 +5,17 @@
 #include <QUrl>
 #include <functional>
 
+namespace seb::settings::browser {
+struct BrowserSettings;
+}
+
+namespace seb::configuration::contracts {
+struct AppConfig;
+namespace cryptography {
+class IKeyGenerator;
+}
+}
+
 QT_BEGIN_NAMESPACE
 class QWidget;
 class QAuthenticator;
@@ -43,6 +54,16 @@ public:
      */
     using NavigationRequestDelegate = std::function<bool(const QUrl &url, bool isMainFrame)>;
     virtual void setNavigationRequestDelegate(NavigationRequestDelegate delegate) = 0;
+
+    virtual void initializeSebApi(
+        seb::configuration::contracts::cryptography::IKeyGenerator *keyGenerator,
+        const seb::settings::browser::BrowserSettings &settings,
+        const seb::configuration::contracts::AppConfig &appConfig)
+    {
+        Q_UNUSED(keyGenerator);
+        Q_UNUSED(settings);
+        Q_UNUSED(appConfig);
+    }
 
 signals:
     void urlChanged(const QUrl &url);

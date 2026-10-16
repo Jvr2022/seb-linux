@@ -4,10 +4,12 @@
 
 namespace seb::browser {
 
-RequestInterceptor::RequestInterceptor(const seb::settings::browser::BrowserSettings &settings)
+RequestInterceptor::RequestInterceptor(
+    const seb::settings::browser::BrowserSettings &settings,
+    seb::configuration::contracts::cryptography::IKeyGenerator &keyGenerator)
     : settings_(settings)
     , filter_(settings.Filter)
-    , keyGenerator_(settings)
+    , keyGenerator_(keyGenerator)
 {
 }
 
@@ -35,11 +37,20 @@ void RequestInterceptor::interceptRequest(contracts::IRequest &request)
     }
 
     if (shouldAppendHeaders(request)) {
-        if (settings_.SendConfigurationKey && !settings_.ConfigurationKey.isEmpty()) {
-            request.setHttpHeader("X-SafeExamBrowser-ConfigKeyHash", keyGenerator_.configurationKeyHash(requestUrl));
+        const QString encodedUrl = QString::fromLatin1(requestUrl.toEncoded(QUrl::FullyEncoded));
+        if (settings_.SendConfigurationKey) {
+            request.setHttpHeader(
+                "X-SafeExamBrowser-ConfigKeyHash",
+                keyGenerator_.calculateConfigurationKeyHash(settings_.ConfigurationKey, encodedUrl).toLatin1());
         }
         if (settings_.SendBrowserExamKey) {
-            request.setHttpHeader("X-SafeExamBrowser-RequestHash", keyGenerator_.requestHash(requestUrl));
+            request.setHttpHeader(
+                "X-SafeExamBrowser-RequestHash",
+                keyGenerator_.calculateBrowserExamKeyHash(
+                    settings_.ConfigurationKey,
+                    settings_.BrowserExamKeySalt,
+                    encodedUrl)
+                    .toLatin1());
         }
     }
 }

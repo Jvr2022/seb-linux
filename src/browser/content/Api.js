@@ -6,11 +6,39 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/.
  */
 
-SafeExamBrowser = {
-    version: 'SEB_Windows_%%_VERSION_%%',
-    security: {
-        browserExamKey: '%%_BEK_%%',
-        configKey: '%%_CK_%%',
-        updateKeys: (callback) => callback()
+(function () {
+    'use strict';
+
+    if (typeof QWebChannel !== 'function' || !window.qt || !qt.webChannelTransport) {
+        return;
     }
-}
+
+    new QWebChannel(qt.webChannelTransport, function (channel) {
+        var bridge = channel.objects.sebSecurityApi;
+        if (!bridge) {
+            return;
+        }
+
+        var updateKeys = function (callback) {
+            bridge.keysForUrl(window.location.href, function (keys) {
+                window.SafeExamBrowser.security.browserExamKey = keys.browserExamKey || '';
+                window.SafeExamBrowser.security.configKey = keys.configKey || '';
+                if (typeof callback === 'function') {
+                    callback();
+                }
+            });
+        };
+
+        window.SafeExamBrowser = {
+            version: bridge.version,
+            security: {
+                browserExamKey: '',
+                configKey: '',
+                updateKeys: updateKeys
+            }
+        };
+
+        updateKeys();
+        window.addEventListener('popstate', updateKeys);
+    });
+}());

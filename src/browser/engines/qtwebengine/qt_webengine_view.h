@@ -6,6 +6,7 @@
 
 QT_BEGIN_NAMESPACE
 class QWebEngineView;
+class QWebChannel;
 QT_END_NAMESPACE
 
 namespace seb::browser {
@@ -35,10 +36,16 @@ public:
     void findText(const QString &text) override;
 
     void setNavigationRequestDelegate(contracts::IWebView::NavigationRequestDelegate delegate) override;
+    void initializeSebApi(
+        seb::configuration::contracts::cryptography::IKeyGenerator *keyGenerator,
+        const seb::settings::browser::BrowserSettings &settings,
+        const seb::configuration::contracts::AppConfig &appConfig) override;
     const contracts::IWebView::NavigationRequestDelegate& delegate() const { return navigationDelegate_; }
 
 private:
     QWebEngineView *view_ = nullptr;
+    QWebChannel *webChannel_ = nullptr;
+    bool sebApiInitialized_ = false;
     contracts::IWebView::NavigationRequestDelegate navigationDelegate_;
 };
 

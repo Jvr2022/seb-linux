@@ -36,6 +36,7 @@ jobs:
             libqt6svg6-dev \
             qt6-base-dev \
             qt6-tools-dev-tools \
+            qt6-webchannel-dev \
             qt6-webengine-dev \
             zlib1g-dev \
             libsecret-1-dev
@@ -106,6 +107,7 @@ jobs:
             libqt6webenginewidgets6 \
             libqt6webenginecore6-bin \
             libqt6webengine6-data \
+            libqt6webchannel6 \
             libqt6xml6t64 \
             qt6-qpa-plugins \
             libwebkit2gtk-4.1-0 \

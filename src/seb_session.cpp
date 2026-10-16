@@ -2,6 +2,7 @@
 #include <cstdlib>
 #include "browser/engines/engine_factory.h"
 #include "browser/request_interceptor.h"
+#include "configuration/cryptography/key_generator.h"
 #include "applications/application_manager.h"
 #include "browser_window.h"
 
@@ -179,7 +180,12 @@ SebSession::SebSession(
     profilePtr_->setHttpUserAgent(buildUserAgent());
     profilePtr_->setDevBypass(false);
 
-    interceptor_.reset(new seb::browser::RequestInterceptor(settings.Browser));
+    keyGenerator_ = std::make_unique<seb::configuration::cryptography::KeyGenerator>(configuration_.appConfig);
+    if (!settings.Browser.CustomBrowserExamKey.isEmpty()) {
+        keyGenerator_->useCustomBrowserExamKey(settings.Browser.CustomBrowserExamKey);
+    }
+
+    interceptor_.reset(new seb::browser::RequestInterceptor(settings.Browser, *keyGenerator_));
     profilePtr_->setUrlRequestInterceptor(interceptor_.data());
 
     connect(profilePtr_, &seb::browser::contracts::IWebProfile::downloadRequested,
@@ -334,6 +340,16 @@ bool SebSession::requestApplicationQuit(QWidget *parent, const QString &reason) 
 const seb::settings::AppSettings &SebSession::settings() const
 {
     return configuration_.settings;
+}
+
+const seb::configuration::contracts::SessionConfiguration &SebSession::configuration() const
+{
+    return configuration_;
+}
+
+seb::configuration::contracts::cryptography::IKeyGenerator *SebSession::keyGenerator() const
+{
+    return keyGenerator_.get();
 }
 
 seb::browser::contracts::IWebProfile *SebSession::profile() const
