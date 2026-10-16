@@ -22,6 +22,7 @@ class WebKitGtkProfile::Private
 {
 public:
     WebKitWebContext *context = nullptr;
+    QString defaultUserAgent;
     QString userAgent;
     QString acceptLanguage;
 };
@@ -32,6 +33,11 @@ WebKitGtkProfile::WebKitGtkProfile(QObject *parent)
 {
     // Create an ephemeral or persistent WebKitContext
     d->context = webkit_web_context_new();
+
+    WebKitSettings *settings = webkit_settings_new();
+    const gchar *userAgent = webkit_settings_get_user_agent(settings);
+    d->defaultUserAgent = userAgent ? QString::fromUtf8(userAgent) : QString();
+    g_object_unref(settings);
 }
 
 WebKitGtkProfile::~WebKitGtkProfile()
@@ -113,11 +119,12 @@ QString WebKitGtkProfile::httpUserAgent() const
         return d->userAgent;
     }
 
-    WebKitSettings *settings = webkit_settings_new();
-    const gchar *userAgent = webkit_settings_get_user_agent(settings);
-    const QString result = userAgent ? QString::fromUtf8(userAgent) : QString();
-    g_object_unref(settings);
-    return result;
+    return d->defaultUserAgent;
+}
+
+QString WebKitGtkProfile::defaultHttpUserAgent() const
+{
+    return d->defaultUserAgent;
 }
 
 void WebKitGtkProfile::setHttpAcceptLanguage(const QString &language)

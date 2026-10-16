@@ -76,6 +76,7 @@ QtWebEngineProfile::QtWebEngineProfile(
     profile_ = storageName.isEmpty()
         ? new QWebEngineProfile(this)
         : new QWebEngineProfile(storageName, this);
+    defaultUserAgent_ = profile_->httpUserAgent();
 
     // Forward native download requests to the abstraction
     connect(profile_, &QWebEngineProfile::downloadRequested, this, [this](auto *download) {
@@ -134,6 +135,11 @@ void QtWebEngineProfile::setSpellCheckLanguages(const QStringList &languages)
 QString QtWebEngineProfile::httpUserAgent() const
 {
     return profile_->httpUserAgent();
+}
+
+QString QtWebEngineProfile::defaultHttpUserAgent() const
+{
+    return defaultUserAgent_;
 }
 
 void QtWebEngineProfile::setHttpUserAgent(const QString &userAgent)

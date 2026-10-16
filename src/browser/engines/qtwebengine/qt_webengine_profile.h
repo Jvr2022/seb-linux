@@ -27,6 +27,7 @@ public:
     void setPdfViewerEnabled(bool enabled) override;
     void setSpellCheckEnabled(bool enabled) override;
     void setSpellCheckLanguages(const QStringList &languages) override;
+    QString defaultHttpUserAgent() const override;
     QString httpUserAgent() const override;
     void setHttpUserAgent(const QString &userAgent) override;
     void setHttpAcceptLanguage(const QString &language) override;
@@ -38,6 +39,7 @@ public:
 
 private:
     QWebEngineProfile *profile_ = nullptr;
+    QString defaultUserAgent_;
     bool devBypass_ = false;
 };
 

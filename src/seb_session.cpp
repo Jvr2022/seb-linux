@@ -142,7 +142,7 @@ SebSession::SebSession(
     const QString locale = QLocale::system().bcp47Name();
     profilePtr_->setSpellCheckLanguages(QStringList{locale});
     profilePtr_->setHttpAcceptLanguage(locale);
-    const QString nativeUserAgent = profilePtr_->httpUserAgent();
+    const QString nativeUserAgent = profilePtr_->defaultHttpUserAgent();
     const QString userAgent = buildUserAgent();
     profilePtr_->setHttpUserAgent(userAgent);
     qDebug() << "Linux application version:" << configuration_.appConfig.programBuildVersion;
@@ -488,7 +488,7 @@ QString SebSession::buildUserAgent() const
     if (configuration_.settings.Browser.UseCustomUserAgent && !customUserAgent.isEmpty()) {
         agent = customUserAgent;
     } else {
-        agent = profilePtr_ ? profilePtr_->httpUserAgent().trimmed() : QString();
+        agent = profilePtr_ ? profilePtr_->defaultHttpUserAgent().trimmed() : QString();
     }
 
     appendUserAgentPart(

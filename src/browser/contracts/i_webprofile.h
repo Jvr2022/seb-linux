@@ -31,6 +31,7 @@ public:
     virtual void setPdfViewerEnabled(bool enabled) = 0;
     virtual void setSpellCheckEnabled(bool enabled) = 0;
     virtual void setSpellCheckLanguages(const QStringList &languages) = 0;
+    virtual QString defaultHttpUserAgent() const = 0;
     virtual QString httpUserAgent() const = 0;
     virtual void setHttpUserAgent(const QString &userAgent) = 0;
     virtual void setHttpAcceptLanguage(const QString &language) = 0;

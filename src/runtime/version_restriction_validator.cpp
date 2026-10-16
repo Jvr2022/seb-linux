@@ -87,20 +87,25 @@ bool VersionRestrictionValidator::isFulfilled(
         return true;
     }
 
-    const std::array<int, 4> required{
-        restriction.Major,
-        restriction.Minor,
-        restriction.Patch.value_or(0),
-        restriction.Build.value_or(0)};
-    const std::array<int, 4> actual{major, minor, patch, build};
+    bool fulfilled = true;
+    fulfilled &= restriction.Major <= major;
 
-    for (std::size_t index = 0; index < required.size(); ++index) {
-        if (actual[index] != required[index]) {
-            return actual[index] > required[index];
+    if (restriction.Major == major) {
+        fulfilled &= restriction.Minor <= minor;
+
+        if (restriction.Minor == minor) {
+            fulfilled &= !restriction.Patch.has_value()
+                || *restriction.Patch <= patch;
+
+            if (restriction.Patch.has_value()
+                && *restriction.Patch == patch) {
+                fulfilled &= !restriction.Build.has_value()
+                    || *restriction.Build <= build;
+            }
         }
     }
 
-    return true;
+    return fulfilled;
 }
 
 }  // namespace seb::runtime
