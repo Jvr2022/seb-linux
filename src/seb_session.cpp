@@ -17,6 +17,7 @@
 #include <QPushButton>
 #include <QDesktopServices>
 #include <QDebug>
+#include <QRegularExpression>
 #include <QTemporaryDir>
 #include <QUrl>
 #include <QStandardPaths>
@@ -24,6 +25,7 @@
 
 #include "browser/contracts/i_engine_provider.h"
 #include "browser/contracts/i_webprofile.h"
+#include "browser/configuration_resource_detector.h"
 
 namespace {
 
@@ -53,10 +55,7 @@ SebSession::SebSession(
     , opener_(std::move(opener))
 {
     const auto &settings = configuration_.settings;
-    const bool useTemporaryProfile =
-        settings.Browser.DeleteCacheOnShutdown ||
-        settings.Browser.DeleteCookiesOnShutdown ||
-        settings.Browser.DeleteCookiesOnStartup;
+    const bool useTemporaryProfile = false;
 
     if (sharedEngineProvider && sharedProfile) {
         engineProviderPtr_ = sharedEngineProvider;
@@ -109,11 +108,28 @@ SebSession::SebSession(
 
     connect(profilePtr_, &seb::browser::contracts::IWebProfile::downloadFinished,
             this, [this](const QString &path) {
-                if (!configuration_.isBrowserResource || path.isEmpty() ||
-                    !path.endsWith(QStringLiteral(".seb"), Qt::CaseInsensitive)) {
+                if (!reconfigurationDownloadInProgress_) {
+                    return;
+                }
+                if (path.isEmpty()) {
+                    reconfigurationDownloadInProgress_ = false;
                     return;
                 }
 
+                const QString directory = configurationDownloadDirectory_
+                    ? configurationDownloadDirectory_->path()
+                    : QString();
+                const QString cleanPath = QDir::cleanPath(path);
+                const QString cleanDirectory = QDir::cleanPath(directory);
+                const bool insideDirectory =
+                    !cleanDirectory.isEmpty() &&
+                    (cleanPath == cleanDirectory ||
+                     cleanPath.startsWith(cleanDirectory + QDir::separator()));
+                reconfigurationDownloadInProgress_ = false;
+                if (!insideDirectory ||
+                    !path.endsWith(QStringLiteral(".seb"), Qt::CaseInsensitive)) {
+                    return;
+                }
                 openSebResource(QUrl::fromLocalFile(path), QApplication::activeWindow());
             });
 
@@ -142,6 +158,9 @@ SebSession::SebSession(
     const QString locale = QLocale::system().bcp47Name();
     profilePtr_->setSpellCheckLanguages(QStringList{locale});
     profilePtr_->setHttpAcceptLanguage(locale);
+    profilePtr_->setPersistSessionCookies(
+        !settings.Browser.DeleteCookiesOnStartup ||
+        !settings.Browser.DeleteCookiesOnShutdown);
     const QString nativeUserAgent = profilePtr_->defaultHttpUserAgent();
     const QString userAgent = buildUserAgent();
     profilePtr_->setHttpUserAgent(userAgent);
@@ -174,6 +193,15 @@ SebSession::SebSession(
 
 SebSession::~SebSession()
 {
+    if (profilePtr_ && !configuration_.isBrowserResource) {
+        if (configuration_.settings.Browser.DeleteCookiesOnShutdown) {
+            profilePtr_->deleteAllCookies();
+        }
+        if (configuration_.settings.Browser.DeleteCacheOnShutdown &&
+            configuration_.settings.Browser.DeleteCookiesOnShutdown) {
+            profilePtr_->clearHttpCache();
+        }
+    }
     if (applicationManager_) {
         applicationManager_->terminate();
     }
@@ -260,10 +288,19 @@ bool SebSession::isPopupAllowed(const QUrl &opener, const QUrl &target, bool *op
 
 bool SebSession::isQuitUrl(const QUrl &url) const
 {
-    if (configuration_.settings.Browser.QuitUrl.isEmpty()) {
+    QString configured = configuration_.settings.Browser.QuitUrl;
+    if (configured.trimmed().isEmpty()) {
         return false;
     }
-    return normalizeUrl(url) == normalizeUrl(QUrl(configuration_.settings.Browser.QuitUrl));
+
+    while (configured.endsWith(QLatin1Char('/'))) {
+        configured.chop(1);
+    }
+    const QString pattern = QRegularExpression::escape(configured);
+    const QRegularExpression matcher(
+        QStringLiteral("^%1/?$").arg(pattern),
+        QRegularExpression::CaseInsensitiveOption);
+    return matcher.match(url.toString(QUrl::FullyEncoded)).hasMatch();
 }
 
 bool SebSession::promptForHomeNavigation(QWidget *parent) const
@@ -362,6 +399,16 @@ QUrl SebSession::initialUrl() const
     return url;
 }
 
+QString SebSession::downAndUploadDirectory() const
+{
+    return defaultDownloadDirectory();
+}
+
+bool SebSession::isReconfigurationInProgress() const
+{
+    return reconfigurationDownloadInProgress_;
+}
+
 bool SebSession::openSebResource(const QUrl &url, QWidget *parent) const
 {
     if (!opener_) {
@@ -423,39 +470,47 @@ void SebSession::activateWindow(BrowserWindow *window)
     window->activateWindow();
 }
 
-void SebSession::handleDownloadRequested(const QUrl &url, const QString &suggestedFilename, bool &accepted, QString &downloadDirectory)
+void SebSession::handleDownloadRequested(seb::browser::contracts::DownloadRequest &request)
 {
-    const QString fileName = suggestedFilename.isEmpty()
-        ? QStringLiteral("download")
-        : suggestedFilename;
-    const bool sebConfig = fileName.endsWith(QStringLiteral(".seb"), Qt::CaseInsensitive);
+    QString fileName = QFileInfo(request.suggestedFileName).fileName();
+    if (fileName.isEmpty() || fileName == QStringLiteral(".") || fileName == QStringLiteral("..")) {
+        fileName = QStringLiteral("download");
+    }
+    const bool sebConfig = seb::browser::ConfigurationResourceDetector::isConfigurationResource(
+        request.url, fileName, request.mimeType);
 
-    if (!configuration_.settings.Browser.AllowDownloads && !(sebConfig && configuration_.settings.Browser.AllowConfigurationDownloads)) {
-        accepted = false;
+    if (sebConfig && !fileName.endsWith(QStringLiteral(".seb"), Qt::CaseInsensitive)) {
+        fileName += QStringLiteral(".seb");
+    }
+
+    if (!configuration_.settings.Browser.AllowDownloads && !sebConfig) {
         return;
     }
 
     if (sebConfig && !configuration_.settings.Browser.AllowConfigurationDownloads) {
-        accepted = false;
         return;
     }
 
     if (sebConfig) {
-        if (configuration_.isBrowserResource) {
-            if (!configurationDownloadDirectory_ || !configurationDownloadDirectory_->isValid()) {
-                configurationDownloadDirectory_ = std::make_unique<QTemporaryDir>(
-                    QDir::tempPath() + QStringLiteral("/seb-linux-configuration-XXXXXX"));
-            }
-
-            if (configurationDownloadDirectory_ && configurationDownloadDirectory_->isValid()) {
-                downloadDirectory = configurationDownloadDirectory_->path();
-                accepted = true;
-                return;
-            }
+        if (!isConfigurationReconfigurationAllowed(request.url) ||
+            reconfigurationDownloadInProgress_) {
+            qWarning() << "Blocked SEB configuration download:" << request.url;
+            return;
         }
 
-        accepted = false;
-        openSebResource(url, QApplication::activeWindow());
+        if (!configurationDownloadDirectory_ || !configurationDownloadDirectory_->isValid()) {
+            configurationDownloadDirectory_ = std::make_unique<QTemporaryDir>(
+                QDir::tempPath() + QStringLiteral("/seb-linux-configuration-XXXXXX"));
+        }
+
+        if (!configurationDownloadDirectory_ || !configurationDownloadDirectory_->isValid()) {
+            return;
+        }
+
+        reconfigurationDownloadInProgress_ = true;
+        request.targetDirectory = configurationDownloadDirectory_->path();
+        request.targetFileName = fileName;
+        request.accepted = true;
         return;
     }
 
@@ -467,16 +522,63 @@ void SebSession::handleDownloadRequested(const QUrl &url, const QString &suggest
             destination);
 
         if (selected.isEmpty()) {
-            accepted = false;
             return;
         }
 
         destination = selected;
     }
 
+    if (!configuration_.settings.Browser.AllowCustomDownAndUploadLocation) {
+        QFileInfo candidate(destination);
+        const QString directory = candidate.dir().path();
+        const QString stem = candidate.completeBaseName();
+        const QString suffix = candidate.completeSuffix();
+        int index = 0;
+        while (candidate.exists()) {
+            ++index;
+            const QString numbered = suffix.isEmpty()
+                ? QStringLiteral("%1(%2)").arg(stem).arg(index)
+                : QStringLiteral("%1(%2).%3").arg(stem).arg(index).arg(suffix);
+            destination = QDir(directory).filePath(numbered);
+            candidate.setFile(destination);
+        }
+    }
+
     const QFileInfo info(destination);
-    downloadDirectory = info.dir().path();
-    accepted = true;
+    request.targetDirectory = info.dir().path();
+    request.targetFileName = info.fileName();
+    request.accepted = true;
+}
+
+bool SebSession::isConfigurationReconfigurationAllowed(const QUrl &url) const
+{
+    const auto &security = configuration_.settings.Security;
+    if (security.QuitPasswordHash.isEmpty()) {
+        return configuration_.settings.ConfigurationMode ==
+                   seb::settings::ConfigurationMode::ConfigureClient ||
+               security.AllowReconfiguration;
+    }
+
+    if (!security.AllowReconfiguration || security.ReconfigurationUrl.trimmed().isEmpty()) {
+        return false;
+    }
+
+    QString pattern = QRegularExpression::escape(security.ReconfigurationUrl);
+    pattern.replace(QStringLiteral("\\*"), QStringLiteral(".*"));
+    const QRegularExpression matcher(
+        QStringLiteral("^%1$").arg(pattern),
+        QRegularExpression::CaseInsensitiveOption);
+    QUrl equivalent = url;
+    if (url.scheme().compare(QStringLiteral("http"), Qt::CaseInsensitive) == 0) {
+        equivalent.setScheme(QStringLiteral("seb"));
+    } else if (url.scheme().compare(QStringLiteral("https"), Qt::CaseInsensitive) == 0) {
+        equivalent.setScheme(QStringLiteral("sebs"));
+    } else {
+        equivalent = seb::browser::ConfigurationResourceDetector::downloadUrl(url);
+    }
+
+    return matcher.match(url.toString(QUrl::FullyEncoded)).hasMatch() ||
+           matcher.match(equivalent.toString(QUrl::FullyEncoded)).hasMatch();
 }
 
 QString SebSession::buildUserAgent() const
@@ -508,8 +610,13 @@ QString SebSession::defaultDownloadDirectory() const
         return downloadDirectory_->path();
     }
 
-    if (!configuration_.settings.Browser.DownAndUploadDirectory.trimmed().isEmpty()) {
-        return configuration_.settings.Browser.DownAndUploadDirectory.trimmed();
+    const QString configured = configuration_.settings.Browser.DownAndUploadDirectory.trimmed();
+    if (!configured.isEmpty() && QDir(configured).exists()) {
+        return configured;
+    }
+
+    if (!configured.isEmpty()) {
+        qWarning() << "Configured SEB download directory does not exist; using Downloads:" << configured;
     }
 
     QString path = QStandardPaths::writableLocation(QStandardPaths::DownloadLocation);
@@ -517,15 +624,6 @@ QString SebSession::defaultDownloadDirectory() const
         path = QDir::homePath();
     }
     return path;
-}
-
-QString SebSession::normalizeUrl(const QUrl &url) const
-{
-    QString normalized = url.adjusted(QUrl::NormalizePathSegments | QUrl::RemoveFragment).toString();
-    while (normalized.endsWith('/') && normalized.size() > 1) {
-        normalized.chop(1);
-    }
-    return normalized;
 }
 
 bool SebSession::promptForPassword(QWidget *parent, const QString &title, const QString &message) const

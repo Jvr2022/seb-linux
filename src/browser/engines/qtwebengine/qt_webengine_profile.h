@@ -31,11 +31,13 @@ public:
     QString httpUserAgent() const override;
     void setHttpUserAgent(const QString &userAgent) override;
     void setHttpAcceptLanguage(const QString &language) override;
+    void setPersistSessionCookies(bool persist) override;
     void setDevBypass(bool enabled) override { devBypass_ = enabled; }
     bool devBypass() const { return devBypass_; }
 
     void setUrlRequestInterceptor(contracts::IRequestInterceptor *interceptor) override;
     void deleteAllCookies() override;
+    void clearHttpCache() override;
 
 private:
     QWebEngineProfile *profile_ = nullptr;

@@ -1,6 +1,7 @@
 #pragma once
 
 #include <QObject>
+#include <QStringList>
 #include <QtGlobal>
 #include <QUrl>
 #include <functional>
@@ -39,6 +40,7 @@ public:
 
     virtual QUrl url() const = 0;
     virtual void setUrl(const QUrl &url) = 0;
+    virtual void download(const QUrl &url, const QString &suggestedFileName = {}) = 0;
 
     virtual void back() = 0;
     virtual void forward() = 0;
@@ -54,6 +56,12 @@ public:
      */
     using NavigationRequestDelegate = std::function<bool(const QUrl &url, bool isMainFrame)>;
     virtual void setNavigationRequestDelegate(NavigationRequestDelegate delegate) = 0;
+
+    using FileSelectionDelegate = std::function<QStringList(
+        int mode,
+        const QStringList &oldFiles,
+        const QStringList &acceptedMimeTypes)>;
+    virtual void setFileSelectionDelegate(FileSelectionDelegate delegate) = 0;
 
     virtual void initializeSebApi(
         seb::configuration::contracts::cryptography::IKeyGenerator *keyGenerator,

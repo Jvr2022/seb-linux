@@ -11,8 +11,11 @@
 #endif
 #include "browser/contracts/i_webview.h"
 #include "browser/contracts/i_webprofile.h"
+#include "browser/configuration_resource_detector.h"
 #include <QCloseEvent>
+#include <QDir>
 #include <QEvent>
+#include <QFileInfo>
 #include <QInputDialog>
 #include <QLineEdit>
 #include <QFocusEvent>
@@ -23,11 +26,15 @@
 #include <QLineEdit>
 #include <QMessageBox>
 #include <QScreen>
+#include <QStandardPaths>
 #include <QTextBrowser>
 #include <QTimer>
 #include <QToolBar>
 #include <QUrl>
 #include <QVBoxLayout>
+
+#include <algorithm>
+#include <limits>
 
 #include "browser/contracts/i_engine_provider.h"
 #include "browser/contracts/i_webview.h"
@@ -61,6 +68,130 @@ BrowserWindow::BrowserWindow(
             return false;
         }
         return true;
+    });
+
+    view_->setFileSelectionDelegate([this](int mode, const QStringList &oldFiles, const QStringList &acceptedMimeTypes) {
+        const bool save = mode == 3;
+        if (save && !session_.settings().Browser.AllowDownloads) {
+            return QStringList();
+        }
+        if (!save && !session_.settings().Browser.AllowUploads) {
+            return QStringList();
+        }
+
+        const QString baseDirectory = session_.downAndUploadDirectory();
+        const bool customLocation = session_.settings().Browser.AllowCustomDownAndUploadLocation;
+        const bool showPath = session_.settings().Browser.ShowFileSystemElementPath;
+        const QString allowed = QDir(baseDirectory).canonicalPath();
+
+        auto restrictDialogDirectory = [&](QFileDialog &dialog) {
+            if (customLocation || allowed.isEmpty()) {
+                return;
+            }
+            QObject::connect(
+                &dialog,
+                &QFileDialog::directoryEntered,
+                &dialog,
+                [&dialog, allowed](const QString &directory) {
+                    const QString canonical = QFileInfo(directory).canonicalFilePath();
+                    if (canonical != allowed &&
+                        !canonical.startsWith(allowed + QDir::separator())) {
+                        dialog.setDirectory(allowed);
+                    }
+                });
+        };
+
+        auto uniquePath = [](const QString &directory, const QString &name) {
+            QFileInfo candidate(QDir(directory).filePath(name));
+            if (!candidate.exists()) {
+                return candidate.filePath();
+            }
+
+            const QString stem = candidate.completeBaseName();
+            const QString suffix = candidate.completeSuffix();
+            for (int index = 1; index < std::numeric_limits<int>::max(); ++index) {
+                const QString numbered = suffix.isEmpty()
+                    ? QStringLiteral("%1(%2)").arg(stem).arg(index)
+                    : QStringLiteral("%1(%2).%3").arg(stem).arg(index).arg(suffix);
+                candidate.setFile(QDir(directory).filePath(numbered));
+                if (!candidate.exists()) {
+                    return candidate.filePath();
+                }
+            }
+            return QString();
+        };
+
+        QStringList selected;
+        if (save) {
+            if (customLocation) {
+                QFileDialog dialog(this, QStringLiteral("Save Download"), baseDirectory);
+                dialog.setAcceptMode(QFileDialog::AcceptSave);
+                dialog.setFileMode(QFileDialog::AnyFile);
+                dialog.setOption(QFileDialog::DontUseNativeDialog, !customLocation || !showPath);
+                restrictDialogDirectory(dialog);
+                if (dialog.exec() == QDialog::Accepted) {
+                    selected = dialog.selectedFiles();
+                }
+            } else {
+                const QString requestedName = oldFiles.value(0).trimmed();
+                const QString name = QFileInfo(requestedName).fileName().isEmpty()
+                    ? QStringLiteral("download")
+                    : QFileInfo(requestedName).fileName();
+                const QString file = uniquePath(baseDirectory, name);
+                if (!file.isEmpty()) {
+                    selected << file;
+                }
+            }
+        } else if (mode == 2) {
+            QFileDialog dialog(this, QStringLiteral("Select Upload Folder"), baseDirectory);
+            dialog.setFileMode(QFileDialog::Directory);
+            dialog.setOption(QFileDialog::ShowDirsOnly, true);
+            dialog.setOption(QFileDialog::DontUseNativeDialog, !customLocation || !showPath);
+            restrictDialogDirectory(dialog);
+            if (dialog.exec() == QDialog::Accepted) {
+                selected = dialog.selectedFiles();
+            }
+        } else if (mode == 1) {
+            QFileDialog dialog(this, QStringLiteral("Select Files to Upload"), baseDirectory);
+            dialog.setFileMode(QFileDialog::ExistingFiles);
+            dialog.setOption(QFileDialog::DontUseNativeDialog, !customLocation || !showPath);
+            restrictDialogDirectory(dialog);
+            if (!acceptedMimeTypes.isEmpty()) {
+                dialog.setMimeTypeFilters(acceptedMimeTypes);
+            }
+            if (dialog.exec() == QDialog::Accepted) {
+                selected = dialog.selectedFiles();
+            }
+        } else {
+            QFileDialog dialog(this, QStringLiteral("Select File to Upload"), baseDirectory);
+            dialog.setFileMode(QFileDialog::ExistingFile);
+            dialog.setOption(QFileDialog::DontUseNativeDialog, !customLocation || !showPath);
+            restrictDialogDirectory(dialog);
+            if (!acceptedMimeTypes.isEmpty()) {
+                dialog.setMimeTypeFilters(acceptedMimeTypes);
+            }
+            if (dialog.exec() == QDialog::Accepted) {
+                selected = dialog.selectedFiles();
+            }
+        }
+
+        if (customLocation) {
+            return selected;
+        }
+
+        if (allowed.isEmpty()) {
+            return QStringList();
+        }
+
+        selected.erase(
+            std::remove_if(selected.begin(), selected.end(), [&allowed](const QString &path) {
+                const QString canonical = QFileInfo(path).canonicalFilePath();
+                return canonical.isEmpty() ||
+                       (canonical != allowed &&
+                        !canonical.startsWith(allowed + QDir::separator()));
+            }),
+            selected.end());
+        return selected;
     });
 
     if (isMainWindow_ && session_.settings().UserInterface.Taskbar.EnableTaskbar) {
@@ -137,10 +268,12 @@ bool BrowserWindow::shouldAllowNavigation(const QUrl &url)
         return true;
     }
 
-    const QString scheme = url.scheme().toLower();
-    if (scheme == QStringLiteral("seb") || scheme == QStringLiteral("sebs") ||
-        url.path().endsWith(QStringLiteral(".seb"), Qt::CaseInsensitive)) {
-        session_.openSebResource(url, this);
+    if (url.isLocalFile()) {
+        return false;
+    }
+
+    if (seb::browser::ConfigurationResourceDetector::isConfigurationResource(url)) {
+        view_->download(seb::browser::ConfigurationResourceDetector::downloadUrl(url));
         return false;
     }
 
@@ -508,10 +641,8 @@ void BrowserWindow::handleNewWindowRequest(const QUrl &target, bool &handled)
     bool openInSameWindow = false;
     const QUrl opener = view_->url();
 
-    const QString scheme = target.scheme().toLower();
-    if (scheme == QStringLiteral("seb") || scheme == QStringLiteral("sebs") ||
-        target.path().endsWith(QStringLiteral(".seb"), Qt::CaseInsensitive)) {
-        session_.openSebResource(target, this);
+    if (seb::browser::ConfigurationResourceDetector::isConfigurationResource(target)) {
+        view_->download(seb::browser::ConfigurationResourceDetector::downloadUrl(target));
         handled = true;
         return;
     }

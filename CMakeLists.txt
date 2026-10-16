@@ -150,6 +150,9 @@ set(SEB_SOURCES
     src/browser/engines/webkitgtk/webkitgtk_view.cpp
     src/browser/request_filter.cpp
     src/browser/request_interceptor.cpp
+    src/browser/configuration_resource_detector.cpp
+    src/browser/filters/rules/regex_rule.cpp
+    src/browser/filters/rules/simplified_rule.cpp
     src/browser/engines/engine_factory.cpp
     src/browser/webengine_environment.cpp
     src/app_controller.cpp
@@ -359,6 +362,11 @@ set(SEB_HEADERS
     src/browser/engines/webkitgtk/webkitgtk_view.h
     src/browser/request_filter.h
     src/browser/request_interceptor.h
+    src/browser/configuration_resource_detector.h
+    src/browser/contracts/download_request.h
+    src/browser/filters/rules/i_rule.h
+    src/browser/filters/rules/regex_rule.h
+    src/browser/filters/rules/simplified_rule.h
     src/browser/engines/engine_factory.h
     src/browser/webengine_environment.h
     src/shell/taskbar/taskbar_model.h

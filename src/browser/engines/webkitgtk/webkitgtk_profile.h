@@ -9,6 +9,10 @@ typedef struct _WebKitWebContext WebKitWebContext;
 
 namespace seb::browser {
 
+namespace contracts {
+class IRequestInterceptor;
+}
+
 class WebKitGtkProfile : public contracts::IWebProfile {
   Q_OBJECT
 
@@ -29,12 +33,15 @@ public:
   QString httpUserAgent() const override;
   void setHttpUserAgent(const QString &userAgent) override;
   void setHttpAcceptLanguage(const QString &language) override;
+  void setPersistSessionCookies(bool persist) override;
   QString httpAcceptLanguage() const;
   void setDevBypass(bool enabled) override {}
 
   void setUrlRequestInterceptor(
       seb::browser::contracts::IRequestInterceptor *interceptor) override;
+  seb::browser::contracts::IRequestInterceptor *urlRequestInterceptor() const;
   void deleteAllCookies() override;
+  void clearHttpCache() override;
 
 private:
   class Private;

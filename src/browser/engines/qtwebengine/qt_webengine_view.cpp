@@ -17,6 +17,10 @@
 #include <QWebEngineScript>
 #include <QWebEngineScriptCollection>
 #include <QAuthenticator>
+#include <QEvent>
+#include <QDragEnterEvent>
+#include <QDragMoveEvent>
+#include <QDropEvent>
 
 namespace seb::browser {
 
@@ -81,6 +85,18 @@ public:
         : QWebEnginePage(profile, parent), wrapper_(wrapper) {}
 
 protected:
+    QStringList chooseFiles(
+        FileSelectionMode mode,
+        const QStringList &oldFiles,
+        const QStringList &acceptedMimeTypes) override
+    {
+        if (!wrapper_->fileSelectionDelegate()) {
+            return {};
+        }
+        return wrapper_->fileSelectionDelegate()(
+            static_cast<int>(mode), oldFiles, acceptedMimeTypes);
+    }
+
     bool acceptNavigationRequest(const QUrl &url, QWebEnginePage::NavigationType type, bool isMainFrame) override
     {
         if (wrapper_->delegate() && !wrapper_->delegate()(url, isMainFrame)) {
@@ -97,6 +113,8 @@ QtWebEngineWebView::QtWebEngineWebView(QtWebEngineProfile *profile, QWidget *par
     : IWebView(parent)
 {
     view_ = new QWebEngineView(parent);
+    view_->setAcceptDrops(false);
+    view_->installEventFilter(this);
     auto *page = new InterceptingPage(profile->nativeProfile(), this, view_);
     view_->setPage(page);
 
@@ -162,6 +180,30 @@ void QtWebEngineWebView::setUrl(const QUrl &url)
     view_->setUrl(url);
 }
 
+void QtWebEngineWebView::download(const QUrl &url, const QString &suggestedFileName)
+{
+    view_->page()->download(url, suggestedFileName);
+}
+
+bool QtWebEngineWebView::eventFilter(QObject *watched, QEvent *event)
+{
+    if (watched == view_ && event &&
+        (event->type() == QEvent::DragEnter ||
+         event->type() == QEvent::DragMove ||
+         event->type() == QEvent::Drop)) {
+        if (event->type() == QEvent::DragEnter) {
+            static_cast<QDragEnterEvent *>(event)->ignore();
+        } else if (event->type() == QEvent::DragMove) {
+            static_cast<QDragMoveEvent *>(event)->ignore();
+        } else {
+            static_cast<QDropEvent *>(event)->ignore();
+        }
+        return true;
+    }
+
+    return QObject::eventFilter(watched, event);
+}
+
 void QtWebEngineWebView::back()
 {
     view_->back();
@@ -207,6 +249,11 @@ void QtWebEngineWebView::findText(const QString &text)
 void QtWebEngineWebView::setNavigationRequestDelegate(contracts::IWebView::NavigationRequestDelegate delegate)
 {
     navigationDelegate_ = std::move(delegate);
+}
+
+void QtWebEngineWebView::setFileSelectionDelegate(contracts::IWebView::FileSelectionDelegate delegate)
+{
+    fileSelectionDelegate_ = std::move(delegate);
 }
 
 void QtWebEngineWebView::initializeSebApi(

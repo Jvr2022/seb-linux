@@ -144,6 +144,30 @@ QString persistentClientPath(const seb::configuration::contracts::AppConfig &con
     return {};
 }
 
+class ReconfigurationGuard
+{
+public:
+    ReconfigurationGuard(bool &lock, bool active)
+        : lock_(lock)
+        , active_(active)
+    {
+        if (active_) {
+            lock_ = true;
+        }
+    }
+
+    ~ReconfigurationGuard()
+    {
+        if (active_) {
+            lock_ = false;
+        }
+    }
+
+private:
+    bool &lock_;
+    bool active_;
+};
+
 }  // namespace
 
 AppController::AppController(QObject *parent)
@@ -239,6 +263,15 @@ bool AppController::ensureBrowserProfileContext()
 bool AppController::launch(const QString &resource, QString *error)
 {
     const bool isReconfiguration = session_ != nullptr;
+    if (isReconfiguration &&
+        (reconfigurationInProgress_ ||
+         (session_ && session_->isReconfigurationInProgress()))) {
+        if (error) {
+            *error = QStringLiteral("A Safe Exam Browser reconfiguration is already in progress.");
+        }
+        return false;
+    }
+    ReconfigurationGuard reconfigurationGuard(reconfigurationInProgress_, isReconfiguration);
     const bool previousBrowserResource = sessionConfiguration_.isBrowserResource;
     const QString previousBrowserProfilePath = sessionConfiguration_.browserProfilePath;
     const QString previousAdminPasswordHash = session_

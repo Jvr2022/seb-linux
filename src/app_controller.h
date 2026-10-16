@@ -54,4 +54,5 @@ private:
     std::unique_ptr<seb::browser::contracts::IWebProfile> browserProfile_;
     std::unique_ptr<SebSession> session_;
     BrowserWindow *mainWindow_ = nullptr;
+    bool reconfigurationInProgress_ = false;
 };

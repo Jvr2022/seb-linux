@@ -80,22 +80,31 @@ QtWebEngineProfile::QtWebEngineProfile(
 
     // Forward native download requests to the abstraction
     connect(profile_, &QWebEngineProfile::downloadRequested, this, [this](auto *download) {
-        bool accepted = false;
-        QString downloadDir;
-        emit this->downloadRequested(download->url(), download->downloadFileName(), accepted, downloadDir);
+        contracts::DownloadRequest request;
+        request.url = download->url();
+        request.suggestedFileName = download->downloadFileName();
+        request.mimeType = download->mimeType();
+        emit this->downloadRequested(request);
         
-        if (!accepted) {
+        if (!request.accepted) {
             download->cancel();
         } else {
-            if (!downloadDir.isEmpty()) {
-                download->setDownloadDirectory(downloadDir);
+            if (!request.targetDirectory.isEmpty()) {
+                download->setDownloadDirectory(request.targetDirectory);
+            }
+            if (!request.targetFileName.isEmpty()) {
+                download->setDownloadFileName(request.targetFileName);
             }
             connect(download, &QWebEngineDownloadRequest::isFinishedChanged, this, [this, download]() {
-                if (download->state() != QWebEngineDownloadRequest::DownloadCompleted) {
+                if (download->state() == QWebEngineDownloadRequest::DownloadInProgress) {
                     return;
                 }
-                emit this->downloadFinished(
-                    QDir(download->downloadDirectory()).filePath(download->downloadFileName()));
+                if (download->state() == QWebEngineDownloadRequest::DownloadCompleted) {
+                    emit this->downloadFinished(
+                        QDir(download->downloadDirectory()).filePath(download->downloadFileName()));
+                } else {
+                    emit this->downloadFinished(QString());
+                }
             });
             download->accept();
         }
@@ -152,6 +161,14 @@ void QtWebEngineProfile::setHttpAcceptLanguage(const QString &language)
     profile_->setHttpAcceptLanguage(language);
 }
 
+void QtWebEngineProfile::setPersistSessionCookies(bool persist)
+{
+    profile_->setPersistentCookiesPolicy(
+        persist
+            ? QWebEngineProfile::ForcePersistentCookies
+            : QWebEngineProfile::AllowPersistentCookies);
+}
+
 void QtWebEngineProfile::setUrlRequestInterceptor(contracts::IRequestInterceptor *interceptor)
 {
     if (!interceptor) {
@@ -168,6 +185,11 @@ void QtWebEngineProfile::deleteAllCookies()
     if (profile_->cookieStore()) {
         profile_->cookieStore()->deleteAllCookies();
     }
+}
+
+void QtWebEngineProfile::clearHttpCache()
+{
+    profile_->clearHttpCache();
 }
 
 }  // namespace seb::browser

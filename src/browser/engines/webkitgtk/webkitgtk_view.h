@@ -20,6 +20,7 @@ public:
 
     QUrl url() const override;
     void setUrl(const QUrl &url) override;
+    void download(const QUrl &url, const QString &suggestedFileName = {}) override;
 
     void back() override;
     void forward() override;
@@ -31,6 +32,7 @@ public:
     void findText(const QString &text) override;
 
     void setNavigationRequestDelegate(IWebView::NavigationRequestDelegate delegate) override;
+    void setFileSelectionDelegate(IWebView::FileSelectionDelegate delegate) override;
 
 private:
     class Private;

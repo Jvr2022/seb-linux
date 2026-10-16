@@ -30,6 +30,7 @@ class BrowserWindow;
 namespace seb::browser::contracts {
 class IWebProfile;
 class IEngineProvider;
+struct DownloadRequest;
 }
 
 namespace seb::configuration::contracts::cryptography {
@@ -66,6 +67,8 @@ public:
     seb::browser::contracts::IEngineProvider *engineProvider() const;
     QUrl homeUrl() const;
     QUrl initialUrl() const;
+    QString downAndUploadDirectory() const;
+    bool isReconfigurationInProgress() const;
     bool openSebResource(const QUrl &url, QWidget *parent) const;
     QList<BrowserWindow *> browserWindows() const;
     QList<seb::applications::ExternalApplication *> externalApplications() const;
@@ -81,10 +84,10 @@ public slots:
     void activateWindow(BrowserWindow *window);
 
 private:
-    void handleDownloadRequested(const QUrl &url, const QString &suggestedFilename, bool &accepted, QString &downloadDirectory);
+    void handleDownloadRequested(seb::browser::contracts::DownloadRequest &request);
+    bool isConfigurationReconfigurationAllowed(const QUrl &url) const;
     QString buildUserAgent() const;
     QString defaultDownloadDirectory() const;
-    QString normalizeUrl(const QUrl &url) const;
     bool promptForPassword(QWidget *parent, const QString &title, const QString &message) const;
 
     seb::configuration::contracts::SessionConfiguration configuration_;
@@ -97,6 +100,7 @@ private:
     seb::browser::contracts::IWebProfile *profilePtr_ = nullptr;
     std::unique_ptr<QTemporaryDir> downloadDirectory_;
     std::unique_ptr<QTemporaryDir> configurationDownloadDirectory_;
+    bool reconfigurationDownloadInProgress_ = false;
     std::unique_ptr<seb::applications::ApplicationManager> applicationManager_;
     ResourceOpener opener_;
     QList<BrowserWindow *> browserWindows_;

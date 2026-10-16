@@ -1,8 +1,10 @@
 #pragma once
 #include "../settings/Browser/FilterSettings.h"
 
-#include <QRegularExpression>
-#include <QVector>
+#include "filters/rules/i_rule.h"
+
+#include <memory>
+#include <vector>
 
 #include "contracts/i_request_interceptor.h"
 
@@ -26,20 +28,18 @@ public:
     FilterDecision evaluate(const QUrl &url, contracts::ResourceType resourceType) const;
 
 private:
-    struct CompiledRule
+    struct LoadedRule
     {
-        QRegularExpression expression;
+        std::unique_ptr<filters::rules::IRule> rule;
         seb::settings::browser::filter::FilterResult result =
             seb::settings::browser::filter::FilterResult::Block;
     };
 
-    static QRegularExpression compileRule(
-        const seb::settings::browser::filter::FilterRuleSettings &rule);
     static bool isMainRequest(contracts::ResourceType resourceType);
 
     seb::settings::browser::FilterSettings settings_;
-    QVector<CompiledRule> allowRules_;
-    QVector<CompiledRule> blockRules_;
+    std::vector<LoadedRule> allowRules_;
+    std::vector<LoadedRule> blockRules_;
 };
 
 }  // namespace seb::browser

@@ -1,5 +1,7 @@
 #include "request_interceptor.h"
 
+#include "browser/configuration_resource_detector.h"
+
 #include <QUrl>
 
 namespace seb::browser {
@@ -25,7 +27,7 @@ void RequestInterceptor::interceptRequest(contracts::IRequest &request)
         return;
     }
 
-    if (requestUrl.scheme() == QStringLiteral("seb") || requestUrl.scheme() == QStringLiteral("sebs")) {
+    if (ConfigurationResourceDetector::isConfigurationResource(requestUrl)) {
         request.redirect(replaceSebScheme(requestUrl));
         return;
     }

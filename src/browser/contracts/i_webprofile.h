@@ -5,6 +5,8 @@
 #include <QString>
 #include <QStringList>
 
+#include "download_request.h"
+
 QT_BEGIN_NAMESPACE
 class QUrl;
 QT_END_NAMESPACE
@@ -35,13 +37,15 @@ public:
     virtual QString httpUserAgent() const = 0;
     virtual void setHttpUserAgent(const QString &userAgent) = 0;
     virtual void setHttpAcceptLanguage(const QString &language) = 0;
+    virtual void setPersistSessionCookies(bool persist) = 0;
     virtual void setDevBypass(bool enabled) = 0;
     virtual void setUrlRequestInterceptor(IRequestInterceptor *interceptor) = 0;
     virtual void deleteAllCookies() = 0;
+    virtual void clearHttpCache() = 0;
 
 signals:
     // Simple download abstraction. A full download interceptor would have its own class.
-    void downloadRequested(const QUrl &url, const QString &suggestedFilename, bool &accepted, QString &downloadDirectory);
+    void downloadRequested(DownloadRequest &request);
     void downloadFinished(const QString &localPath);
 };
 

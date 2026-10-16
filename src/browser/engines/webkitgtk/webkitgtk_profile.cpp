@@ -14,6 +14,7 @@
 #endif
 
 #include <QByteArray>
+#include <QDir>
 #include <QVector>
 
 namespace seb::browser {
@@ -25,6 +26,7 @@ public:
     QString defaultUserAgent;
     QString userAgent;
     QString acceptLanguage;
+    contracts::IRequestInterceptor *urlRequestInterceptor = nullptr;
 };
 
 WebKitGtkProfile::WebKitGtkProfile(QObject *parent)
@@ -38,6 +40,51 @@ WebKitGtkProfile::WebKitGtkProfile(QObject *parent)
     const gchar *userAgent = webkit_settings_get_user_agent(settings);
     d->defaultUserAgent = userAgent ? QString::fromUtf8(userAgent) : QString();
     g_object_unref(settings);
+
+    g_signal_connect(d->context, "download-started", G_CALLBACK(+[](WebKitWebContext *, WebKitDownload *download, gpointer userData) {
+        auto *profile = static_cast<WebKitGtkProfile *>(userData);
+        WebKitURIRequest *uriRequest = webkit_download_get_request(download);
+        WebKitURIResponse *response = webkit_download_get_response(download);
+
+        contracts::DownloadRequest request;
+        if (uriRequest) {
+            const gchar *uri = webkit_uri_request_get_uri(uriRequest);
+            if (uri) {
+                request.url = QUrl(QString::fromUtf8(uri));
+            }
+        }
+        if (response) {
+            const gchar *mime = webkit_uri_response_get_mime_type(response);
+            const gchar *fileName = webkit_uri_response_get_suggested_filename(response);
+            if (mime) {
+                request.mimeType = QString::fromUtf8(mime);
+            }
+            if (fileName) {
+                request.suggestedFileName = QString::fromUtf8(fileName);
+            }
+        }
+
+        emit profile->downloadRequested(request);
+        if (!request.accepted) {
+            webkit_download_cancel(download);
+            return;
+        }
+
+        const QString fileName = request.targetFileName.isEmpty()
+            ? request.suggestedFileName
+            : request.targetFileName;
+        const QString path = QDir(request.targetDirectory).filePath(fileName);
+        webkit_download_set_destination(
+            download,
+            QUrl::fromLocalFile(path).toString(QUrl::FullyEncoded).toUtf8().constData());
+
+        g_signal_connect(download, "finished", G_CALLBACK(+[](WebKitDownload *finished, gpointer data) {
+            auto *owner = static_cast<WebKitGtkProfile *>(data);
+            const gchar *destination = webkit_download_get_destination(finished);
+            emit owner->downloadFinished(
+                destination ? QUrl(QString::fromUtf8(destination)).toLocalFile() : QString());
+        }), profile);
+    }), this);
 }
 
 WebKitGtkProfile::~WebKitGtkProfile()
@@ -132,6 +179,11 @@ void WebKitGtkProfile::setHttpAcceptLanguage(const QString &language)
     d->acceptLanguage = language;
 }
 
+void WebKitGtkProfile::setPersistSessionCookies(bool persist)
+{
+    Q_UNUSED(persist);
+}
+
 QString WebKitGtkProfile::httpAcceptLanguage() const
 {
     return d->acceptLanguage;
@@ -139,13 +191,37 @@ QString WebKitGtkProfile::httpAcceptLanguage() const
 
 void WebKitGtkProfile::setUrlRequestInterceptor(seb::browser::contracts::IRequestInterceptor *interceptor)
 {
-    // Use WebKitUserContentManager or custom URI scheme handler
+    d->urlRequestInterceptor = interceptor;
+}
+
+seb::browser::contracts::IRequestInterceptor *WebKitGtkProfile::urlRequestInterceptor() const
+{
+    return d->urlRequestInterceptor;
 }
 
 void WebKitGtkProfile::deleteAllCookies()
 {
     WebKitCookieManager *cookieManager = webkit_web_context_get_cookie_manager(d->context);
     webkit_cookie_manager_delete_all_cookies(cookieManager);
+}
+
+void WebKitGtkProfile::clearHttpCache()
+{
+    if (!d->context) {
+        return;
+    }
+
+    WebKitWebsiteDataManager *manager = webkit_web_context_get_website_data_manager(d->context);
+    if (manager) {
+        webkit_website_data_manager_clear(
+            manager,
+            static_cast<WebKitWebsiteDataTypes>(
+                WEBKIT_WEBSITE_DATA_MEMORY_CACHE | WEBKIT_WEBSITE_DATA_DISK_CACHE),
+            0,
+            nullptr,
+            nullptr,
+            nullptr);
+    }
 }
 
 }  // namespace seb::browser
