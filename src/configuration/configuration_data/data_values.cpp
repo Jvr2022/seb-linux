@@ -60,6 +60,8 @@ contracts::AppConfig DataValues::initializeAppConfig() const
     config.runtimeLogFilePath = appData + QStringLiteral("/runtime.log");
     config.sebUriScheme = QStringLiteral("seb");
     config.sebUriSchemeSecure = QStringLiteral("sebs");
+    config.sebCompatibilityVersion = QStringLiteral(SEB_COMPATIBILITY_VERSION);
+    config.sebCompatibilityBuildVersion = QStringLiteral(SEB_COMPATIBILITY_BUILD_VERSION);
     config.serviceAddress = QStringLiteral("local://safeexambrowser/service");
     config.serviceLogFilePath = appData + QStringLiteral("/service.log");
     config.sessionCacheFilePath = appData + QStringLiteral("/session.cache");

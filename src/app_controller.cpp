@@ -6,6 +6,7 @@
 #include "browser/contracts/i_engine_provider.h"
 #include "browser/contracts/i_webprofile.h"
 #include "configuration/cryptography/hash_algorithm.h"
+#include "runtime/version_restriction_validator.h"
 #include "seb_session.h"
 #include "ui/runtime_window.h"
 
@@ -106,6 +107,30 @@ void applyStartUrlQuery(
 bool samePasswordHash(const QString &left, const QString &right)
 {
     return !left.isEmpty() && left.compare(right, Qt::CaseInsensitive) == 0;
+}
+
+bool validateVersionRestrictions(
+    const seb::configuration::contracts::SessionConfiguration &configuration,
+    QString *error)
+{
+    const auto &restrictions = configuration.settings.Security.VersionRestrictions;
+    const seb::runtime::VersionRestrictionValidator validator;
+    if (validator.validate(
+            restrictions,
+            configuration.appConfig.sebCompatibilityBuildVersion,
+            false)) {
+        return true;
+    }
+
+    if (error) {
+        *error = QStringLiteral(
+                     "This configuration requires another Safe Exam Browser version.\n"
+                     "Installed Linux SEB: %1\n"
+                     "SEB compatibility level: %2")
+                     .arg(configuration.appConfig.programBuildVersion,
+                          configuration.appConfig.sebCompatibilityBuildVersion);
+    }
+    return false;
 }
 
 QString persistentClientPath(const seb::configuration::contracts::AppConfig &config)
@@ -417,6 +442,10 @@ bool AppController::launch(const QString &resource, QString *error)
                 }
             }
         }
+    }
+
+    if (!validateVersionRestrictions(sessionConfiguration_, error)) {
+        return false;
     }
 
     applyRuntimeOverrides(sessionConfiguration_.settings);

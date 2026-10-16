@@ -2,6 +2,9 @@ cmake_minimum_required(VERSION 3.21)
 
 project(safe-exam-browser VERSION 0.6.1 LANGUAGES C CXX)
 
+set(SEB_COMPATIBILITY_VERSION "3.10.2")
+set(SEB_COMPATIBILITY_BUILD_VERSION "3.10.2.0")
+
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
@@ -150,6 +153,7 @@ set(SEB_SOURCES
     src/browser/engines/engine_factory.cpp
     src/browser/webengine_environment.cpp
     src/app_controller.cpp
+    src/runtime/version_restriction_validator.cpp
     src/main.cpp
     src/shell/taskbar/taskbar_service.cpp
     src/shell/taskbar/platform/audio_controller.cpp
@@ -179,6 +183,7 @@ set(SEB_SOURCES
 
 set(SEB_HEADERS
     src/app_controller.h
+    src/runtime/version_restriction_validator.h
     src/applications/application_factory.h
     src/applications/application_manager.h
     src/applications/application_window.h
@@ -396,6 +401,8 @@ target_precompile_headers(safe-exam-browser PRIVATE src/pch.h)
 
 target_compile_definitions(safe-exam-browser PRIVATE
     SEB_APPLICATION_VERSION="${PROJECT_VERSION}"
+    SEB_COMPATIBILITY_VERSION="${SEB_COMPATIBILITY_VERSION}"
+    SEB_COMPATIBILITY_BUILD_VERSION="${SEB_COMPATIBILITY_BUILD_VERSION}"
     SEB_HAS_QTWEBENGINE=${SEB_HAS_QTWEBENGINE}
     SEB_HAS_WEBKITGTK=${SEB_HAS_WEBKITGTK}
     SEB_HAS_ANY_ENGINE=${SEB_HAS_ANY_ENGINE}

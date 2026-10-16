@@ -1,4 +1,5 @@
 #include "webkitgtk_view.h"
+#include "webkitgtk_profile.h"
 
 #if !SEB_HAS_QTWEBENGINE && SEB_HAS_WEBKITGTK
 
@@ -15,6 +16,7 @@
 #endif
 
 #include <QVBoxLayout>
+#include <QByteArray>
 #include <QWidget>
 #include <QWindow>
 
@@ -45,7 +47,35 @@ WebKitGtkWebView::WebKitGtkWebView(WebKitGtkProfile *profile, QWidget *parent)
         gtk_init(nullptr, nullptr);
         gtkInitialized = true;
     }
-    d->webView = webkit_web_view_new();
+    d->webView = profile && profile->nativeContext()
+        ? webkit_web_view_new_with_context(profile->nativeContext())
+        : webkit_web_view_new();
+
+    if (profile) {
+        WebKitSettings *settings = webkit_settings_new();
+        const QByteArray userAgent = profile->httpUserAgent().toUtf8();
+        if (!userAgent.isEmpty()) {
+            webkit_settings_set_user_agent(settings, userAgent.constData());
+        }
+        webkit_web_view_set_settings(WEBKIT_WEB_VIEW(d->webView), settings);
+        g_object_unref(settings);
+
+        g_signal_connect(d->webView, "send-request", G_CALLBACK(+[](WebKitWebView *,
+                                                                      WebKitWebResource *,
+                                                                      WebKitURIRequest *request,
+                                                                      WebKitURIResponse *,
+                                                                      gpointer userData) -> gboolean {
+            auto *requestProfile = static_cast<WebKitGtkProfile *>(userData);
+            const QByteArray language = requestProfile->httpAcceptLanguage().toUtf8();
+            if (!language.isEmpty()) {
+                soup_message_headers_replace(
+                    webkit_uri_request_get_http_headers(request),
+                    "Accept-Language",
+                    language.constData());
+            }
+            return FALSE;
+        }), profile);
+    }
     
     // Connect WebKitGTK signals (load-changed, decide-policy, etc.)
     g_signal_connect(d->webView, "load-changed", G_CALLBACK(+[](WebKitWebView *, WebKitLoadEvent event, gpointer data) {

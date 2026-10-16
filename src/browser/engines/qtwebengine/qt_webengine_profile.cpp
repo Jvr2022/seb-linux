@@ -131,9 +131,19 @@ void QtWebEngineProfile::setSpellCheckLanguages(const QStringList &languages)
     profile_->setSpellCheckLanguages(languages);
 }
 
+QString QtWebEngineProfile::httpUserAgent() const
+{
+    return profile_->httpUserAgent();
+}
+
 void QtWebEngineProfile::setHttpUserAgent(const QString &userAgent)
 {
     profile_->setHttpUserAgent(userAgent);
+}
+
+void QtWebEngineProfile::setHttpAcceptLanguage(const QString &language)
+{
+    profile_->setHttpAcceptLanguage(language);
 }
 
 void QtWebEngineProfile::setUrlRequestInterceptor(contracts::IRequestInterceptor *interceptor)

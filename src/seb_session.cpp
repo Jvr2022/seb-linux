@@ -10,71 +10,34 @@
 #include <QAuthenticator>
 #include <QCryptographicHash>
 #include <QDir>
-#include <QEventLoop>
 #include <QFileDialog>
 #include <QFileInfo>
 #include <QInputDialog>
-#include <QJsonDocument>
-#include <QJsonObject>
 #include <QMessageBox>
 #include <QPushButton>
 #include <QDesktopServices>
-#include <QCoreApplication>
+#include <QDebug>
 #include <QTemporaryDir>
-#include <QTimer>
 #include <QUrl>
 #include <QStandardPaths>
-#include <QNetworkAccessManager>
-#include <QNetworkRequest>
-#include <QNetworkReply>
 #include <QLocale>
-#include <QRegularExpression>
 
 #include "browser/contracts/i_engine_provider.h"
 #include "browser/contracts/i_webprofile.h"
 
 namespace {
 
-QString getCachedSebVersion()
+void appendUserAgentPart(QString &agent, const QString &part)
 {
-    static QString cachedVersion;
-    if (!cachedVersion.isEmpty()) {
-        return cachedVersion;
+    const QString value = part.trimmed();
+    if (value.isEmpty()) {
+        return;
     }
 
-    cachedVersion = QStringLiteral("3.10.1");
-
-    QNetworkAccessManager manager;
-    QNetworkRequest request(QUrl(QStringLiteral("https://api.github.com/repos/SafeExamBrowser/seb-win-refactoring/releases/latest")));
-    request.setAttribute(QNetworkRequest::RedirectPolicyAttribute, QNetworkRequest::NoLessSafeRedirectPolicy);
-    request.setHeader(QNetworkRequest::UserAgentHeader, QStringLiteral("SEB Linux Qt/") + QApplication::applicationVersion());
-
-    QEventLoop loop;
-    QNetworkReply *reply = manager.get(request);
-    QObject::connect(reply, &QNetworkReply::finished, &loop, &QEventLoop::quit);
-    QTimer::singleShot(5000, &loop, &QEventLoop::quit);
-    loop.exec();
-
-    if (!reply->isFinished()) {
-        reply->abort();
+    if (!agent.isEmpty()) {
+        agent += QLatin1Char(' ');
     }
-
-    if (reply->error() == QNetworkReply::NoError) {
-        const QByteArray responseData = reply->readAll();
-        QJsonDocument json = QJsonDocument::fromJson(responseData);
-        if (json.isObject()) {
-            QString tag = json.object().value(QStringLiteral("tag_name")).toString();
-            if (!tag.isEmpty()) {
-                if (tag.startsWith(QLatin1Char('v'), Qt::CaseInsensitive)) {
-                    tag = tag.mid(1);
-                }
-                cachedVersion = tag;
-            }
-        }
-    }
-    reply->deleteLater();
-
-    return cachedVersion;
+    agent += value;
 }
 
 }  // namespace
@@ -176,8 +139,16 @@ SebSession::SebSession(
 
     profilePtr_->setPdfViewerEnabled(settings.Browser.AllowPdfReader);
     profilePtr_->setSpellCheckEnabled(settings.Browser.AllowSpellChecking);
-    profilePtr_->setSpellCheckLanguages(QStringList{QLocale::system().bcp47Name()});
-    profilePtr_->setHttpUserAgent(buildUserAgent());
+    const QString locale = QLocale::system().bcp47Name();
+    profilePtr_->setSpellCheckLanguages(QStringList{locale});
+    profilePtr_->setHttpAcceptLanguage(locale);
+    const QString nativeUserAgent = profilePtr_->httpUserAgent();
+    const QString userAgent = buildUserAgent();
+    profilePtr_->setHttpUserAgent(userAgent);
+    qDebug() << "Linux application version:" << configuration_.appConfig.programBuildVersion;
+    qDebug() << "SEB compatibility version:" << configuration_.appConfig.sebCompatibilityVersion;
+    qDebug() << "Browser engine User-Agent:" << nativeUserAgent;
+    qDebug() << "Browser User-Agent:" << userAgent;
     profilePtr_->setDevBypass(false);
 
     keyGenerator_ = std::make_unique<seb::configuration::cryptography::KeyGenerator>(configuration_.appConfig);
@@ -510,29 +481,25 @@ void SebSession::handleDownloadRequested(const QUrl &url, const QString &suggest
 
 QString SebSession::buildUserAgent() const
 {
+    const QString customUserAgent =
+        configuration_.settings.Browser.CustomUserAgent.trimmed();
     QString agent;
 
-    if (configuration_.settings.Browser.UseCustomUserAgent && !configuration_.settings.Browser.CustomUserAgent.isEmpty()) {
-        agent = configuration_.settings.Browser.CustomUserAgent.trimmed();
+    if (configuration_.settings.Browser.UseCustomUserAgent && !customUserAgent.isEmpty()) {
+        agent = customUserAgent;
     } else {
-        const QString chromeVersion = QStringLiteral("110.0.0.0");
-        agent = QStringLiteral("Mozilla/5.0 (Windows NT 10.0) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/") + chromeVersion;
+        agent = profilePtr_ ? profilePtr_->httpUserAgent().trimmed() : QString();
     }
 
-    const QString sebVersion = QStringLiteral("SEB/") + getCachedSebVersion();
-    if (!agent.endsWith(' ')) {
-        agent += QLatin1Char(' ');
-    }
-    agent += sebVersion;
+    appendUserAgentPart(
+        agent,
+        QStringLiteral("SEB-Linux/") + configuration_.appConfig.programBuildVersion);
+    appendUserAgentPart(
+        agent,
+        QStringLiteral("SEB/") + configuration_.appConfig.sebCompatibilityVersion);
+    appendUserAgentPart(agent, configuration_.settings.Browser.UserAgentSuffix);
 
-    if (!configuration_.settings.Browser.UserAgentSuffix.trimmed().isEmpty()) {
-        if (!agent.endsWith(' ')) {
-            agent += QLatin1Char(' ');
-        }
-        agent += configuration_.settings.Browser.UserAgentSuffix.trimmed();
-    }
-
-    return agent;
+    return agent.trimmed();
 }
 
 QString SebSession::defaultDownloadDirectory() const

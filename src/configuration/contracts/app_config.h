@@ -36,6 +36,8 @@ struct AppConfig
     QString runtimeLogFilePath;
     QString sebUriScheme;
     QString sebUriSchemeSecure;
+    QString sebCompatibilityVersion;
+    QString sebCompatibilityBuildVersion;
     QString serverApi;
     QString serverConnectionToken;
     QString serverExamId;

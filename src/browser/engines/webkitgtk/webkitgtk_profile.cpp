@@ -22,6 +22,8 @@ class WebKitGtkProfile::Private
 {
 public:
     WebKitWebContext *context = nullptr;
+    QString userAgent;
+    QString acceptLanguage;
 };
 
 WebKitGtkProfile::WebKitGtkProfile(QObject *parent)
@@ -37,6 +39,11 @@ WebKitGtkProfile::~WebKitGtkProfile()
     if (d->context) {
         g_object_unref(d->context);
     }
+}
+
+WebKitWebContext *WebKitGtkProfile::nativeContext() const
+{
+    return d->context;
 }
 
 void WebKitGtkProfile::setPersistentStoragePath(const QString &path)
@@ -97,7 +104,30 @@ void WebKitGtkProfile::setSpellCheckLanguages(const QStringList &languages)
 
 void WebKitGtkProfile::setHttpUserAgent(const QString &userAgent)
 {
-    // Agent is typically set on WebKitSettings per WebView, but can be managed here
+    d->userAgent = userAgent;
+}
+
+QString WebKitGtkProfile::httpUserAgent() const
+{
+    if (!d->userAgent.isEmpty()) {
+        return d->userAgent;
+    }
+
+    WebKitSettings *settings = webkit_settings_new();
+    const gchar *userAgent = webkit_settings_get_user_agent(settings);
+    const QString result = userAgent ? QString::fromUtf8(userAgent) : QString();
+    g_object_unref(settings);
+    return result;
+}
+
+void WebKitGtkProfile::setHttpAcceptLanguage(const QString &language)
+{
+    d->acceptLanguage = language;
+}
+
+QString WebKitGtkProfile::httpAcceptLanguage() const
+{
+    return d->acceptLanguage;
 }
 
 void WebKitGtkProfile::setUrlRequestInterceptor(seb::browser::contracts::IRequestInterceptor *interceptor)
