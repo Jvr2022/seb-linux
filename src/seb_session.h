@@ -12,6 +12,7 @@
 #include <QString>
 #include <QUuid>
 #include <QUrl>
+#include <QNetworkAccessManager>
 
 namespace seb::browser {
 class RequestInterceptor;
@@ -39,6 +40,10 @@ namespace seb::configuration::contracts::cryptography {
 class IKeyGenerator;
 }
 
+namespace seb::server {
+class ServerProxy;
+}
+
 class SebSession : public QObject
 {
     Q_OBJECT
@@ -51,7 +56,8 @@ public:
         ResourceOpener opener,
         QObject *parent = nullptr,
         seb::browser::contracts::IEngineProvider *sharedEngineProvider = nullptr,
-        seb::browser::contracts::IWebProfile *sharedProfile = nullptr);
+        seb::browser::contracts::IWebProfile *sharedProfile = nullptr,
+        std::unique_ptr<seb::server::ServerProxy> serverProxy = nullptr);
     ~SebSession() override;
 
     BrowserWindow *createWindow(const QUrl &url, bool isMainWindow);
@@ -78,10 +84,15 @@ public:
     void registerBrowserWindow(BrowserWindow *window);
     void unregisterBrowserWindow(BrowserWindow *window);
     void notifyBrowserWindowStateChanged(BrowserWindow *window);
+    std::unique_ptr<seb::server::ServerProxy> takeServerProxy();
+    bool isServerSession() const;
+    bool raiseServerHand(const QString &message = {});
+    bool lowerServerHand();
 
 signals:
     void browserWindowsChanged();
     void externalApplicationsChanged();
+    void serverHandConfirmed();
 
 public slots:
     void activateWindow(BrowserWindow *window);
@@ -92,6 +103,7 @@ private:
     QString buildUserAgent() const;
     QString defaultDownloadDirectory() const;
     bool promptForPassword(QWidget *parent, const QString &title, const QString &message) const;
+    void handleServerCookie(const QNetworkCookie &cookie);
 
     seb::configuration::contracts::SessionConfiguration configuration_;
     std::unique_ptr<seb::configuration::contracts::cryptography::IKeyGenerator> keyGenerator_;
@@ -107,4 +119,8 @@ private:
     std::unique_ptr<seb::applications::ApplicationManager> applicationManager_;
     ResourceOpener opener_;
     QList<BrowserWindow *> browserWindows_;
+    std::unique_ptr<seb::server::ServerProxy> serverProxy_;
+    QWidget *serverLockScreen_ = nullptr;
+    QNetworkAccessManager serverIdentityNetwork_;
+    QString serverUserIdentifier_;
 };

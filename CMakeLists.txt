@@ -190,6 +190,9 @@ set(SEB_SOURCES
     src/ui/seb_taskbar.cpp
     src/seb_session.cpp
     src/security/security_service.cpp
+    src/server/parser.cpp
+    src/server/sanitizer.cpp
+    src/server/server_proxy.cpp
     src/browser_window.cpp
 )
 
@@ -403,6 +406,14 @@ set(SEB_HEADERS
     src/ui/seb_taskbar.h
     src/seb_session.h
     src/security/security_service.h
+    src/server/contracts/server_response.h
+    src/server/data/api.h
+    src/server/data/connection_info.h
+    src/server/data/exam.h
+    src/server/data/instructions.h
+    src/server/parser.h
+    src/server/sanitizer.h
+    src/server/server_proxy.h
     src/browser_window.h
 )
 

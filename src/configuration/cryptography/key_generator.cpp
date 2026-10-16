@@ -21,9 +21,13 @@ KeyGenerator::KeyGenerator(const contracts::AppConfig &appConfig)
 {
 }
 
-QString KeyGenerator::calculateAppSignatureKey(const QString &connectionToken, const QString &salt)
+std::optional<QString> KeyGenerator::calculateAppSignatureKey(
+    const QString &connectionToken,
+    const QString &salt)
 {
-    return hashBytes((connectionToken + salt).toUtf8());
+    Q_UNUSED(connectionToken);
+    Q_UNUSED(salt);
+    return std::nullopt;
 }
 
 QString KeyGenerator::calculateBrowserExamKeyHash(const QString &configurationKey, const QByteArray &salt, const QString &url)

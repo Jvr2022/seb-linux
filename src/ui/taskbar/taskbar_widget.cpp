@@ -101,8 +101,16 @@ TaskbarWidget::TaskbarWidget(SebSession &session, QWidget *parent)
             false,
             notificationContainer));
     }
-    if (model.showProctoring) {
-        notificationLayout->addWidget(new RaiseHandControl(notificationContainer));
+    if (session_.isServerSession() && settings.Server.Invigilation.ShowRaiseHandNotification) {
+        raiseHandControl_ = new RaiseHandControl(notificationContainer);
+        raiseHandControl_->setMessageRequired(
+            settings.Server.Invigilation.ForceRaiseHandMessage);
+        raiseHandControl_->setServerCallbacks(
+            [this](const QString &message) { return session_.raiseServerHand(message); },
+            [this] { return session_.lowerServerHand(); });
+        connect(&session_, &SebSession::serverHandConfirmed,
+                raiseHandControl_, &RaiseHandControl::resetRaisedState);
+        notificationLayout->addWidget(raiseHandControl_);
     }
     layout->addWidget(notificationContainer);
 

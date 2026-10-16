@@ -1,6 +1,7 @@
 #pragma once
 
 #include <QObject>
+#include <QNetworkCookie>
 #include <QtGlobal>
 #include <QString>
 #include <QStringList>
@@ -46,6 +47,7 @@ public:
 signals:
     void downloadRequested(DownloadRequest &request);
     void downloadFinished(const DownloadResult &result);
+    void cookieAdded(const QNetworkCookie &cookie);
 };
 
 }  // namespace seb::browser::contracts

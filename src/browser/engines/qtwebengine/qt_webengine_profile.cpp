@@ -78,6 +78,11 @@ QtWebEngineProfile::QtWebEngineProfile(
         : new QWebEngineProfile(storageName, this);
     defaultUserAgent_ = profile_->httpUserAgent();
 
+    if (profile_->cookieStore()) {
+        connect(profile_->cookieStore(), &QWebEngineCookieStore::cookieAdded,
+                this, &contracts::IWebProfile::cookieAdded);
+    }
+
     // Forward native download requests to the abstraction
     connect(profile_, &QWebEngineProfile::downloadRequested, this, [this](auto *download) {
         contracts::DownloadRequest request;

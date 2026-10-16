@@ -13,6 +13,10 @@ class SebSession;
 class QTemporaryDir;
 class QWidget;
 
+namespace seb::server {
+class ServerProxy;
+}
+
 namespace seb::browser::contracts {
 class IEngineProvider;
 class IWebProfile;
@@ -41,6 +45,10 @@ private:
     bool ensureBrowserProfile();
     bool ensureBrowserProfileContext();
 
+    bool initializeServerSession(
+        seb::settings::AppSettings &settings,
+        QString *error);
+
     bool applySettings(
         const seb::configuration::contracts::SessionConfiguration &configuration,
         const QStringList &warnings,
@@ -53,6 +61,7 @@ private:
     std::unique_ptr<seb::browser::contracts::IEngineProvider> browserEngineProvider_;
     std::unique_ptr<seb::browser::contracts::IWebProfile> browserProfile_;
     std::unique_ptr<SebSession> session_;
+    std::unique_ptr<seb::server::ServerProxy> serverProxy_;
     BrowserWindow *mainWindow_ = nullptr;
     bool reconfigurationInProgress_ = false;
 };

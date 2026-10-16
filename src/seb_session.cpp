@@ -5,6 +5,7 @@
 #include "configuration/cryptography/key_generator.h"
 #include "applications/application_manager.h"
 #include "browser_window.h"
+#include "server/server_proxy.h"
 
 #include <QApplication>
 #include <QAuthenticator>
@@ -16,6 +17,12 @@
 #include <QMessageBox>
 #include <QPushButton>
 #include <QDesktopServices>
+#include <QLabel>
+#include <QJsonDocument>
+#include <QJsonObject>
+#include <QNetworkReply>
+#include <QNetworkRequest>
+#include <QVBoxLayout>
 #include <QDebug>
 #include <QRegularExpression>
 #include <QTemporaryDir>
@@ -49,11 +56,18 @@ SebSession::SebSession(
     ResourceOpener opener,
     QObject *parent,
     seb::browser::contracts::IEngineProvider *sharedEngineProvider,
-    seb::browser::contracts::IWebProfile *sharedProfile)
+    seb::browser::contracts::IWebProfile *sharedProfile,
+    std::unique_ptr<seb::server::ServerProxy> serverProxy)
     : QObject(parent)
     , configuration_(configuration)
     , opener_(std::move(opener))
+    , serverProxy_(std::move(serverProxy))
 {
+    if (serverProxy_) {
+        connect(profilePtr_, &seb::browser::contracts::IWebProfile::cookieAdded,
+                this, &SebSession::handleServerCookie);
+        serverProxy_->setParent(this);
+    }
     const auto &settings = configuration_.settings;
     const bool useTemporaryProfile = false;
 
@@ -104,6 +118,72 @@ SebSession::SebSession(
             QDesktopServices::openUrl(QUrl(QStringLiteral("https://github.com/Jvr2022/seb-linux/issues")));
         }
         std::exit(1);
+    }
+
+    if (!serverProxy_ && settings.SessionMode == seb::settings::SessionMode::Server &&
+        !configuration_.appConfig.serverApi.isEmpty()) {
+        auto proxy = std::make_unique<seb::server::ServerProxy>(configuration_.appConfig, this);
+        QString ignored;
+        if (proxy->initializeConnection(
+                configuration_.appConfig.serverApi,
+                configuration_.appConfig.serverConnectionToken,
+                configuration_.appConfig.serverExamId,
+                configuration_.appConfig.serverOauth2Token,
+                settings.Server,
+                &ignored)) {
+            serverProxy_ = std::move(proxy);
+        }
+    }
+
+    if (serverProxy_) {
+        connect(serverProxy_.get(), &seb::server::ServerProxy::terminationRequested,
+                this, [] { qDebug() << "SEB Server requested termination"; QCoreApplication::quit(); });
+        connect(serverProxy_.get(), &seb::server::ServerProxy::handConfirmed,
+                this, &SebSession::serverHandConfirmed);
+        connect(serverProxy_.get(), &seb::server::ServerProxy::lockScreenRequested,
+                this, [this](const QString &message) {
+                    if (serverLockScreen_) {
+                        if (auto *label = serverLockScreen_->findChild<QLabel *>()) {
+                            label->setText(message);
+                        }
+                        serverLockScreen_->showFullScreen();
+                        return;
+                    }
+                    auto *overlay = new QWidget();
+                    overlay->setAttribute(Qt::WA_DeleteOnClose, false);
+                    overlay->setWindowFlags(Qt::FramelessWindowHint | Qt::WindowStaysOnTopHint);
+                    overlay->setStyleSheet(QStringLiteral("background: #000000; color: #ffffff;"));
+                    auto *layout = new QVBoxLayout(overlay);
+                    auto *label = new QLabel(message, overlay);
+                    label->setAlignment(Qt::AlignCenter);
+                    label->setWordWrap(true);
+                    layout->addWidget(label);
+                    auto *confirm = new QPushButton(QStringLiteral("Confirm"), overlay);
+                    confirm->setFixedWidth(160);
+                    confirm->setProperty("serverLockConfirm", true);
+                    layout->addWidget(confirm, 0, Qt::AlignHCenter);
+                    connect(confirm, &QPushButton::clicked, this, [this] {
+                        if (serverProxy_) {
+                            serverProxy_->confirmLockScreen();
+                        }
+                    });
+                    serverLockScreen_ = overlay;
+                    overlay->showFullScreen();
+                });
+        connect(serverProxy_.get(), &seb::server::ServerProxy::lockScreenConfirmed,
+                this, [this] {
+                    if (serverLockScreen_) {
+                        serverLockScreen_->close();
+                        serverLockScreen_->deleteLater();
+                        serverLockScreen_ = nullptr;
+                    }
+                });
+        connect(serverProxy_.get(), &seb::server::ServerProxy::proctoringInstructionReceived,
+                this, [](const QString &message) { qDebug() << "SEB Server proctoring instruction:" << message; });
+        connect(serverProxy_.get(), &seb::server::ServerProxy::proctoringConfigurationReceived,
+                this, [](bool allowChat, bool receiveAudio, bool receiveVideo) {
+                    qDebug() << "SEB Server proctoring configuration:" << allowChat << receiveAudio << receiveVideo;
+                });
     }
 
     connect(profilePtr_, &seb::browser::contracts::IWebProfile::downloadFinished,
@@ -193,6 +273,11 @@ SebSession::SebSession(
 
 SebSession::~SebSession()
 {
+    if (serverLockScreen_) {
+        serverLockScreen_->close();
+        serverLockScreen_->deleteLater();
+        serverLockScreen_ = nullptr;
+    }
     if (profilePtr_ && !configuration_.isBrowserResource) {
         if (configuration_.settings.Browser.DeleteCookiesOnShutdown) {
             profilePtr_->deleteAllCookies();
@@ -207,6 +292,87 @@ SebSession::~SebSession()
     }
 }
 
+std::unique_ptr<seb::server::ServerProxy> SebSession::takeServerProxy()
+{
+    if (serverProxy_) {
+        serverProxy_->setParent(nullptr);
+    }
+    return std::move(serverProxy_);
+}
+
+bool SebSession::isServerSession() const
+{
+    return configuration_.settings.SessionMode == seb::settings::SessionMode::Server;
+}
+
+bool SebSession::raiseServerHand(const QString &message)
+{
+    if (!serverProxy_ || !isServerSession() ||
+        !configuration_.settings.Server.Invigilation.ShowRaiseHandNotification) {
+        return false;
+    }
+    if (configuration_.settings.Server.Invigilation.ForceRaiseHandMessage && message.trimmed().isEmpty()) {
+        return false;
+    }
+    return serverProxy_->raiseHand(message).success;
+}
+
+bool SebSession::lowerServerHand()
+{
+    return serverProxy_ && isServerSession() && serverProxy_->lowerHand().success;
+}
+
+void SebSession::handleServerCookie(const QNetworkCookie &cookie)
+{
+    if (!serverProxy_ || !isServerSession()) {
+        return;
+    }
+
+    QString identifier;
+    const QByteArray name = cookie.name();
+    const QByteArray value = cookie.value();
+    if (name == QByteArrayLiteral("SEB-LMS-USER-ID")) {
+        identifier = QString::fromUtf8(value);
+    } else if (name == QByteArrayLiteral("edx-user-info")) {
+        QByteArray decoded = QByteArray::fromPercentEncoding(value);
+        decoded.replace("\\\"", "\"");
+        decoded.replace("\\054", ",");
+        QJsonParseError parseError;
+        const auto document = QJsonDocument::fromJson(decoded, &parseError);
+        if (document.isObject()) {
+            identifier = document.object().value(QStringLiteral("username")).toString();
+        }
+    } else if (name == QByteArrayLiteral("MoodleSession")) {
+        const QString domain = cookie.domain().trimmed();
+        if (!domain.isEmpty()) {
+            const QString scheme = cookie.isSecure() ? QStringLiteral("https") : QStringLiteral("http");
+            const QString path = QStringLiteral("/mod/quiz/accessrule/sebserver/classes/external/user.php");
+            QNetworkRequest request(QUrl(scheme + QStringLiteral("://") + domain + path));
+            request.setRawHeader(QByteArrayLiteral("Cookie"),
+                                 name + QByteArrayLiteral("=") + value);
+            auto *reply = serverIdentityNetwork_.get(request);
+            connect(reply, &QNetworkReply::finished, this, [this, reply] {
+                const QByteArray body = reply->readAll().trimmed();
+                bool ok = false;
+                const int id = body.toInt(&ok);
+                if (ok && id > 0 && serverProxy_ && isServerSession()) {
+                    const QString identifier = QString::number(id);
+                    if (identifier != serverUserIdentifier_) {
+                        serverUserIdentifier_ = identifier;
+                        serverProxy_->sendUserIdentifier(identifier);
+                    }
+                }
+                reply->deleteLater();
+            });
+        }
+    }
+
+    if (!identifier.isEmpty() && identifier != serverUserIdentifier_) {
+        serverUserIdentifier_ = identifier;
+        serverProxy_->sendUserIdentifier(identifier);
+    }
+}
+
 BrowserWindow *SebSession::createWindow(const QUrl &url, bool isMainWindow)
 {
     const auto &windowSettings = isMainWindow
@@ -215,6 +381,9 @@ BrowserWindow *SebSession::createWindow(const QUrl &url, bool isMainWindow)
     auto *window = new BrowserWindow(*this, windowSettings, url, isMainWindow);
     if (!isMainWindow) {
         window->setAttribute(Qt::WA_DeleteOnClose);
+    }
+    if (isMainWindow && serverProxy_) {
+        serverProxy_->startConnectivity();
     }
     return window;
 }

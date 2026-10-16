@@ -2,6 +2,8 @@
 
 #include <QWidget>
 
+#include <functional>
+
 QT_BEGIN_NAMESPACE
 class QLineEdit;
 QT_END_NAMESPACE
@@ -17,6 +19,11 @@ class RaiseHandControl : public QWidget
 
 public:
     explicit RaiseHandControl(QWidget *parent = nullptr);
+    void setServerCallbacks(
+        std::function<bool(const QString &)> raise,
+        std::function<bool()> lower);
+    void setMessageRequired(bool required);
+    void resetRaisedState();
 
 private:
     void updateState();
@@ -27,6 +34,9 @@ private:
     QLineEdit *messageEdit_ = nullptr;
     TaskbarButton *actionButton_ = nullptr;
     bool handRaised_ = false;
+    bool messageRequired_ = false;
+    std::function<bool(const QString &)> raiseCallback_;
+    std::function<bool()> lowerCallback_;
 };
 
 }  // namespace seb::ui::taskbar

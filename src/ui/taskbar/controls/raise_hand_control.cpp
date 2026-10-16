@@ -76,10 +76,40 @@ void RaiseHandControl::updateState()
 
 void RaiseHandControl::toggleRaisedState()
 {
+    const QString message = messageEdit_->text();
+    const bool success = handRaised_
+        ? (!lowerCallback_ || lowerCallback_())
+        : (!messageRequired_ || !message.trimmed().isEmpty()) &&
+              (!raiseCallback_ || raiseCallback_(message));
+    if (!success) {
+        return;
+    }
     handRaised_ = !handRaised_;
     if (handRaised_) {
         messageEdit_->clear();
     }
+    updateState();
+}
+
+void RaiseHandControl::setServerCallbacks(
+    std::function<bool(const QString &)> raise,
+    std::function<bool()> lower)
+{
+    raiseCallback_ = std::move(raise);
+    lowerCallback_ = std::move(lower);
+}
+
+void RaiseHandControl::setMessageRequired(bool required)
+{
+    messageRequired_ = required;
+    messageEdit_->setPlaceholderText(required
+        ? QStringLiteral("Message required")
+        : QStringLiteral("Optional message"));
+}
+
+void RaiseHandControl::resetRaisedState()
+{
+    handRaised_ = false;
     updateState();
 }
 

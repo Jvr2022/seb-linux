@@ -7,16 +7,24 @@
 #include "browser/contracts/i_webprofile.h"
 #include "configuration/cryptography/hash_algorithm.h"
 #include "runtime/version_restriction_validator.h"
+#include "server/data/exam.h"
+#include "server/server_proxy.h"
 #include "seb_session.h"
 #include "ui/runtime_window.h"
 
 #include <QCoreApplication>
+#include <QDir>
+#include <QDialog>
+#include <QDialogButtonBox>
 #include <QElapsedTimer>
 #include <QEventLoop>
 #include <QFileInfo>
+#include <QFile>
 #include <QInputDialog>
 #include <QLineEdit>
 #include <QMessageBox>
+#include <QListWidget>
+#include <QVBoxLayout>
 #include <QTimer>
 #include <QTemporaryDir>
 #include <QTextStream>
@@ -144,6 +152,105 @@ QString persistentClientPath(const seb::configuration::contracts::AppConfig &con
     return {};
 }
 
+bool chooseServerExam(
+    QWidget *parent,
+    const QList<seb::server::data::Exam> &exams,
+    seb::server::data::Exam &selected)
+{
+    if (exams.size() == 1) {
+        selected = exams.first();
+        return true;
+    }
+
+    QDialog dialog(parent);
+    dialog.setWindowTitle(QStringLiteral("Select exam"));
+    auto *layout = new QVBoxLayout(&dialog);
+    auto *list = new QListWidget(&dialog);
+    for (const auto &exam : exams) {
+        auto *item = new QListWidgetItem(
+            exam.name + (exam.lmsName.isEmpty()
+                ? QString()
+                : QStringLiteral(" (%1)").arg(exam.lmsName)),
+            list);
+        item->setData(Qt::UserRole, exam.id);
+    }
+    list->setCurrentRow(0);
+    layout->addWidget(list);
+    auto *buttons = new QDialogButtonBox(
+        QDialogButtonBox::Ok | QDialogButtonBox::Cancel,
+        Qt::Horizontal,
+        &dialog);
+    layout->addWidget(buttons);
+    QObject::connect(buttons, &QDialogButtonBox::accepted, &dialog, &QDialog::accept);
+    QObject::connect(buttons, &QDialogButtonBox::rejected, &dialog, &QDialog::reject);
+    if (dialog.exec() != QDialog::Accepted || !list->currentItem()) {
+        return false;
+    }
+    const QString id = list->currentItem()->data(Qt::UserRole).toString();
+    for (const auto &exam : exams) {
+        if (exam.id == id) {
+            selected = exam;
+            return true;
+        }
+    }
+    return false;
+}
+
+enum class ServerFailureAction { Retry, Fallback, Abort };
+
+ServerFailureAction chooseServerFailure(
+    QWidget *parent,
+    const QString &message,
+    bool allowFallback)
+{
+    QMessageBox box(parent);
+    box.setIcon(QMessageBox::Warning);
+    box.setWindowTitle(QStringLiteral("SEB Server unavailable"));
+    box.setText(message);
+    auto *retry = box.addButton(QStringLiteral("Retry"), QMessageBox::AcceptRole);
+    QPushButton *fallback = nullptr;
+    if (allowFallback) {
+        fallback = box.addButton(QStringLiteral("Use fallback"), QMessageBox::DestructiveRole);
+    }
+    auto *abort = box.addButton(QStringLiteral("Abort"), QMessageBox::RejectRole);
+    box.setDefaultButton(retry);
+    box.exec();
+    if (box.clickedButton() == retry) return ServerFailureAction::Retry;
+    if (fallback && box.clickedButton() == fallback) return ServerFailureAction::Fallback;
+    Q_UNUSED(abort);
+    return ServerFailureAction::Abort;
+}
+
+bool tryServerFallbackPassword(
+    QWidget *parent,
+    const QString &expectedHash,
+    QString &passwordOut)
+{
+    if (expectedHash.isEmpty()) {
+        return false;
+    }
+    const seb::configuration::cryptography::HashAlgorithm hashAlgorithm;
+    for (int attempt = 0; attempt < 5; ++attempt) {
+        bool accepted = false;
+        const QString password = QInputDialog::getText(
+            parent,
+            QStringLiteral("Fallback password"),
+            QStringLiteral("Enter the password for the offline fallback configuration."),
+            QLineEdit::Password,
+            QString(),
+            &accepted);
+        if (!accepted) {
+            return false;
+        }
+        if (hashAlgorithm.generateHashFor(password)
+                .compare(expectedHash, Qt::CaseInsensitive) == 0) {
+            passwordOut = password;
+            return true;
+        }
+    }
+    return false;
+}
+
 class ReconfigurationGuard
 {
 public:
@@ -260,6 +367,186 @@ bool AppController::ensureBrowserProfileContext()
     return browserProfile_ != nullptr;
 }
 
+bool AppController::initializeServerSession(
+    seb::settings::AppSettings &settings,
+    QString *error)
+{
+    using seb::configuration::contracts::LoadStatus;
+    using seb::settings::SessionMode;
+
+    if (settings.SessionMode != SessionMode::Server) {
+        return true;
+    }
+
+    if (serverProxy_ && serverProxy_->isConnected() && !serverProxy_->examId().isEmpty()) {
+        const auto info = serverProxy_->connectionInfo();
+        sessionConfiguration_.appConfig.serverApi = info.api;
+        sessionConfiguration_.appConfig.serverConnectionToken = info.connectionToken;
+        sessionConfiguration_.appConfig.serverOauth2Token = info.oauth2Token;
+        sessionConfiguration_.appConfig.serverExamId = serverProxy_->examId();
+        return true;
+    }
+
+    if (settings.Server.ServerUrl.trimmed().isEmpty()) {
+        if (error) *error = QStringLiteral("SEB Server mode requires sebServerURL.");
+        return false;
+    }
+
+    const auto connectionBrowser = settings.Browser;
+    const auto connectionServer = settings.Server;
+    const auto fallbackToLocalSettings = [&]() {
+        QString fallbackPassword;
+        if (!tryServerFallbackPassword(
+                mainWindow_,
+                connectionServer.FallbackPasswordHash,
+                fallbackPassword)) {
+            return false;
+        }
+        const QString fallbackPath = persistentClientPath(sessionConfiguration_.appConfig);
+        if (fallbackPath.isEmpty()) {
+            return false;
+        }
+        seb::settings::AppSettings fallbackSettings;
+        seb::configuration::contracts::cryptography::PasswordParameters fallbackParameters;
+        fallbackParameters.password = fallbackPassword;
+        fallbackParameters.isHash = false;
+        seb::configuration::contracts::LoadStatus fallbackStatus =
+            seb::configuration::contracts::LoadStatus::UnexpectedError;
+        bool fallbackAborted = false;
+        const bool loaded = loadSettingsWithPassword(
+            QUrl::fromLocalFile(fallbackPath),
+            fallbackSettings,
+            fallbackParameters,
+            QString(),
+            true,
+            fallbackStatus,
+            fallbackAborted);
+        if (!loaded || fallbackStatus != seb::configuration::contracts::LoadStatus::Success) {
+            return false;
+        }
+        fallbackSettings.SessionMode = SessionMode::Normal;
+        settings = fallbackSettings;
+        serverProxy_.reset();
+        return true;
+    };
+    if (!serverProxy_) {
+        serverProxy_ = std::make_unique<seb::server::ServerProxy>(
+            sessionConfiguration_.appConfig,
+            this);
+    }
+
+    for (int attempt = 0; attempt < 5; ++attempt) {
+        serverProxy_->initialize(connectionServer);
+        const auto connected = serverProxy_->connectToServer();
+        if (!connected.success) {
+            const auto action = chooseServerFailure(
+                mainWindow_, connected.message, connectionServer.PerformFallback);
+            if (action == ServerFailureAction::Retry) continue;
+            if (action == ServerFailureAction::Fallback && connectionServer.PerformFallback) {
+                if (fallbackToLocalSettings()) {
+                    return true;
+                }
+            }
+            if (error) *error = connected.message;
+            return false;
+        }
+
+        QList<seb::server::data::Exam> exams;
+        const auto available = serverProxy_->availableExams(exams, connectionServer.ExamId);
+        if (!available.success) {
+            const auto action = chooseServerFailure(
+                mainWindow_, available.message, connectionServer.PerformFallback);
+            if (action == ServerFailureAction::Retry) continue;
+            if (action == ServerFailureAction::Fallback && connectionServer.PerformFallback) {
+                if (fallbackToLocalSettings()) {
+                    return true;
+                }
+            }
+            if (error) *error = available.message;
+            return false;
+        }
+
+        seb::server::data::Exam selected;
+        if (!connectionServer.ExamId.isEmpty()) {
+            for (const auto &exam : exams) {
+                if (exam.id == connectionServer.ExamId) {
+                    selected = exam;
+                    break;
+                }
+            }
+            if (selected.id.isEmpty()) {
+                if (error) *error = QStringLiteral("The configured SEB Server exam was not available.");
+                return false;
+            }
+        } else if (!chooseServerExam(mainWindow_, exams, selected)) {
+            if (error) *error = QStringLiteral("No SEB Server exam was selected.");
+            return false;
+        }
+
+        const QString directory = sessionConfiguration_.appConfig.temporaryDirectory;
+        if (!QDir().mkpath(directory)) {
+            if (error) *error = QStringLiteral("Could not create temporary SEB Server storage.");
+            return false;
+        }
+        const QString path = QDir(directory).filePath(
+            QStringLiteral("seb-server-%1.seb").arg(QUuid::createUuid().toString(QUuid::WithoutBraces)));
+        const auto downloaded = serverProxy_->downloadExamConfiguration(selected, path);
+        if (!downloaded.success) {
+            QFile::remove(path);
+            if (error) *error = downloaded.message;
+            return false;
+        }
+
+        seb::settings::AppSettings examSettings;
+        seb::configuration::contracts::cryptography::PasswordParameters password;
+        LoadStatus status = LoadStatus::UnexpectedError;
+        bool aborted = false;
+        const bool loaded = loadSettingsWithPassword(
+            QUrl::fromLocalFile(path),
+            examSettings,
+            password,
+            connectionServer.FallbackPasswordHash,
+            false,
+            status,
+            aborted);
+        QFile::remove(path);
+        if (!loaded || status != LoadStatus::Success) {
+            if (error) {
+                *error = aborted
+                    ? QStringLiteral("The SEB Server exam configuration password was not accepted.")
+                    : loadStatusMessage(status);
+            }
+            return false;
+        }
+
+        QString browserExamKey;
+        const auto selectedResponse = serverProxy_->selectExam(selected, &browserExamKey);
+        if (!selectedResponse.success) {
+            if (error) *error = selectedResponse.message;
+            return false;
+        }
+
+        examSettings.Browser.StartUrl = selected.url;
+        examSettings.Browser.StartUrlQuery = connectionBrowser.StartUrlQuery;
+        examSettings.Server = connectionServer;
+        examSettings.SessionMode = SessionMode::Server;
+        if (!browserExamKey.isEmpty()) {
+            examSettings.Browser.CustomBrowserExamKey = browserExamKey;
+        }
+        settings = examSettings;
+
+        const auto info = serverProxy_->connectionInfo();
+        sessionConfiguration_.appConfig.serverApi = info.api;
+        sessionConfiguration_.appConfig.serverConnectionToken = info.connectionToken;
+        sessionConfiguration_.appConfig.serverOauth2Token = info.oauth2Token;
+        sessionConfiguration_.appConfig.serverExamId = selected.id;
+        return true;
+    }
+
+    if (error) *error = QStringLiteral("Could not connect to the SEB Server.");
+    return false;
+}
+
 bool AppController::launch(const QString &resource, QString *error)
 {
     const bool isReconfiguration = session_ != nullptr;
@@ -272,6 +559,9 @@ bool AppController::launch(const QString &resource, QString *error)
         return false;
     }
     ReconfigurationGuard reconfigurationGuard(reconfigurationInProgress_, isReconfiguration);
+    if (session_) {
+        serverProxy_ = session_->takeServerProxy();
+    }
     const bool previousBrowserResource = sessionConfiguration_.isBrowserResource;
     const QString previousBrowserProfilePath = sessionConfiguration_.browserProfilePath;
     const QString previousAdminPasswordHash = session_
@@ -477,6 +767,10 @@ bool AppController::launch(const QString &resource, QString *error)
         }
     }
 
+    if (!initializeServerSession(sessionConfiguration_.settings, error)) {
+        return false;
+    }
+
     if (!validateVersionRestrictions(sessionConfiguration_, error)) {
         return false;
     }
@@ -532,7 +826,8 @@ bool AppController::applySettings(
         },
         this,
         configuration.reuseBrowserProfile ? browserEngineProvider_.get() : nullptr,
-        configuration.reuseBrowserProfile ? browserProfile_.get() : nullptr);
+        configuration.reuseBrowserProfile ? browserProfile_.get() : nullptr,
+        std::move(serverProxy_));
 
     BrowserWindow *nextWindow = nextSession->createWindow(nextSession->initialUrl(), true);
     runtimeWindow_->setStatusText(QStringLiteral("Opening secure browser window"));
