@@ -3,6 +3,7 @@
 #include <QObject>
 #include <QList>
 #include <QString>
+#include <QProcess>
 
 QT_BEGIN_NAMESPACE
 class QTimer;
@@ -43,13 +44,23 @@ public:
 
     const NetworkState &state() const;
     void refresh();
+    void connectToNetwork(const QString &ssid);
 
 signals:
     void stateChanged();
 
+private slots:
+    void onDeviceQueryFinished(int exitCode, QProcess::ExitStatus exitStatus);
+    void onWifiListQueryFinished(int exitCode, QProcess::ExitStatus exitStatus);
+
 private:
+    void finalizeState();
+
     NetworkState state_;
+    NetworkState pendingState_;
     QTimer *timer_ = nullptr;
+    QProcess *deviceProcess_ = nullptr;
+    QProcess *wifiProcess_ = nullptr;
 };
 
 }  // namespace seb::shell::taskbar::platform

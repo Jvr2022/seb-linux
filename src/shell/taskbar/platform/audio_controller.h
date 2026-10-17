@@ -1,6 +1,7 @@
 #pragma once
 
 #include <QObject>
+#include <QProcess>
 
 QT_BEGIN_NAMESPACE
 class QTimer;
@@ -30,9 +31,13 @@ public:
 signals:
     void stateChanged();
 
+private slots:
+    void onGetVolumeFinished(int exitCode, QProcess::ExitStatus exitStatus);
+
 private:
     AudioState state_;
     QTimer *timer_ = nullptr;
+    QProcess *getVolumeProcess_ = nullptr;
 };
 
 }  // namespace seb::shell::taskbar::platform

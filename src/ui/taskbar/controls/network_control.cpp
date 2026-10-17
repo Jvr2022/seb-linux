@@ -89,7 +89,11 @@ void NetworkControl::rebuildPopup()
                              .arg(network.active ? QStringLiteral("•") : QStringLiteral(" "))
                              .arg(network.ssid)
                              .arg(network.signalPercent));
-            connect(row, &QPushButton::clicked, popup_, &QWidget::hide);
+            QString ssid = network.ssid;
+            connect(row, &QPushButton::clicked, this, [this, ssid] {
+                controller_.connectToNetwork(ssid);
+                popup_->hide();
+            });
             popupLayout_->addWidget(row);
         }
     }

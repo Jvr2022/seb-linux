@@ -1,4 +1,4 @@
-QT += core gui widgets network xml
+QT += core gui widgets network xml dbus
 
 # Safe Exam Browser for Linux: Browser Engine Detection
 # We support Qt WebEngine (primary) and WebKitGTK (fallback for RISC-V/Older systems).
@@ -64,16 +64,17 @@ DEFINES += SEB_HAS_QTWEBENGINE=$$seb_has_qtwebengine
 DEFINES += SEB_HAS_WEBKITGTK=$$seb_has_webkitgtk
 DEFINES += SEB_HAS_ANY_ENGINE=$$seb_has_any_engine
 
+CONFIG += c++20 console warn_on object_parallel_to_source
+TEMPLATE = app
+TARGET = safe-exam-browser
+
 # Dev Bypass Build Option
 # Usage: qmake CONFIG+=dev_bypass
 dev_bypass {
     DEFINES += SEB_DEV_BYPASS_DEFAULT=1
+    TARGET = safe-exam-browser_dev
     message("Building with PERSISTENT developer bypass enabled.")
 }
-
-CONFIG += c++20 console warn_on object_parallel_to_source
-TEMPLATE = app
-TARGET = safe-exam-browser
 
 QMAKE_CXXFLAGS += -Wall -Wextra -Wpedantic
 

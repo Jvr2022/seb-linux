@@ -2,10 +2,8 @@
 
 #include <QObject>
 #include <QString>
-
-QT_BEGIN_NAMESPACE
-class QTimer;
-QT_END_NAMESPACE
+#include <QVariantMap>
+#include <QStringList>
 
 namespace seb::shell::taskbar::platform {
 
@@ -30,9 +28,11 @@ public:
 signals:
     void stateChanged();
 
+private slots:
+    void onPropertiesChanged(const QString &interfaceName, const QVariantMap &changedProperties, const QStringList &invalidatedProperties);
+
 private:
     BatteryState state_;
-    QTimer *timer_ = nullptr;
 };
 
 }  // namespace seb::shell::taskbar::platform
