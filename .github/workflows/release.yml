@@ -14,10 +14,24 @@ on:
 permissions:
   contents: write
 
+env:
+  APPIMAGE_EXTRACT_AND_RUN: "1"
+
 jobs:
   build-linux:
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-latest
+    container:
+      image: ubuntu:22.04
     steps:
+      - name: Bootstrap container packages
+        run: |
+          apt-get update
+          DEBIAN_FRONTEND=noninteractive apt-get install -y \
+            ca-certificates \
+            git \
+            wget \
+            sudo
+
       - uses: actions/checkout@v7
 
       - name: Resolve release version
@@ -52,6 +66,8 @@ jobs:
           generate_release_notes: true
           body: |
             Thanks to everyone who contributed to this release.
+
+            Supported targets: Ubuntu 22.04+, Fedora 39+ (x86_64), glibc >= 2.35.
 
             GitHub generated release notes below include the commit summary and new contributors automatically.
           files: |

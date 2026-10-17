@@ -7,6 +7,9 @@ on:
       - master
   pull_request:
 
+env:
+  APPIMAGE_EXTRACT_AND_RUN: "1"
+
 jobs:
   build-qtwebengine:
     runs-on: ubuntu-24.04
@@ -109,3 +112,114 @@ jobs:
           ldd artifacts/webkitgtk/safe-exam-browser | grep -q 'libwebkit2gtk-4.1'
           ! ldd artifacts/webkitgtk/safe-exam-browser | grep -q 'libQt6WebEngine'
           artifacts/webkitgtk/safe-exam-browser --version
+
+  # Portable AppImages are built on Ubuntu 22.04 (glibc 2.35) for Ubuntu 22.04+ / Fedora 39+.
+  # Full AppImage packaging is heavy; run on main/master pushes (not every PR).
+  build-appimage:
+    if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master')
+    runs-on: ubuntu-latest
+    container:
+      image: ubuntu:22.04
+    steps:
+      - name: Bootstrap container packages
+        run: |
+          apt-get update
+          DEBIAN_FRONTEND=noninteractive apt-get install -y \
+            ca-certificates \
+            git \
+            wget \
+            sudo \
+            binutils
+
+      - uses: actions/checkout@v7
+
+      - name: Build AppImage artifacts
+        run: |
+          chmod +x scripts/build-release.sh
+          scripts/build-release.sh "0.0.0-ci"
+
+      - name: Upload AppImage artifacts
+        uses: actions/upload-artifact@v7
+        with:
+          name: safe-exam-browser-appimage
+          path: |
+            dist/*.AppImage
+          if-no-files-found: error
+
+  appimage-smoke-ubuntu:
+    needs:
+      - build-appimage
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Install AppImage host runtime libs
+        run: |
+          # GL/EGL/OpenGL stay on the host (not bundled). Fonts/GTK bits help the WebKit AppImage.
+          # AppImages only ship the xcb Qt plugin, so smoke under Xvfb.
+          sudo apt-get update
+          sudo apt-get install -y \
+            libegl1 \
+            libgl1 \
+            libgles2 \
+            libopengl0 \
+            libfreetype6 \
+            fontconfig \
+            libxkbcommon0 \
+            libgtk-3-0t64 \
+            libwebkit2gtk-4.1-0 \
+            xvfb
+
+      - name: Download AppImage artifacts
+        uses: actions/download-artifact@v8
+        with:
+          name: safe-exam-browser-appimage
+          path: dist
+
+      - name: Smoke-test AppImages on Ubuntu
+        env:
+          QT_QPA_PLATFORM: xcb
+          APPIMAGE_EXTRACT_AND_RUN: "1"
+        run: |
+          chmod +x dist/*.AppImage
+          for appimage in dist/*.AppImage; do
+            echo "Running ${appimage} --version"
+            xvfb-run -a "${appimage}" --version
+          done
+
+  appimage-smoke-fedora:
+    needs:
+      - build-appimage
+    runs-on: ubuntu-latest
+    container:
+      image: fedora:latest
+    steps:
+      - name: Install AppImage host runtime libs
+        run: |
+          dnf install -y \
+            libglvnd-egl \
+            libglvnd-glx \
+            libglvnd-opengl \
+            mesa-libEGL \
+            mesa-libGL \
+            freetype \
+            fontconfig \
+            libxkbcommon \
+            gtk3 \
+            webkit2gtk4.1 \
+            xorg-x11-server-Xvfb
+
+      - name: Download AppImage artifacts
+        uses: actions/download-artifact@v8
+        with:
+          name: safe-exam-browser-appimage
+          path: dist
+
+      - name: Smoke-test AppImages on Fedora
+        env:
+          QT_QPA_PLATFORM: xcb
+          APPIMAGE_EXTRACT_AND_RUN: "1"
+        run: |
+          chmod +x dist/*.AppImage
+          for appimage in dist/*.AppImage; do
+            echo "Running ${appimage} --version"
+            xvfb-run -a "${appimage}" --version
+          done

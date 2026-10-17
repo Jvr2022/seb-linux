@@ -6,6 +6,7 @@
 #include <QApplication>
 #include <QCommandLineOption>
 #include <QCommandLineParser>
+#include <QDir>
 #include <QIcon>
 #include <QInputDialog>
 #include <QLineEdit>
@@ -140,12 +141,82 @@ bool hasArgument(int argc, char *argv[], const QString &value)
     return false;
 }
 
+// QApplication is not created yet, so probe known plugin locations (AppImage APPDIR + distro paths).
+static bool qtPlatformPluginAvailable(const QString &platformName)
+{
+    const QString fileName = QStringLiteral("libq") + platformName + QStringLiteral(".so");
+    QStringList dirs;
+
+    const QByteArray appDir = qgetenv("APPDIR");
+    if (!appDir.isEmpty()) {
+        dirs << (QString::fromLocal8Bit(appDir) + QStringLiteral("/usr/plugins/platforms"));
+    }
+
+    dirs << QStringLiteral("/usr/lib/x86_64-linux-gnu/qt6/plugins/platforms")
+         << QStringLiteral("/usr/lib/qt6/plugins/platforms")
+         << QStringLiteral("/usr/lib64/qt6/plugins/platforms");
+
+    for (const QString &dir : dirs) {
+        if (QFileInfo::exists(dir + QLatin1Char('/') + fileName)) {
+            return true;
+        }
+    }
+    return false;
+}
+
 static void appendPkexecEnvironmentVariable(QStringList &args, const char *name)
 {
     const QByteArray value = qgetenv(name);
     if (!value.isEmpty()) {
         args << (QString(name) + QLatin1Char('=') + QString::fromLocal8Bit(value));
     }
+}
+
+// When running from an AppImage, applicationFilePath() is under the FUSE mount
+// (/tmp/.mount_*/usr/bin/...). Root cannot execute that path after pkexec.
+// Prefer $APPIMAGE so elevation re-runs the outer AppImage file instead.
+static QString elevatedExecutablePath()
+{
+    const QByteArray appImage = qgetenv("APPIMAGE");
+    if (!appImage.isEmpty()) {
+        const QString path = QString::fromLocal8Bit(appImage);
+        if (QFileInfo::exists(path)) {
+            return path;
+        }
+    }
+    return QCoreApplication::applicationFilePath();
+}
+
+// Build pkexec argv without --keep-cwd (unsupported on Ubuntu 22.04 / pkexec 0.105).
+// Preserve the caller's cwd via /bin/sh so AppImage and relative paths keep working.
+static QStringList buildPkexecArguments(const QStringList &appArgs,
+                                        const QStringList &extraEnvAssignments = {})
+{
+    QStringList pkexecArgs;
+    pkexecArgs << QStringLiteral("env");
+    appendPkexecEnvironmentVariable(pkexecArgs, "DISPLAY");
+    appendPkexecEnvironmentVariable(pkexecArgs, "WAYLAND_DISPLAY");
+    appendPkexecEnvironmentVariable(pkexecArgs, "XAUTHORITY");
+    appendPkexecEnvironmentVariable(pkexecArgs, "XDG_RUNTIME_DIR");
+    appendPkexecEnvironmentVariable(pkexecArgs, "XDG_SESSION_TYPE");
+    appendPkexecEnvironmentVariable(pkexecArgs, "DBUS_SESSION_BUS_ADDRESS");
+    // Do not forward QT_QPA_PLATFORM from the parent: lockdown mode chooses linuxfb/xcb itself.
+    // Keep AppImage runtime hints for the elevated re-exec.
+    appendPkexecEnvironmentVariable(pkexecArgs, "APPIMAGE");
+    appendPkexecEnvironmentVariable(pkexecArgs, "APPDIR");
+    appendPkexecEnvironmentVariable(pkexecArgs, "OWD");
+    appendPkexecEnvironmentVariable(pkexecArgs, "ARGV0");
+    appendPkexecEnvironmentVariable(pkexecArgs, "APPIMAGE_EXTRACT_AND_RUN");
+    pkexecArgs << extraEnvAssignments;
+
+    pkexecArgs << QStringLiteral("/bin/sh");
+    pkexecArgs << QStringLiteral("-c");
+    pkexecArgs << QStringLiteral("cd -- \"$1\" && shift && exec \"$@\"");
+    pkexecArgs << QStringLiteral("sh");
+    pkexecArgs << QDir::currentPath();
+    pkexecArgs << elevatedExecutablePath();
+    pkexecArgs << appArgs;
+    return pkexecArgs;
 }
 
 static int runNonDetachedPkexecChild(QProcess &child)
@@ -244,12 +315,16 @@ void applyEarlyEnvironment(int argc, char *argv[])
 
     if (isExamAntiCheat || isMenuLockdown) {
         if (isMenuLockdown || (isExamAntiCheat && hasResource)) {
-            if (!setup_barebones_vt()) {
-                qCritical() << "Anti-cheat VT setup failed; aborting.";
-                _exit(1);
+            // Lockdown prefers a bare VT + linuxfb. AppImages often only ship xcb unless
+            // EXTRA_PLATFORM_PLUGINS includes libqlinuxfb.so — fall back instead of aborting.
+            if (qtPlatformPluginAvailable(QStringLiteral("linuxfb")) && setup_barebones_vt()) {
+                qputenv("QT_QPA_PLATFORM", "linuxfb");
+                qputenv("QT_QUICK_BACKEND", "software");
+            } else {
+                qWarning() << "VT/linuxfb lockdown unavailable; continuing with the default Qt platform "
+                              "(xcb). Rebuild the AppImage with EXTRA_PLATFORM_PLUGINS=libqlinuxfb.so "
+                              "for full bare-VT lockdown.";
             }
-            qputenv("QT_QPA_PLATFORM", "linuxfb");
-            qputenv("QT_QUICK_BACKEND", "software");
         }
 #if SEB_HAS_QTWEBENGINE
         qputenv("QTWEBENGINE_CHROMIUM_FLAGS", "--no-sandbox");
@@ -460,21 +535,7 @@ int main(int argc, char *argv[])
 
             QProcess child;
             child.setProgram(QStringLiteral("pkexec"));
-
-            QStringList pkexecArgs;
-            pkexecArgs << QStringLiteral("--keep-cwd");
-            pkexecArgs << QStringLiteral("env");
-            appendPkexecEnvironmentVariable(pkexecArgs, "DISPLAY");
-            appendPkexecEnvironmentVariable(pkexecArgs, "WAYLAND_DISPLAY");
-            appendPkexecEnvironmentVariable(pkexecArgs, "XAUTHORITY");
-            appendPkexecEnvironmentVariable(pkexecArgs, "XDG_RUNTIME_DIR");
-            appendPkexecEnvironmentVariable(pkexecArgs, "XDG_SESSION_TYPE");
-            appendPkexecEnvironmentVariable(pkexecArgs, "DBUS_SESSION_BUS_ADDRESS");
-            appendPkexecEnvironmentVariable(pkexecArgs, "QT_QPA_PLATFORM");
-            pkexecArgs << QCoreApplication::applicationFilePath();
-            pkexecArgs << args;
-
-            child.setArguments(pkexecArgs);
+            child.setArguments(buildPkexecArguments(args));
             return runNonDetachedPkexecChild(child);
         }
 
@@ -498,27 +559,15 @@ int main(int argc, char *argv[])
             if (!args.contains(QStringLiteral("--anti-cheat"))) {
                 args.prepend(QStringLiteral("--anti-cheat"));
             }
-            
+
+            QStringList extraEnv;
+            if (usedPassword) {
+                extraEnv << (QStringLiteral("SEB_PASSWORD=") + userPassword);
+            }
+
             QProcess child;
             child.setProgram(QStringLiteral("pkexec"));
-            
-            QStringList pkexecArgs;
-            pkexecArgs << QStringLiteral("--keep-cwd");
-            pkexecArgs << QStringLiteral("env");
-            appendPkexecEnvironmentVariable(pkexecArgs, "DISPLAY");
-            appendPkexecEnvironmentVariable(pkexecArgs, "WAYLAND_DISPLAY");
-            appendPkexecEnvironmentVariable(pkexecArgs, "XAUTHORITY");
-            appendPkexecEnvironmentVariable(pkexecArgs, "XDG_RUNTIME_DIR");
-            appendPkexecEnvironmentVariable(pkexecArgs, "XDG_SESSION_TYPE");
-            appendPkexecEnvironmentVariable(pkexecArgs, "DBUS_SESSION_BUS_ADDRESS");
-            appendPkexecEnvironmentVariable(pkexecArgs, "QT_QPA_PLATFORM");
-            if (usedPassword) {
-                pkexecArgs << (QStringLiteral("SEB_PASSWORD=") + userPassword);
-            }
-            pkexecArgs << QCoreApplication::applicationFilePath();
-            pkexecArgs << args;
-            
-            child.setArguments(pkexecArgs);
+            child.setArguments(buildPkexecArguments(args, extraEnv));
             return runNonDetachedPkexecChild(child);
         }
     }
