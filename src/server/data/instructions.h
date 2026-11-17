@@ -21,8 +21,20 @@ enum class NotificationType
     Hand
 };
 
+enum class ProctoringProvider { Unknown, JitsiMeet, Zoom, ScreenProctoring };
+enum class ProctoringMethod { Unknown, Join, Leave };
+struct ProctoringInstruction
+{
+    ProctoringProvider provider = ProctoringProvider::Unknown;
+    ProctoringMethod method = ProctoringMethod::Unknown;
+    QString clientId, clientSecret, groupId, serviceUrl, sessionId, encryptionSecret;
+    QString roomName, token;
+    QString meetingNumber, password, sdkKey, signature, subject, userName;
+};
+
 struct InstructionData
 {
+    ProctoringInstruction proctoring;
     Instruction instruction = Instruction::None;
     NotificationType notificationType = NotificationType::Unknown;
     QString message;

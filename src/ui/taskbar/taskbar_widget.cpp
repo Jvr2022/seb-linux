@@ -65,8 +65,8 @@ TaskbarWidget::TaskbarWidget(SebSession &session, QWidget *parent)
     scrollArea->setWidget(applicationContainer);
 
     audioController_ = new seb::shell::taskbar::platform::AudioController(this);
-    networkController_ = new seb::shell::taskbar::platform::NetworkController(this);
-    batteryController_ = new seb::shell::taskbar::platform::BatteryController(this);
+    networkController_ = session_.networkController();
+    batteryController_ = session_.batteryController();
     keyboardController_ = new seb::shell::taskbar::platform::KeyboardController(this);
 
     const auto &settings = session_.settings();
@@ -106,8 +106,8 @@ TaskbarWidget::TaskbarWidget(SebSession &session, QWidget *parent)
         raiseHandControl_->setMessageRequired(
             settings.Server.Invigilation.ForceRaiseHandMessage);
         raiseHandControl_->setServerCallbacks(
-            [this](const QString &message) { return session_.raiseServerHand(message); },
-            [this] { return session_.lowerServerHand(); });
+            [this](const QString &message, auto done) { session_.raiseServerHand(message, done); },
+            [this](auto done) { session_.lowerServerHand(done); });
         connect(&session_, &SebSession::serverHandConfirmed,
                 raiseHandControl_, &RaiseHandControl::resetRaisedState);
         notificationLayout->addWidget(raiseHandControl_);
@@ -118,9 +118,7 @@ TaskbarWidget::TaskbarWidget(SebSession &session, QWidget *parent)
     auto *systemLayout = new QHBoxLayout(systemContainer);
     systemLayout->setContentsMargins(0, 0, 0, 0);
     systemLayout->setSpacing(0);
-    if (model.showPower) {
-        systemLayout->addWidget(new BatteryControl(*batteryController_, systemContainer));
-    }
+    systemLayout->addWidget(new BatteryControl(*batteryController_, systemContainer));
     if (model.showNetwork) {
         systemLayout->addWidget(new NetworkControl(*networkController_, systemContainer));
     }

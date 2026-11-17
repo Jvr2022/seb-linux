@@ -4,10 +4,10 @@ namespace seb::server {
 
 QUrl Sanitizer::baseAddress(const QString &serverUrl)
 {
-    QUrl url(serverUrl.trimmed());
+    QUrl url(serverUrl.trimmed(), QUrl::StrictMode);
     if (!url.isValid() || (url.scheme() != QStringLiteral("http") &&
                            url.scheme() != QStringLiteral("https")) ||
-        url.host().isEmpty()) {
+        url.host().isEmpty() || !url.userInfo().isEmpty() || url.hasFragment() || url.hasQuery()) {
         return {};
     }
 
@@ -31,16 +31,15 @@ QString Sanitizer::apiEndpoint(const QString &endpoint)
 
 QUrl Sanitizer::resolve(const QUrl &base, const QString &endpoint)
 {
-    const QString sanitized = apiEndpoint(endpoint);
-    const QUrl absolute(sanitized);
-    if (absolute.isValid() && (absolute.scheme() == QStringLiteral("http") ||
-                               absolute.scheme() == QStringLiteral("https"))) {
-        return absolute;
-    }
-    if (sanitized.isEmpty()) {
-        return {};
-    }
-    return base.resolved(QUrl(sanitized));
+    if (!base.isValid() || endpoint.trimmed().isEmpty()) return {};
+    if (endpoint.trimmed().startsWith(QStringLiteral("//"))) return {};
+    const QUrl relative(apiEndpoint(endpoint), QUrl::StrictMode);
+    const QUrl resolved = base.resolved(relative);
+    if (!relative.isValid() || !resolved.isValid() || !resolved.userInfo().isEmpty() || resolved.hasFragment() ||
+        resolved.scheme() != base.scheme() || resolved.host().compare(base.host(), Qt::CaseInsensitive) != 0 ||
+        resolved.port(resolved.scheme() == QStringLiteral("https") ? 443 : 80) !=
+            base.port(base.scheme() == QStringLiteral("https") ? 443 : 80)) return {};
+    return resolved;
 }
 
-}  // namespace seb::server
+} // namespace seb::server

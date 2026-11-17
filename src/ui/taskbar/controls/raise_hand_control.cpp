@@ -4,6 +4,7 @@
 #include "../common/taskbar_popup.h"
 
 #include <QGridLayout>
+#include <QPointer>
 #include <QLineEdit>
 #include <QVBoxLayout>
 
@@ -76,24 +77,30 @@ void RaiseHandControl::updateState()
 
 void RaiseHandControl::toggleRaisedState()
 {
-    const QString message = messageEdit_->text();
-    const bool success = handRaised_
-        ? (!lowerCallback_ || lowerCallback_())
-        : (!messageRequired_ || !message.trimmed().isEmpty()) &&
-              (!raiseCallback_ || raiseCallback_(message));
-    if (!success) {
-        return;
-    }
-    handRaised_ = !handRaised_;
-    if (handRaised_) {
-        messageEdit_->clear();
-    }
-    updateState();
+    if (pending_ || (!handRaised_ && messageRequired_ && messageEdit_->text().trimmed().isEmpty())) return;
+    const bool raised = !handRaised_;
+    const auto generation = ++generation_;
+    pending_ = true;
+    actionButton_->setEnabled(false);
+    QPointer<RaiseHandControl> self(this);
+    auto done = [self, raised, generation](bool success) {
+        if (!self || generation != self->generation_) return;
+        self->pending_ = false;
+        self->actionButton_->setEnabled(true);
+        if (success) {
+            self->handRaised_ = raised;
+            if (raised) self->messageEdit_->clear();
+        }
+        self->updateState();
+    };
+    if (raised && raiseCallback_) raiseCallback_(messageEdit_->text(), done);
+    else if (!raised && lowerCallback_) lowerCallback_(done);
+    else done(false);
 }
 
 void RaiseHandControl::setServerCallbacks(
-    std::function<bool(const QString &)> raise,
-    std::function<bool()> lower)
+    std::function<void(const QString &, std::function<void(bool)>)> raise,
+    std::function<void(std::function<void(bool)>)> lower)
 {
     raiseCallback_ = std::move(raise);
     lowerCallback_ = std::move(lower);
@@ -109,6 +116,9 @@ void RaiseHandControl::setMessageRequired(bool required)
 
 void RaiseHandControl::resetRaisedState()
 {
+    ++generation_;
+    pending_ = false;
+    actionButton_->setEnabled(true);
     handRaised_ = false;
     updateState();
 }

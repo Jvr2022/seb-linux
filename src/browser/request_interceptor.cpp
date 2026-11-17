@@ -6,10 +6,10 @@ namespace seb::browser {
 
 RequestInterceptor::RequestInterceptor(
     const seb::settings::browser::BrowserSettings &settings,
-    seb::configuration::contracts::cryptography::IKeyGenerator &keyGenerator)
+    std::shared_ptr<seb::configuration::contracts::cryptography::IKeyGenerator> keyGenerator)
     : settings_(settings)
     , filter_(settings.Filter)
-    , keyGenerator_(keyGenerator)
+    , keyGenerator_(std::move(keyGenerator))
 {
 }
 
@@ -36,12 +36,12 @@ void RequestInterceptor::interceptRequest(contracts::IRequest &request)
         if (settings_.SendConfigurationKey) {
             request.setHttpHeader(
                 "X-SafeExamBrowser-ConfigKeyHash",
-                keyGenerator_.calculateConfigurationKeyHash(settings_.ConfigurationKey, encodedUrl).toLatin1());
+                keyGenerator_->calculateConfigurationKeyHash(settings_.ConfigurationKey, encodedUrl).toLatin1());
         }
         if (settings_.SendBrowserExamKey) {
             request.setHttpHeader(
                 "X-SafeExamBrowser-RequestHash",
-                keyGenerator_.calculateBrowserExamKeyHash(
+                keyGenerator_->calculateBrowserExamKeyHash(
                     settings_.ConfigurationKey,
                     settings_.BrowserExamKeySalt,
                     encodedUrl)

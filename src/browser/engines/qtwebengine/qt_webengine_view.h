@@ -3,10 +3,14 @@
 #if SEB_HAS_QTWEBENGINE
 
 #include "browser/contracts/i_webview.h"
+#include "settings/AppSettings.h"
+#include "settings/Browser/WindowSettings.h"
+#include <memory>
 
 QT_BEGIN_NAMESPACE
 class QWebEngineView;
 class QWebChannel;
+class QPrinter;
 QT_END_NAMESPACE
 
 namespace seb::browser {
@@ -22,6 +26,11 @@ public:
     ~QtWebEngineWebView() override;
 
     QWidget *widget() const override;
+    void configureBrowser(const seb::settings::AppSettings &settings,
+                          const seb::settings::browser::WindowSettings &window) override;
+    void initializeClipboard(seb::browser::Clipboard *clipboard) override;
+    void setZoomFactor(double factor) override;
+    void print() override;
 
     QUrl url() const override;
     void setUrl(const QUrl &url) override;
@@ -51,6 +60,16 @@ private:
     QWebEngineView *view_ = nullptr;
     QWebChannel *webChannel_ = nullptr;
     bool sebApiInitialized_ = false;
+    bool configured_ = false;
+    bool printing_ = false;
+    seb::settings::security::ClipboardPolicy clipboardPolicy_ = seb::settings::security::ClipboardPolicy::Isolated;
+    seb::settings::monitoring::KeyboardSettings keyboardSettings_;
+    seb::settings::monitoring::MouseSettings mouseSettings_;
+    seb::browser::Clipboard *clipboard_ = nullptr;
+    std::function<void(const QString &)> clipboardCommand_;
+    seb::settings::browser::BrowserSettings settings_;
+    seb::settings::browser::WindowSettings windowSettings_;
+    std::unique_ptr<QPrinter> printer_;
     contracts::IWebView::NavigationRequestDelegate navigationDelegate_;
     contracts::IWebView::FileSelectionDelegate fileSelectionDelegate_;
 };

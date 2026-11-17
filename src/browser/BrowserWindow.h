@@ -4,6 +4,7 @@
 #include "contracts/IBrowserWindow.h"
 
 #include <QObject>
+#include <QPointer>
 
 class BrowserWindow;
 
@@ -25,7 +26,7 @@ public:
     BrowserWindowContext context() const;
 
 private:
-    ::BrowserWindow *window_ = nullptr;
+    QPointer<::BrowserWindow> window_;
 };
 
 }  // namespace seb::browser

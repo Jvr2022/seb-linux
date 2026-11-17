@@ -4,14 +4,16 @@
 #include "sanitizer.h"
 
 #include <QDateTime>
-#include <QEventLoop>
+#include "configuration/cryptography/key_generator.h"
+#include <QPointer>
+#include <memory>
+#include <utility>
 #include <QHostInfo>
 #include <QJsonDocument>
 #include <QJsonObject>
 #include <QNetworkRequest>
 #include <QSaveFile>
 #include <QTimer>
-#include <QUrlQuery>
 
 namespace seb::server {
 
@@ -23,532 +25,452 @@ constexpr auto ConnectionTokenHeader = "SEBConnectionToken";
 constexpr auto ExamSaltHeader = "SEBExamSalt";
 constexpr auto BrowserExamKeyHeader = "SEBServerBEK";
 
-QString responseMessage(const QNetworkReply *reply)
+bool isSuccess(int status) { return status >= 200 && status < 300; }
+void complete(const ServerProxy::Completion &done, contracts::ServerResponse response)
 {
-    if (!reply) {
-        return QStringLiteral("No response from SEB Server.");
-    }
-    if (reply->error() != QNetworkReply::NoError) {
-        return reply->errorString();
-    }
-    return QStringLiteral("HTTP %1").arg(reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt());
+    if (done) done(std::move(response));
 }
+} // namespace
 
-bool isSuccess(int status)
-{
-    return status >= 200 && status < 300;
-}
-
-}  // namespace
-
-ServerProxy::ServerProxy(
-    const seb::configuration::contracts::AppConfig &appConfig,
-    QObject *parent)
-    : QObject(parent)
-    , appConfig_(appConfig)
+ServerProxy::ServerProxy(const seb::configuration::contracts::AppConfig &appConfig, QObject *parent)
+    : QObject(parent), appConfig_(appConfig)
 {
     connect(&pingTimer_, &QTimer::timeout, this, &ServerProxy::performPing);
+    logTimer_.setInterval(500);
+    connect(&logTimer_, &QTimer::timeout, this, &ServerProxy::flushLogs);
 }
 
 ServerProxy::~ServerProxy()
 {
     stopConnectivity();
-    if (connected_) {
-        disconnectFromServer();
+    cancelRequests();
+    clearConnection();
+}
+
+void ServerProxy::cancelRequests()
+{
+    ++generation_;
+    const auto timers = retryTimers_;
+    retryTimers_.clear();
+    for (auto *timer : timers) delete timer;
+    const auto replies = replies_;
+    replies_.clear();
+    for (auto *reply : replies) {
+        reply->disconnect(this);
+        reply->abort();
+        reply->deleteLater();
     }
+    tokenWaiters_.clear();
+    refreshingToken_ = false;
+    pingInFlight_ = logInFlight_ = false;
+}
+
+void ServerProxy::clearConnection()
+{
+    state_ = ConnectionState::Disconnected;
+    connectionToken_.clear();
+    oauth2Token_.clear();
+    examId_.clear();
+    instructionConfirmations_.clear();
+    api_ = {};
+    settings_.ClientSecret.clear();
+    currentHandId_ = pendingHandId_ = currentLockScreenId_ = 0;
+    ++handRevision_;
 }
 
 void ServerProxy::initialize(const seb::settings::server::ServerSettings &settings)
 {
+    stopConnectivity();
+    cancelRequests();
+    clearConnection();
     settings_ = settings;
     baseUrl_ = Sanitizer::baseAddress(settings.ServerUrl);
-    api_ = {};
-    connectionToken_.clear();
-    oauth2Token_.clear();
-    examId_.clear();
-    pingNumber_ = 0;
-    notificationId_ = 0;
-    currentHandId_ = 0;
-    currentLockScreenId_ = 0;
-    connected_ = false;
+    pingNumber_ = notificationId_ = 0;
+    batteryPercentage_ = batteryOnline_ = -1;
+    wirelessSignal_ = -2;
 }
 
-bool ServerProxy::initializeConnection(
-    const QString &api,
-    const QString &connectionToken,
-    const QString &examId,
-    const QString &oauth2Token,
-    const seb::settings::server::ServerSettings &settings,
-    QString *error)
+void ServerProxy::connectToServer(Completion done)
 {
-    initialize(settings);
-    QJsonParseError parseError;
-    const QJsonDocument document = QJsonDocument::fromJson(api.toUtf8(), &parseError);
-    if (!document.isObject()) {
-        if (error) *error = parseError.errorString();
-        return false;
-    }
-    const QJsonObject object = document.object();
-    api_.accessTokenEndpoint = object.value(QStringLiteral("accessTokenEndpoint")).toString();
-    api_.configurationEndpoint = object.value(QStringLiteral("configurationEndpoint")).toString();
-    api_.handshakeEndpoint = object.value(QStringLiteral("handshakeEndpoint")).toString();
-    api_.logEndpoint = object.value(QStringLiteral("logEndpoint")).toString();
-    api_.pingEndpoint = object.value(QStringLiteral("pingEndpoint")).toString();
-    if (api_.accessTokenEndpoint.isEmpty() || api_.configurationEndpoint.isEmpty() ||
-        api_.handshakeEndpoint.isEmpty() || api_.pingEndpoint.isEmpty()) {
-        if (error) *error = QStringLiteral("Stored SEB Server API information is incomplete.");
-        return false;
-    }
-    connectionToken_ = connectionToken;
-    oauth2Token_ = oauth2Token;
-    examId_ = examId;
-    connected_ = !connectionToken_.isEmpty() && !oauth2Token_.isEmpty();
-    return connected_;
+    execute([this, done](auto response) {
+        if (!response.success) { complete(done, response); return; }
+        QString error;
+        if (!Parser::parseApi(response.body, api_, &error)) {
+            complete(done, {false, response.statusCode, error, {}, {}}); return;
+        }
+        for (const auto &endpoint : {api_.accessTokenEndpoint, api_.configurationEndpoint,
+             api_.handshakeEndpoint, api_.logEndpoint, api_.pingEndpoint}) {
+            if (!endpointUrl(endpoint).isValid()) {
+                complete(done, {false, 0, QStringLiteral("Unsafe SEB Server API endpoint."), {}, {}}); return;
+            }
+        }
+        requestOAuthToken([this, done](auto tokenResponse) {
+            if (tokenResponse.success) state_ = ConnectionState::Authenticated;
+            complete(done, tokenResponse);
+        });
+    }, "GET", settings_.ApiEndpoint);
 }
 
-contracts::ServerResponse ServerProxy::connectToServer()
-{
-    contracts::ServerResponse result;
-    if (!baseUrl_.isValid()) {
-        result.message = QStringLiteral("The SEB Server URL is invalid.");
-        return result;
-    }
-
-    const auto apiResponse = execute(
-        QByteArrayLiteral("GET"),
-        settings_.ApiEndpoint);
-    if (!apiResponse.success) {
-        return apiResponse;
-    }
-
-    QString error;
-    if (!Parser::parseApi(apiResponse.body, api_, &error)) {
-        result.message = error;
-        return result;
-    }
-    api_.accessTokenEndpoint = Sanitizer::apiEndpoint(api_.accessTokenEndpoint);
-    api_.configurationEndpoint = Sanitizer::apiEndpoint(api_.configurationEndpoint);
-    api_.handshakeEndpoint = Sanitizer::apiEndpoint(api_.handshakeEndpoint);
-    api_.logEndpoint = Sanitizer::apiEndpoint(api_.logEndpoint);
-    api_.pingEndpoint = Sanitizer::apiEndpoint(api_.pingEndpoint);
-
-    if (!requestOAuthToken(&error)) {
-        result.message = error;
-        return result;
-    }
-    result.success = true;
-    result.statusCode = 200;
-    connected_ = true;
-    return result;
-}
-
-contracts::ServerResponse ServerProxy::disconnectFromServer()
+void ServerProxy::disconnectFromServer(Completion done)
 {
     stopConnectivity();
-    if (!connected_ || connectionToken_.isEmpty()) {
-        connected_ = false;
-        return {true, 200, {}, {}, {}};
+    cancelRequests();
+    state_ = ConnectionState::Disconnecting;
+    if (connectionToken_.isEmpty()) {
+        clearConnection(); complete(done, {true, 200, {}, {}, {}}); return;
     }
-    const auto result = execute(
-        QByteArrayLiteral("DELETE"),
-        api_.handshakeEndpoint,
-        QByteArrayLiteral("delete=true"),
-        QByteArrayLiteral("application/x-www-form-urlencoded"),
-        true,
-        true,
-        false);
-    connected_ = false;
-    return result;
+    execute([this, done](auto response) {
+        clearConnection();
+        complete(done, response);
+    }, "DELETE", api_.handshakeEndpoint, "delete=true",
+       "application/x-www-form-urlencoded", true, true, true);
 }
 
-contracts::ServerResponse ServerProxy::availableExams(
-    QList<data::Exam> &exams,
-    const QString &examId)
+void ServerProxy::availableExams(
+    std::function<void(contracts::ServerResponse, QList<data::Exam>)> done, const QString &examId)
 {
-    exams.clear();
-    const QString user = qEnvironmentVariable("USER", QStringLiteral("unknown"));
-    const QString machine = QHostInfo::localHostName();
-    const QString os = QStringLiteral("Linux");
     QList<QPair<QString, QString>> values{
         {QStringLiteral("institutionId"), settings_.Institution},
-        {QStringLiteral("client_id"), user},
-        {QStringLiteral("seb_machine_name"), machine},
-        {QStringLiteral("seb_os_name"), os},
-        {QStringLiteral("seb_version"), appConfig_.programInformationalVersion}
-    };
-    if (!examId.trimmed().isEmpty()) {
-        values.append({QStringLiteral("examId"), examId});
-    }
-    const auto response = execute(
-        QByteArrayLiteral("POST"),
-        api_.handshakeEndpoint,
-        formEncode(values),
-        QByteArrayLiteral("application/x-www-form-urlencoded"),
-        true);
-    if (!response.success) {
-        return response;
-    }
-
-    QString error;
-    if (!Parser::parseExams(response.body, exams, &error)) {
-        return {false, response.statusCode, error, response.body, response.headers};
-    }
-    const QByteArray token = firstHeader(response.headers, QByteArray(ConnectionTokenHeader));
-    if (token.isEmpty()) {
-        return {false, response.statusCode, QStringLiteral("The SEB Server did not return a connection token."), response.body, response.headers};
-    }
-    connectionToken_ = QString::fromUtf8(token);
-    connected_ = true;
-    return response;
+        {QStringLiteral("client_id"), qEnvironmentVariable("USER", QStringLiteral("unknown"))},
+        {QStringLiteral("seb_machine_name"), QHostInfo::localHostName()},
+        {QStringLiteral("seb_os_name"), QStringLiteral("Linux")},
+        {QStringLiteral("seb_version"), appConfig_.programInformationalVersion}};
+    if (!examId.isEmpty()) values.append({QStringLiteral("examId"), examId});
+    execute([this, done](auto response) {
+        QList<data::Exam> exams;
+        const auto token = firstHeader(response.headers, ConnectionTokenHeader);
+        if (!token.isEmpty()) connectionToken_ = QString::fromUtf8(token);
+        if (response.success) {
+            QString error;
+            if (connectionToken_.isEmpty() || !Parser::parseExams(response.body, exams, &error)) {
+                response.success = false;
+                response.message = error.isEmpty() ? QStringLiteral("Missing SEB connection token.") : error;
+            } else state_ = ConnectionState::AwaitingExamSelection;
+        }
+        done(response, exams);
+    }, "POST", api_.handshakeEndpoint, formEncode(values), "application/x-www-form-urlencoded", true,
+       false);
 }
 
-contracts::ServerResponse ServerProxy::downloadExamConfiguration(
-    const data::Exam &exam,
-    const QString &path)
+void ServerProxy::downloadExamConfiguration(const data::Exam &exam, const QString &path, Completion done)
 {
-    const QString endpoint = QStringLiteral("%1?examId=%2")
-        .arg(api_.configurationEndpoint, QString::fromUtf8(QUrl::toPercentEncoding(exam.id)));
-    const auto response = execute(
-        QByteArrayLiteral("GET"),
-        endpoint,
-        {},
-        {},
-        true,
-        true);
-    if (!response.success) {
-        return response;
-    }
-
-    QSaveFile file(path);
-    if (!file.open(QIODevice::WriteOnly) || file.write(response.body) != response.body.size() || !file.commit()) {
-        return {false, response.statusCode, QStringLiteral("Could not save the exam configuration."), {}, response.headers};
-    }
-    return response;
+    QUrl url(endpointUrl(api_.configurationEndpoint));
+    QString query = url.query(QUrl::FullyEncoded);
+    if (!query.isEmpty()) query += QLatin1Char('&');
+    query += QString::fromLatin1(formEncode({{QStringLiteral("examId"), exam.id}}));
+    url.setQuery(query, QUrl::StrictMode);
+    execute([path, done](auto response) {
+        if (response.success) {
+            QSaveFile file(path);
+            if (!file.open(QIODevice::WriteOnly) || file.write(response.body) != response.body.size() || !file.commit()) {
+                response.success = false;
+                response.message = QStringLiteral("Could not save exam configuration.");
+            }
+        }
+        complete(done, response);
+    }, "GET", url.toString(), {}, {}, true, true);
 }
 
-contracts::ServerResponse ServerProxy::selectExam(
-    const data::Exam &exam,
-    QString *browserExamKey)
+void ServerProxy::selectExam(const data::Exam &exam,
+    std::function<void(contracts::ServerResponse, QString)> done)
 {
-    if (browserExamKey) browserExamKey->clear();
-    const auto response = execute(
-        QByteArrayLiteral("PATCH"),
-        api_.handshakeEndpoint,
-        formEncode({{QStringLiteral("examId"), exam.id}}),
-        QByteArrayLiteral("application/x-www-form-urlencoded"),
-        true,
-        true);
-    if (!response.success) {
-        return response;
+    if (state_ != ConnectionState::AwaitingExamSelection || connectionToken_.isEmpty()) {
+        done({false, 0, QStringLiteral("No exam handshake is available."), {}, {}}, {}); return;
     }
-    examId_ = exam.id;
-    if (browserExamKey) {
-        *browserExamKey = QString::fromUtf8(firstHeader(response.headers, QByteArray(BrowserExamKeyHeader)));
-    }
-    const auto salt = firstHeader(response.headers, QByteArray(ExamSaltHeader));
-    Q_UNUSED(salt);
-    // Linux has no protected native integrity module yet. Finish without a
-    // fabricated SHA-256(token + salt) value; a server requiring ASK will
-    // reject the handshake explicitly.
-    return finishHandshake();
+    state_ = ConnectionState::Handshaking;
+    examId_.clear();
+    execute([this, exam, done](auto response) {
+        if (!response.success) { state_ = ConnectionState::AwaitingExamSelection; done(response, {}); return; }
+        const auto bek = QString::fromUtf8(firstHeader(response.headers, BrowserExamKeyHeader));
+        QByteArray body;
+        bool hasSalt = false;
+        for (auto it = response.headers.cbegin(); it != response.headers.cend(); ++it)
+            hasSalt |= it.key().compare(ExamSaltHeader, Qt::CaseInsensitive) == 0;
+        if (hasSalt) {
+            std::unique_ptr<seb::configuration::contracts::cryptography::IKeyGenerator> generator =
+                std::make_unique<seb::configuration::cryptography::KeyGenerator>(appConfig_);
+            const auto key = generator->calculateAppSignatureKey(connectionToken_,
+                QString::fromUtf8(firstHeader(response.headers, ExamSaltHeader)));
+            if (!key || key->isEmpty()) {
+                state_ = ConnectionState::AwaitingExamSelection;
+                done({false, 0, QStringLiteral("This server requires an App Signature Key; Linux protected integrity is unsupported."), {}, {}}, {});
+                return;
+            }
+            body = formEncode({{QStringLiteral("seb_signature_key"), *key}});
+        }
+        execute([this, exam, bek, done](auto finished) {
+            state_ = finished.success ? ConnectionState::Connected : ConnectionState::AwaitingExamSelection;
+            if (finished.success) examId_ = exam.id;
+            done(finished, finished.success ? bek : QString());
+        }, "PUT", api_.handshakeEndpoint, body, "application/x-www-form-urlencoded", true, true);
+    }, "PATCH", api_.handshakeEndpoint, formEncode({{QStringLiteral("examId"), exam.id}}),
+       "application/x-www-form-urlencoded", true, true);
 }
 
-contracts::ServerResponse ServerProxy::sendUserIdentifier(const QString &identifier)
+void ServerProxy::sendUserIdentifier(const QString &identifier, Completion done)
 {
-    const auto response = execute(
-        QByteArrayLiteral("PATCH"),
-        api_.handshakeEndpoint,
-        formEncode({
-            {QStringLiteral("examId"), examId_},
-            {QStringLiteral("seb_user_session_id"), identifier}
-        }),
-        QByteArrayLiteral("application/x-www-form-urlencoded"),
-        true,
-        true);
-    return response;
+    if (!isConnected()) { complete(done, {}); return; }
+    execute(done, "PATCH", api_.handshakeEndpoint,
+        formEncode({{QStringLiteral("examId"), examId_}, {QStringLiteral("seb_user_session_id"), identifier}}),
+        "application/x-www-form-urlencoded", true, true);
 }
 
-contracts::ServerResponse ServerProxy::raiseHand(const QString &message)
+void ServerProxy::sendNotification(const QJsonObject &object, Completion done)
 {
-    currentHandId_ = ++notificationId_;
-    QJsonObject object;
-    object.insert(QStringLiteral("numericValue"), currentHandId_);
-    object.insert(QStringLiteral("text"), QStringLiteral("<raisehand> ") + message);
-    object.insert(QStringLiteral("timestamp"), QDateTime::currentSecsSinceEpoch());
-    object.insert(QStringLiteral("type"), QStringLiteral("NOTIFICATION"));
-    return execute(
-        QByteArrayLiteral("POST"),
-        api_.logEndpoint,
-        QJsonDocument(object).toJson(QJsonDocument::Compact),
-        QByteArrayLiteral("application/json;charset=UTF-8"),
-        true,
-        true);
+    if (!isConnected()) { complete(done, {}); return; }
+    execute(done, "POST", api_.logEndpoint, QJsonDocument(object).toJson(QJsonDocument::Compact),
+        "application/json;charset=UTF-8", true, true);
 }
 
-contracts::ServerResponse ServerProxy::lowerHand()
+void ServerProxy::raiseHand(const QString &message, Completion done)
 {
-    QJsonObject object;
-    object.insert(QStringLiteral("numericValue"), currentHandId_);
-    object.insert(QStringLiteral("timestamp"), QDateTime::currentSecsSinceEpoch());
-    object.insert(QStringLiteral("type"), QStringLiteral("NOTIFICATION_CONFIRMED"));
-    return execute(
-        QByteArrayLiteral("POST"),
-        api_.logEndpoint,
-        QJsonDocument(object).toJson(QJsonDocument::Compact),
-        QByteArrayLiteral("application/json;charset=UTF-8"),
-        true,
-        true);
+    const int id = ++notificationId_;
+    pendingHandId_ = id;
+    const auto revision = handRevision_;
+    sendNotification({{QStringLiteral("numericValue"), id}, {QStringLiteral("text"), QStringLiteral("<raisehand> ") + message},
+        {QStringLiteral("timestamp"), QDateTime::currentMSecsSinceEpoch()}, {QStringLiteral("type"), QStringLiteral("NOTIFICATION")}},
+        [this, id, revision, done](auto response) {
+            if (handRevision_ != revision) response.success = false;
+            if (response.success) currentHandId_ = id;
+            if (pendingHandId_ == id) pendingHandId_ = 0;
+            complete(done, response);
+        });
 }
 
-contracts::ServerResponse ServerProxy::lockScreen(const QString &message)
+void ServerProxy::lowerHand(Completion done)
+{
+    sendNotification({{QStringLiteral("numericValue"), currentHandId_},
+        {QStringLiteral("timestamp"), QDateTime::currentMSecsSinceEpoch()}, {QStringLiteral("type"), QStringLiteral("NOTIFICATION_CONFIRMED")}},
+        [this, done](auto response) { if (response.success) currentHandId_ = 0; complete(done, response); });
+}
+
+void ServerProxy::lockScreen(const QString &message)
 {
     currentLockScreenId_ = ++notificationId_;
-    QJsonObject object;
-    object.insert(QStringLiteral("numericValue"), currentLockScreenId_);
-    object.insert(QStringLiteral("text"), QStringLiteral("<lockscreen> ") + message);
-    object.insert(QStringLiteral("timestamp"), QDateTime::currentSecsSinceEpoch());
-    object.insert(QStringLiteral("type"), QStringLiteral("NOTIFICATION"));
-    return execute(
-        QByteArrayLiteral("POST"),
-        api_.logEndpoint,
-        QJsonDocument(object).toJson(QJsonDocument::Compact),
-        QByteArrayLiteral("application/json;charset=UTF-8"),
-        true,
-        true);
+    sendNotification({{QStringLiteral("numericValue"), currentLockScreenId_},
+        {QStringLiteral("text"), QStringLiteral("<lockscreen> ") + message},
+        {QStringLiteral("timestamp"), QDateTime::currentMSecsSinceEpoch()}, {QStringLiteral("type"), QStringLiteral("NOTIFICATION")}});
 }
 
-contracts::ServerResponse ServerProxy::confirmLockScreen()
+void ServerProxy::confirmLockScreen()
 {
-    QJsonObject object;
-    object.insert(QStringLiteral("numericValue"), currentLockScreenId_);
-    object.insert(QStringLiteral("timestamp"), QDateTime::currentSecsSinceEpoch());
-    object.insert(QStringLiteral("type"), QStringLiteral("NOTIFICATION_CONFIRMED"));
-    return execute(
-        QByteArrayLiteral("POST"),
-        api_.logEndpoint,
-        QJsonDocument(object).toJson(QJsonDocument::Compact),
-        QByteArrayLiteral("application/json;charset=UTF-8"),
-        true,
-        true);
+    sendNotification({{QStringLiteral("numericValue"), currentLockScreenId_},
+        {QStringLiteral("timestamp"), QDateTime::currentMSecsSinceEpoch()}, {QStringLiteral("type"), QStringLiteral("NOTIFICATION_CONFIRMED")}});
 }
 
 void ServerProxy::startConnectivity()
 {
-    if (!connected_ || api_.pingEndpoint.isEmpty()) {
-        return;
-    }
-    const int interval = qMax(100, settings_.PingInterval);
-    pingTimer_.setInterval(interval);
-    pingTimer_.start();
+    if (!isConnected() || pingTimer_.isActive()) return;
+    pingTimer_.start(qMax(100, settings_.PingInterval));
+    logTimer_.start();
+    logEvent(QStringLiteral("Browser session started"));
 }
 
 void ServerProxy::stopConnectivity()
 {
-    pingTimer_.stop();
+    pingTimer_.stop(); logTimer_.stop(); logs_.clear();
 }
 
-data::ConnectionInfo ServerProxy::connectionInfo() const
+void ServerProxy::logEvent(const QString &text, const QString &severity)
 {
-    QJsonObject object;
-    object.insert(QStringLiteral("accessTokenEndpoint"), api_.accessTokenEndpoint);
-    object.insert(QStringLiteral("configurationEndpoint"), api_.configurationEndpoint);
-    object.insert(QStringLiteral("handshakeEndpoint"), api_.handshakeEndpoint);
-    object.insert(QStringLiteral("logEndpoint"), api_.logEndpoint);
-    object.insert(QStringLiteral("pingEndpoint"), api_.pingEndpoint);
-    return {
-        QString::fromUtf8(QJsonDocument(object).toJson(QJsonDocument::Compact)),
-        connectionToken_,
-        oauth2Token_};
+    if (!isConnected() || !logTimer_.isActive()) return;
+    QString safe = text.left(2048);
+    for (const auto &secret : {oauth2Token_, connectionToken_, settings_.ClientSecret})
+        if (!secret.isEmpty()) safe.replace(secret, QStringLiteral("[redacted]"));
+    if (logs_.size() >= 1000) logs_.dequeue();
+    logs_.enqueue({{QStringLiteral("text"), safe}, {QStringLiteral("timestamp"), QDateTime::currentMSecsSinceEpoch()},
+        {QStringLiteral("type"), severity == QStringLiteral("ERROR") ? QStringLiteral("ERROR_LOG") :
+            severity == QStringLiteral("WARNING") ? QStringLiteral("WARN_LOG") :
+            severity == QStringLiteral("DEBUG") ? QStringLiteral("DEBUG_LOG") : QStringLiteral("INFO_LOG")}});
 }
 
-contracts::ServerResponse ServerProxy::execute(
-    const QByteArray &method,
-    const QString &endpoint,
-    const QByteArray &body,
-    const QByteArray &contentType,
-    bool authorization,
-    bool connectionToken,
-    bool refreshToken,
-    const QHash<QByteArray, QByteArray> &additionalHeaders)
+void ServerProxy::flushLogs()
 {
-    contracts::ServerResponse last;
-    const int attempts = qMax(1, settings_.RequestAttempts);
-    bool refreshed = false;
+    if (!isConnected() || logInFlight_ || logs_.isEmpty()) return;
+    logInFlight_ = true;
+    auto remaining = std::make_shared<int>(qMin(10, int(logs_.size())));
+    auto next = std::make_shared<std::function<void()>>();
+    std::weak_ptr<std::function<void()>> weak = next;
+    *next = [this, remaining, weak] {
+        auto keep = weak.lock();
+        if (!keep || !logTimer_.isActive() || logs_.isEmpty() || (*remaining)-- <= 0) { logInFlight_ = false; return; }
+        const auto entry = logs_.head();
+        sendNotification(entry, [this, keep, entry](auto response) {
+            if (!response.success) { logInFlight_ = false; return; }
+            if (!logs_.isEmpty() && logs_.head() == entry) logs_.dequeue();
+            (*keep)();
+        });
+    };
+    (*next)();
+}
 
-    for (int attempt = 0; attempt < attempts; ++attempt) {
+void ServerProxy::reportBattery(int percentage, bool online)
+{
+    if (!isConnected() || (batteryPercentage_ == percentage && batteryOnline_ == int(online))) return;
+    if (!logTimer_.isActive()) return;
+    batteryPercentage_ = percentage; batteryOnline_ = int(online);
+    logEvent(QStringLiteral("<battery> %1% (%2)").arg(percentage).arg(online ? QStringLiteral("connected") : QStringLiteral("disconnected")));
+    if (!logs_.isEmpty()) logs_.last().insert(QStringLiteral("numericValue"), percentage);
+}
+
+void ServerProxy::reportWireless(int signal)
+{
+    if (!isConnected() || (wirelessSignal_ == signal) ||
+        (signal >= 0 && wirelessSignal_ >= 0 && qAbs(signal - wirelessSignal_) < 5)) return;
+    if (!logTimer_.isActive()) return;
+    wirelessSignal_ = signal;
+    logEvent(signal < 0 ? QStringLiteral("<wlan> disconnected") : QStringLiteral("<wlan> %1%").arg(signal));
+    if (signal >= 0 && !logs_.isEmpty()) logs_.last().insert(QStringLiteral("numericValue"), signal);
+}
+
+void ServerProxy::execute(Completion done, const QByteArray &method, const QString &endpoint,
+    const QByteArray &body, const QByteArray &contentType, bool authorization, bool connectionToken,
+    bool refreshToken, const QHash<QByteArray, QByteArray> &additionalHeaders)
+{
+    struct Operation { int attempts = 0; bool refreshed = false; };
+    const auto operation = std::make_shared<Operation>();
+    const auto generation = generation_;
+    auto send = std::make_shared<std::function<void()>>();
+    std::weak_ptr<std::function<void()>> weak = send;
+    *send = [=, this] {
+        auto keep = weak.lock();
+        if (!keep || generation != generation_) return;
         const QUrl url = endpointUrl(endpoint);
-        if (!url.isValid()) {
-            last.message = QStringLiteral("The SEB Server endpoint is invalid.");
-            return last;
-        }
-
+        if (!url.isValid()) { complete(done, {false, 0, QStringLiteral("Unsafe SEB Server endpoint."), {}, {}}); return; }
+        const QString usedToken = oauth2Token_;
         QNetworkRequest request(url);
-        request.setRawHeader(QByteArrayLiteral("Accept"), QByteArray(AcceptHeader));
-        if (authorization && !oauth2Token_.isEmpty()) {
-            request.setRawHeader(
-                QByteArray(AuthorizationHeader),
-                QByteArrayLiteral("Bearer ") + oauth2Token_.toUtf8());
-        }
-        if (connectionToken && !connectionToken_.isEmpty()) {
-            request.setRawHeader(
-                QByteArray(ConnectionTokenHeader),
-                connectionToken_.toUtf8());
-        }
-        for (auto it = additionalHeaders.cbegin(); it != additionalHeaders.cend(); ++it) {
-            request.setRawHeader(it.key(), it.value());
-        }
-        if (!contentType.isEmpty()) {
-            request.setHeader(QNetworkRequest::ContentTypeHeader, QString::fromLatin1(contentType));
-        }
-
-        QNetworkReply *reply = nullptr;
-        if (method == QByteArrayLiteral("GET")) reply = network_.get(request);
-        else if (method == QByteArrayLiteral("POST")) reply = network_.post(request, body);
-        else if (method == QByteArrayLiteral("PUT")) reply = network_.put(request, body);
-        else reply = network_.sendCustomRequest(request, method, body);
-
-        QEventLoop loop;
-        QTimer timeout;
-        timeout.setSingleShot(true);
-        connect(reply, &QNetworkReply::finished, &loop, &QEventLoop::quit);
-        connect(&timeout, &QTimer::timeout, reply, &QNetworkReply::abort);
-        timeout.start(qMax(1, settings_.RequestTimeout));
-        loop.exec();
-
-        last.statusCode = reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();
-        last.body = reply->readAll();
-        last.message = responseMessage(reply);
-        const QList<QByteArray> names = reply->rawHeaderList();
-        for (const QByteArray &name : names) {
-            last.headers.insert(name, reply->rawHeader(name));
-        }
-        const bool ok = reply->error() == QNetworkReply::NoError && isSuccess(last.statusCode);
-        reply->deleteLater();
-        if (ok) {
-            last.success = true;
-            return last;
-        }
-
-        if (refreshToken && !refreshed && last.statusCode == 401 && Parser::isTokenExpired(last.body)) {
-            refreshed = true;
-            if (requestOAuthToken()) {
-                --attempt;
-                continue;
+        request.setAttribute(QNetworkRequest::RedirectPolicyAttribute, QNetworkRequest::ManualRedirectPolicy);
+        request.setRawHeader("Accept", AcceptHeader);
+        request.setAttribute(QNetworkRequest::CookieLoadControlAttribute, QNetworkRequest::Manual);
+        request.setAttribute(QNetworkRequest::CookieSaveControlAttribute, QNetworkRequest::Manual);
+        if (authorization) request.setRawHeader(AuthorizationHeader, "Bearer " + usedToken.toUtf8());
+        if (connectionToken) request.setRawHeader(ConnectionTokenHeader, connectionToken_.toUtf8());
+        if (!contentType.isEmpty()) request.setHeader(QNetworkRequest::ContentTypeHeader, contentType);
+        for (auto it = additionalHeaders.cbegin(); it != additionalHeaders.cend(); ++it) request.setRawHeader(it.key(), it.value());
+        ++operation->attempts;
+        auto *reply = network_.sendCustomRequest(request, method, body);
+        replies_.insert(reply);
+        auto *timeout = new QTimer(reply);
+        timeout->setSingleShot(true);
+        connect(timeout, &QTimer::timeout, reply, [reply] { reply->setProperty("sebTimedOut", true); reply->abort(); });
+        timeout->start(qMax(1, settings_.RequestTimeout));
+        connect(reply, &QNetworkReply::finished, this, [=, this] {
+            timeout->stop(); replies_.remove(reply);
+            contracts::ServerResponse response;
+            response.statusCode = reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();
+            response.body = reply->readAll();
+            for (const auto &pair : reply->rawHeaderPairs()) response.headers.insert(pair.first, pair.second);
+            response.success = reply->error() == QNetworkReply::NoError && isSuccess(response.statusCode);
+            response.message = reply->property("sebTimedOut").toBool() ? QStringLiteral("SEB Server request timed out.") :
+                response.statusCode == 401 ? QStringLiteral("SEB Server authentication failed.") :
+                response.statusCode ? QStringLiteral("SEB Server HTTP %1.").arg(response.statusCode) : QStringLiteral("SEB Server transport error.");
+            reply->deleteLater();
+            if (generation != generation_) return;
+            if (response.success) { complete(done, response); return; }
+            if (authorization && refreshToken && !operation->refreshed && response.statusCode == 401 && Parser::isTokenExpired(response.body)) {
+                operation->refreshed = true;
+                --operation->attempts;
+                if (usedToken != oauth2Token_) { (*keep)(); return; }
+                requestOAuthToken([=, this](auto tokenResponse) {
+                    if (generation != generation_) return;
+                    if (tokenResponse.success) (*keep)(); else complete(done, tokenResponse);
+                });
+                return;
             }
-        }
-
-        if (attempt + 1 < attempts && settings_.RequestAttemptInterval > 0) {
-            QEventLoop delayLoop;
-            QTimer::singleShot(settings_.RequestAttemptInterval, &delayLoop, &QEventLoop::quit);
-            delayLoop.exec();
-        }
-    }
-    return last;
+            const bool transient = response.statusCode == 0 || response.statusCode == 408 || response.statusCode == 429 || response.statusCode >= 500;
+            if (transient && operation->attempts < qMax(1, settings_.RequestAttempts)) {
+                auto *retry = new QTimer(this);
+                retry->setSingleShot(true);
+                retryTimers_.insert(retry);
+                connect(retry, &QTimer::timeout, this, [this, retry, keep] {
+                    retryTimers_.remove(retry); retry->deleteLater(); (*keep)();
+                });
+                retry->start(qMax(0, settings_.RequestAttemptInterval));
+            } else complete(done, response);
+        });
+    };
+    (*send)();
 }
 
-bool ServerProxy::requestOAuthToken(QString *error)
+void ServerProxy::requestOAuthToken(Completion done)
 {
-    const QByteArray credentials =
-        (settings_.ClientName + QLatin1Char(':') + settings_.ClientSecret).toUtf8().toBase64();
-    const auto response = execute(
-        QByteArrayLiteral("POST"),
-        api_.accessTokenEndpoint,
-        QByteArrayLiteral("grant_type=client_credentials&scope=read%20write"),
-        QByteArrayLiteral("application/x-www-form-urlencoded"),
-        false,
-        false,
-        false,
-        {{QByteArray(AuthorizationHeader), QByteArrayLiteral("Basic ") + credentials}});
-    QString parsedError;
-    QString token;
-    const bool parsed = response.success && Parser::parseOAuthToken(response.body, token, &parsedError);
-    if (!parsed && error) {
-        *error = parsedError.isEmpty() ? response.message : parsedError;
-    }
-    if (parsed) {
-        oauth2Token_ = token;
-    }
-    return parsed;
-}
-
-contracts::ServerResponse ServerProxy::finishHandshake()
-{
-    // No Linux protected integrity module is available yet. Do not send a
-    // fabricated application signature key.
-    return execute(
-        QByteArrayLiteral("PUT"),
-        api_.handshakeEndpoint,
-        {},
-        QByteArrayLiteral("application/x-www-form-urlencoded"),
-        true,
-        true);
+    tokenWaiters_.append(done);
+    if (refreshingToken_) return;
+    refreshingToken_ = true;
+    const QByteArray credentials = (settings_.ClientName + QLatin1Char(':') + settings_.ClientSecret).toUtf8().toBase64();
+    execute([this](auto response) {
+        QString token, error;
+        if (response.success && !Parser::parseOAuthToken(response.body, token, &error)) {
+            response.success = false; response.message = QStringLiteral("Malformed OAuth token response.");
+        }
+        if (response.success) oauth2Token_ = token;
+        refreshingToken_ = false;
+        const auto waiters = std::exchange(tokenWaiters_, {});
+        const auto generation = generation_;
+        QPointer<ServerProxy> self(this);
+        for (const auto &waiter : waiters) {
+            if (!self || generation != self->generation_) break;
+            complete(waiter, response);
+        }
+    }, "POST", api_.accessTokenEndpoint, "grant_type=client_credentials&scope=read%20write",
+       "application/x-www-form-urlencoded", false, false, false,
+       {{QByteArray(AuthorizationHeader), "Basic " + credentials}});
 }
 
 void ServerProxy::performPing()
 {
-    if (!connected_ || pingInFlight_ || api_.pingEndpoint.isEmpty()) {
-        return;
-    }
+    if (!isConnected() || pingInFlight_) return;
     pingInFlight_ = true;
-    QString confirmation;
-    if (!instructionConfirmations_.isEmpty()) {
-        confirmation = instructionConfirmations_.dequeue();
-    }
+    const QString confirmation = instructionConfirmations_.isEmpty() ? QString() : instructionConfirmations_.head();
     QList<QPair<QString, QString>> values{
-        {QStringLiteral("timestamp"), QString::number(QDateTime::currentSecsSinceEpoch())},
-        {QStringLiteral("ping-number"), QString::number(++pingNumber_)}
-    };
-    if (!confirmation.isEmpty()) {
-        values.append({QStringLiteral("instruction-confirm"), confirmation});
-    }
-
-    const auto response = execute(
-        QByteArrayLiteral("POST"),
-        api_.pingEndpoint,
-        formEncode(values),
-        QByteArrayLiteral("application/x-www-form-urlencoded"),
-        true,
-        true);
-    if (response.success) {
+        {QStringLiteral("timestamp"), QString::number(QDateTime::currentMSecsSinceEpoch())},
+        {QStringLiteral("ping-number"), QString::number(++pingNumber_)}};
+    if (!confirmation.isEmpty()) values.append({QStringLiteral("instruction-confirm"), confirmation});
+    execute([this, confirmation](auto response) {
+        pingInFlight_ = false;
+        if (!isConnected()) return;
+        if (!response.success) {
+            if (response.statusCode >= 400 && response.statusCode < 500 &&
+                response.statusCode != 408 && response.statusCode != 429) {
+                stopConnectivity();
+                emit terminationRequested();
+            }
+            return;
+        }
+        if (!confirmation.isEmpty() && !instructionConfirmations_.isEmpty()) instructionConfirmations_.dequeue();
         data::InstructionData instruction;
         if (Parser::parseInstruction(response.body, instruction)) {
+            const bool supported = instruction.instruction != data::Instruction::Proctoring &&
+                instruction.instruction != data::Instruction::ProctoringReconfiguration;
             handleInstruction(instruction);
-            if (!instruction.confirmation.isEmpty()) {
+            if (supported && !instruction.confirmation.isEmpty() && !instructionConfirmations_.contains(instruction.confirmation))
                 instructionConfirmations_.enqueue(instruction.confirmation);
-            }
         }
-    }
-    pingInFlight_ = false;
+    }, "POST", api_.pingEndpoint, formEncode(values), "application/x-www-form-urlencoded", true, true);
 }
 
 void ServerProxy::handleInstruction(const data::InstructionData &instruction)
 {
     switch (instruction.instruction) {
     case data::Instruction::LockScreen:
-        currentLockScreenId_ = instruction.notificationId;
-        emit lockScreenRequested(instruction.message);
-        break;
+        emit lockScreenRequested(instruction.message); break;
     case data::Instruction::NotificationConfirm:
-        if (instruction.notificationType == data::NotificationType::LockScreen) {
+        if (instruction.notificationType == data::NotificationType::LockScreen && instruction.notificationId == currentLockScreenId_) {
+            currentLockScreenId_ = 0;
             emit lockScreenConfirmed();
-        } else if (instruction.notificationType == data::NotificationType::Hand) {
-            emit handConfirmed();
+        }
+        else if (instruction.notificationType == data::NotificationType::Hand && (instruction.notificationId == currentHandId_ || instruction.notificationId == pendingHandId_)) {
+            currentHandId_ = pendingHandId_ = 0;
+            ++handRevision_; emit handConfirmed();
         }
         break;
     case data::Instruction::Proctoring:
-        emit proctoringInstructionReceived(instruction.message);
-        break;
     case data::Instruction::ProctoringReconfiguration:
-        emit proctoringConfigurationReceived(
-            instruction.allowChat,
-            instruction.receiveAudio,
-            instruction.receiveVideo);
+        logEvent(QStringLiteral("Requested proctoring capability is unavailable on Linux."), QStringLiteral("ERROR"));
+        emit lockScreenRequested(QStringLiteral("The server requires an unsupported proctoring capability. Contact your invigilator."));
         break;
-    case data::Instruction::Quit:
-        emit terminationRequested();
-        break;
-    case data::Instruction::None:
-        break;
+    case data::Instruction::Quit: emit terminationRequested(); break;
+    case data::Instruction::None: break;
     }
 }
 
@@ -559,11 +481,12 @@ QUrl ServerProxy::endpointUrl(const QString &endpoint) const
 
 QByteArray ServerProxy::formEncode(const QList<QPair<QString, QString>> &values)
 {
-    QUrlQuery query;
+    QByteArray body;
     for (const auto &value : values) {
-        query.addQueryItem(value.first, value.second);
+        if (!body.isEmpty()) body += '&';
+        body += QUrl::toPercentEncoding(value.first) + '=' + QUrl::toPercentEncoding(value.second);
     }
-    return query.toString(QUrl::FullyEncoded).toUtf8();
+    return body;
 }
 
 QByteArray ServerProxy::firstHeader(

@@ -16,6 +16,7 @@
 
 namespace seb::browser {
 class RequestInterceptor;
+class Clipboard;
 }
 namespace seb::applications {
 class ApplicationManager;
@@ -40,6 +41,11 @@ namespace seb::configuration::contracts::cryptography {
 class IKeyGenerator;
 }
 
+namespace seb::shell::taskbar::platform {
+class BatteryController;
+class NetworkController;
+}
+
 namespace seb::server {
 class ServerProxy;
 }
@@ -61,7 +67,7 @@ public:
     ~SebSession() override;
 
     BrowserWindow *createWindow(const QUrl &url, bool isMainWindow);
-    bool applyProxyAuthentication(const QString &proxyHost, QAuthenticator *authenticator) const;
+    bool applyProxyAuthentication(const QUrl &url, const QString &proxyHost, QAuthenticator *authenticator) const;
     bool confirmReload(QWidget *parent) const;
     bool confirmQuitUrl(QWidget *parent) const;
     bool isPopupAllowed(const QUrl &opener, const QUrl &target, bool *openInSameWindow) const;
@@ -72,6 +78,7 @@ public:
     const seb::configuration::contracts::SessionConfiguration &configuration() const;
     seb::configuration::contracts::cryptography::IKeyGenerator *keyGenerator() const;
     seb::browser::contracts::IWebProfile *profile() const;
+    seb::browser::Clipboard *clipboard() const;
     seb::browser::contracts::IEngineProvider *engineProvider() const;
     QUrl homeUrl() const;
     QUrl initialUrl() const;
@@ -86,13 +93,20 @@ public:
     void notifyBrowserWindowStateChanged(BrowserWindow *window);
     std::unique_ptr<seb::server::ServerProxy> takeServerProxy();
     bool isServerSession() const;
-    bool raiseServerHand(const QString &message = {});
-    bool lowerServerHand();
+    void startRuntimeMonitoring();
+    void finalizeBrowser(std::function<void(bool)> done, bool discardProfile = false);
+    void raiseServerHand(const QString &message, std::function<void(bool)> done);
+    void lowerServerHand(std::function<void(bool)> done);
+    seb::shell::taskbar::platform::BatteryController *batteryController();
+    seb::shell::taskbar::platform::NetworkController *networkController();
+    void reportServerBattery(int percentage, bool online);
+    void reportServerWireless(int signal);
 
 signals:
     void browserWindowsChanged();
     void externalApplicationsChanged();
     void serverHandConfirmed();
+    void shutdownRequested();
 
 public slots:
     void activateWindow(BrowserWindow *window);
@@ -103,13 +117,15 @@ private:
     QString buildUserAgent() const;
     QString defaultDownloadDirectory() const;
     bool promptForPassword(QWidget *parent, const QString &title, const QString &message) const;
+    void sendServerIdentifier(const QString &identifier);
+    void lookupMoodleIdentity(const QByteArray &name, const QByteArray &value, bool theme = false);
     void handleServerCookie(const QNetworkCookie &cookie);
 
     seb::configuration::contracts::SessionConfiguration configuration_;
-    std::unique_ptr<seb::configuration::contracts::cryptography::IKeyGenerator> keyGenerator_;
-    QScopedPointer<seb::browser::RequestInterceptor> interceptor_;
+    std::shared_ptr<seb::configuration::contracts::cryptography::IKeyGenerator> keyGenerator_;
+    std::shared_ptr<seb::browser::RequestInterceptor> interceptor_;
+    std::unique_ptr<seb::browser::Clipboard> clipboard_;
     std::unique_ptr<seb::browser::contracts::IEngineProvider> engineProvider_;
-    std::unique_ptr<QTemporaryDir> profileDirectory_;
     std::unique_ptr<seb::browser::contracts::IWebProfile> profile_;
     seb::browser::contracts::IEngineProvider *engineProviderPtr_ = nullptr;
     seb::browser::contracts::IWebProfile *profilePtr_ = nullptr;
@@ -123,4 +139,15 @@ private:
     QWidget *serverLockScreen_ = nullptr;
     QNetworkAccessManager serverIdentityNetwork_;
     QString serverUserIdentifier_;
+    QString pendingServerIdentifier_;
+    QString desiredServerIdentifier_;
+    bool serverFinalized_ = false;
+    bool browserFinalized_ = false;
+    bool browserFinalizationComplete_ = false;
+    bool browserFinalizationSucceeded_ = false;
+    QList<std::function<void(bool)>> browserFinalizationWaiters_;
+    bool serverLocked_ = false;
+    bool identityLookupInFlight_ = false;
+    seb::shell::taskbar::platform::BatteryController *batteryController_ = nullptr;
+    seb::shell::taskbar::platform::NetworkController *networkController_ = nullptr;
 };

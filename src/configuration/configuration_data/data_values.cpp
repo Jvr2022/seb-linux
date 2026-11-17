@@ -36,7 +36,7 @@ contracts::AppConfig DataValues::initializeAppConfig() const
 
     contracts::AppConfig config;
     const QString appData = QStandardPaths::writableLocation(QStandardPaths::AppDataLocation);
-    const QString tempDir = QDir::tempPath() + QStringLiteral("/seb-linux");
+    const QString tempDir = appData + QStringLiteral("/Temp");
 
     config.applicationStartTime = QDateTime::currentDateTimeUtc();
     config.appDataFilePath = appData + QStringLiteral("/client.seb");
@@ -64,7 +64,7 @@ contracts::AppConfig DataValues::initializeAppConfig() const
     config.sebCompatibilityBuildVersion = QStringLiteral(SEB_COMPATIBILITY_BUILD_VERSION);
     config.serviceAddress = QStringLiteral("local://safeexambrowser/service");
     config.serviceLogFilePath = appData + QStringLiteral("/service.log");
-    config.sessionCacheFilePath = appData + QStringLiteral("/session.cache");
+    config.sessionCacheFilePath = tempDir + QStringLiteral("/cache.bin");
     config.temporaryDirectory = tempDir;
     appConfig_ = config;
     return *appConfig_;

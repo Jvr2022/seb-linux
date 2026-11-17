@@ -85,7 +85,9 @@ BrowserWindow::BrowserWindow(
     contentLayout->setSpacing(0);
 
     view_ = session_.engineProvider()->createWebView(session_.profile(), contentContainer_);
+    view_->configureBrowser(session_.settings(), windowSettings_);
     contentLayout->addWidget(view_->widget(), 1);
+    view_->initializeClipboard(session_.clipboard());
     view_->initializeSebApi(
         session_.keyGenerator(),
         session_.settings().Browser,
@@ -247,12 +249,16 @@ BrowserWindow::BrowserWindow(
         notifyTaskbarStateChanged();
     });
     connect(view_.get(), &seb::browser::contracts::IWebView::newWindowRequested, this, &BrowserWindow::handleNewWindowRequest);
+    connect(view_.get(), &seb::browser::contracts::IWebView::commandRequested, this, &BrowserWindow::handleBrowserCommand);
+    connect(view_.get(), &seb::browser::contracts::IWebView::closeRequested, this, [this] {
+        if (!isMainWindow_) close();
+    }, Qt::QueuedConnection);
     connect(
         view_.get(),
         &seb::browser::contracts::IWebView::proxyAuthenticationRequired,
         this,
-        [this](const QUrl &, QAuthenticator *authenticator, const QString &proxyHost) {
-            session_.applyProxyAuthentication(proxyHost, authenticator);
+        [this](const QUrl &url, QAuthenticator *authenticator, const QString &proxyHost) {
+            session_.applyProxyAuthentication(url, proxyHost, authenticator);
         });
 
     if (taskbar_) {
@@ -363,7 +369,8 @@ void BrowserWindow::closeEvent(QCloseEvent *event)
     if (session_.requestApplicationQuit(
             this,
             QStringLiteral("Enter the quit password to close this exam session."))) {
-        event->accept();
+        event->ignore();
+        QApplication::quit();
         return;
     }
 
@@ -375,49 +382,35 @@ void BrowserWindow::keyPressEvent(QKeyEvent *event)
     const bool ctrl = event->modifiers().testFlag(Qt::ControlModifier);
     const bool shift = event->modifiers().testFlag(Qt::ShiftModifier);
     const bool alt = event->modifiers().testFlag(Qt::AltModifier);
-    const bool devBypass = false;
 
     if (event->key() == Qt::Key_F11) {
-        if (devBypass) {
-            if (isFullScreen()) {
-                showNormal();
-                if (toolbar_) toolbar_->show();
-                if (taskbar_) taskbar_->show();
-            } else {
-                showFullScreen();
-                if (toolbar_) toolbar_->hide();
-                if (taskbar_) taskbar_->show();
-            }
-        }
         event->accept();
         return;
     }
 
     if (!windowSettings_.AllowReloading &&
-        (event->key() == Qt::Key_F5 || (ctrl && event->key() == Qt::Key_R)) &&
-        !devBypass) {
+        (event->key() == Qt::Key_F5 || (ctrl && event->key() == Qt::Key_R))) {
         event->accept();
         return;
     }
 
     if (!windowSettings_.AllowBackwardNavigation &&
-        ((alt && event->key() == Qt::Key_Left) || event->key() == Qt::Key_Backspace) &&
-        !devBypass) {
+        ((alt && event->key() == Qt::Key_Left) || event->key() == Qt::Key_Backspace)) {
         event->accept();
         return;
     }
 
-    if (!windowSettings_.AllowForwardNavigation && (alt && event->key() == Qt::Key_Right) && !devBypass) {
+    if (!windowSettings_.AllowForwardNavigation && (alt && event->key() == Qt::Key_Right)) {
         event->accept();
         return;
     }
 
-    if (!session_.settings().Browser.AllowPrint && ctrl && event->key() == Qt::Key_P && !devBypass) {
+    if (!session_.settings().Browser.AllowPrint && ctrl && event->key() == Qt::Key_P) {
         event->accept();
         return;
     }
 
-    if (!session_.settings().Browser.AllowFind && ctrl && event->key() == Qt::Key_F && !devBypass) {
+    if (!session_.settings().Browser.AllowFind && ctrl && event->key() == Qt::Key_F) {
         event->accept();
         return;
     }
@@ -425,13 +418,12 @@ void BrowserWindow::keyPressEvent(QKeyEvent *event)
     if (!session_.settings().Browser.AllowPageZoom &&
         ctrl &&
         (event->key() == Qt::Key_Plus || event->key() == Qt::Key_Equal || event->key() == Qt::Key_Minus ||
-         event->key() == Qt::Key_0) &&
-        !devBypass) {
+         event->key() == Qt::Key_0)) {
         event->accept();
         return;
     }
 
-    if (!windowSettings_.AllowDeveloperConsole && event->key() == Qt::Key_F12 && !devBypass) {
+    if (!windowSettings_.AllowDeveloperConsole && event->key() == Qt::Key_F12) {
         event->accept();
         return;
     }
@@ -615,6 +607,21 @@ void BrowserWindow::configureShortcuts()
         }
     });
 
+    using Command = seb::browser::contracts::IWebView::Command;
+    const QList<QPair<QKeySequence, Command>> commands{
+        {QKeySequence(Qt::CTRL | Qt::Key_Plus), Command::ZoomIn},
+        {QKeySequence(Qt::CTRL | Qt::Key_Equal), Command::ZoomIn},
+        {QKeySequence(Qt::CTRL | Qt::Key_Minus), Command::ZoomOut},
+        {QKeySequence(Qt::CTRL | Qt::Key_0), Command::ZoomReset},
+        {QKeySequence::Print, Command::Print},
+        {QKeySequence(Qt::ALT | Qt::Key_Home), Command::Home}};
+    for (const auto &entry : commands) {
+        auto *action = new QAction(this);
+        action->setShortcut(entry.first);
+        addAction(action);
+        connect(action, &QAction::triggered, this, [this, command = entry.second] { handleBrowserCommand(command); });
+    }
+
     if (windowSettings_.AllowAddressBar && addressBar_) {
         auto *focusAddressBar = new QAction(this);
         focusAddressBar->setShortcut(QKeySequence(Qt::CTRL | Qt::Key_L));
@@ -671,42 +678,50 @@ void BrowserWindow::navigateHome()
 
 
 
-void BrowserWindow::handleNewWindowRequest(const QUrl &target, bool &handled)
+void BrowserWindow::handleNewWindowRequest(const QUrl &target, seb::browser::contracts::IWebView *&targetView)
 {
     bool openInSameWindow = false;
-    const QUrl opener = view_->url();
-
-    if (!session_.isMainNavigationAllowed(target)) {
-        handled = true;
-        return;
-    }
-
-    if (seb::browser::ConfigurationResourceDetector::isConfigurationResource(target)) {
-        view_->download(seb::browser::ConfigurationResourceDetector::downloadUrl(target));
-        handled = true;
-        return;
-    }
-
-    if (!session_.isPopupAllowed(opener, target, &openInSameWindow)) {
-        handled = true; // Blocked popup
-        return;
-    }
-
+    if (!session_.isMainNavigationAllowed(target) ||
+        !session_.isPopupAllowed(view_->url(), target, &openInSameWindow)) return;
+    if (!shouldAllowNavigation(target)) return;
     if (openInSameWindow) {
-        if (view_) {
-            view_->setUrl(target);
-        } else {
-            // Unlikely to hit this branch unless we are in the compat window
-        }
-        handled = true;
+        targetView = view_.get();
         return;
     }
+    auto *window = session_.createWindow(QUrl(), false);
+    targetView = window->view_.get();
+    window->show();
+}
 
-    auto *window = session_.createWindow(target, false);
-    if (window) {
-        window->show();
+void BrowserWindow::changeZoom(int steps)
+{
+    if (!session_.settings().Browser.AllowPageZoom) return;
+    zoomPercentage_ = steps == 0 ? 100 : qBound(25, zoomPercentage_ + steps * 5, 300);
+    view_->setZoomFactor(zoomPercentage_ / 100.0);
+}
+
+void BrowserWindow::handleBrowserCommand(seb::browser::contracts::IWebView::Command command)
+{
+    if (!isEnabled()) return;
+    using Command = seb::browser::contracts::IWebView::Command;
+    switch (command) {
+    case Command::Back: if (windowSettings_.AllowBackwardNavigation) view_->back(); break;
+    case Command::Forward: if (windowSettings_.AllowForwardNavigation) view_->forward(); break;
+    case Command::Reload: reloadPage(); break;
+    case Command::Find: findInPage(); break;
+    case Command::Home: navigateHome(); break;
+    case Command::FocusAddressBar:
+        if (windowSettings_.AllowAddressBar && addressBar_) { addressBar_->setFocus(); addressBar_->selectAll(); }
+        break;
+    case Command::ZoomIn: changeZoom(1); break;
+    case Command::ZoomOut: changeZoom(-1); break;
+    case Command::ZoomReset: changeZoom(0); break;
+    case Command::Print: if (session_.settings().Browser.AllowPrint) view_->print(); break;
+    case Command::DeveloperTools: if (windowSettings_.AllowDeveloperConsole) view_->openDevTools(); break;
+    case Command::Quit:
+        if (isMainWindow_ && session_.requestApplicationQuit(this, QStringLiteral("Enter the quit password to close this exam session."))) QApplication::quit();
+        break;
     }
-    handled = true;
 }
 
 void BrowserWindow::reloadPage()

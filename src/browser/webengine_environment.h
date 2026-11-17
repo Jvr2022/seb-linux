@@ -4,6 +4,7 @@
 
 namespace seb::browser {
 
-void applyWebEngineEnvironment(const seb::settings::browser::BrowserSettings &settings);
+bool applyWebEngineEnvironment(const seb::settings::browser::BrowserSettings &settings, QString *error = nullptr);
+void freezeWebEngineEnvironment();
 
 }  // namespace seb::browser

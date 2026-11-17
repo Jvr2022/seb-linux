@@ -17,6 +17,7 @@
 #include <QDir>
 #include <QPointer>
 #include <QVector>
+#include <QSet>
 
 namespace seb::browser {
 
@@ -27,7 +28,8 @@ public:
     QString defaultUserAgent;
     QString userAgent;
     QString acceptLanguage;
-    contracts::IRequestInterceptor *urlRequestInterceptor = nullptr;
+    QSet<WebKitDownload *> downloads;
+    std::shared_ptr<contracts::IRequestInterceptor> urlRequestInterceptor;
 };
 
 struct DownloadContext
@@ -35,14 +37,14 @@ struct DownloadContext
     QPointer<WebKitGtkProfile> owner;
     QUuid id;
     QUrl url;
+    bool failed = false;
 };
 
-WebKitGtkProfile::WebKitGtkProfile(QObject *parent)
+WebKitGtkProfile::WebKitGtkProfile(bool ephemeral, QObject *parent)
     : IWebProfile(parent)
     , d(std::make_unique<Private>())
 {
-    // Create an ephemeral or persistent WebKitContext
-    d->context = webkit_web_context_new();
+    d->context = ephemeral ? webkit_web_context_new_ephemeral() : webkit_web_context_new();
 
     WebKitSettings *settings = webkit_settings_new();
     const gchar *userAgent = webkit_settings_get_user_agent(settings);
@@ -87,10 +89,15 @@ WebKitGtkProfile::WebKitGtkProfile(QObject *parent)
             download,
             QUrl::fromLocalFile(path).toString(QUrl::FullyEncoded).toUtf8().constData());
 
+        profile->d->downloads.insert(download);
+        g_object_ref(download);
         auto *downloadContext = new DownloadContext;
         downloadContext->owner = profile;
         downloadContext->id = request.id;
         downloadContext->url = request.url;
+        g_signal_connect(download, "failed", G_CALLBACK(+[](WebKitDownload *, GError *, gpointer data) {
+            static_cast<DownloadContext *>(data)->failed = true;
+        }), downloadContext);
         g_signal_connect(download, "finished", G_CALLBACK(+[](WebKitDownload *finished, gpointer data) {
             auto *context = static_cast<DownloadContext *>(data);
             const gchar *destination = webkit_download_get_destination(finished);
@@ -101,16 +108,20 @@ WebKitGtkProfile::WebKitGtkProfile(QObject *parent)
                 result.localPath = destination
                     ? QUrl(QString::fromUtf8(destination)).toLocalFile()
                     : QString();
-                result.success = !result.localPath.isEmpty();
+                result.success = !context->failed && !result.localPath.isEmpty();
+                context->owner->d->downloads.remove(finished);
                 emit context->owner->downloadFinished(result);
             }
+            g_signal_handlers_disconnect_by_data(finished, context);
             delete context;
+            g_object_unref(finished);
         }), downloadContext);
     }), this);
 }
 
 WebKitGtkProfile::~WebKitGtkProfile()
 {
+    cancelDownloads();
     if (d->context) {
         g_object_unref(d->context);
     }
@@ -211,14 +222,14 @@ QString WebKitGtkProfile::httpAcceptLanguage() const
     return d->acceptLanguage;
 }
 
-void WebKitGtkProfile::setUrlRequestInterceptor(seb::browser::contracts::IRequestInterceptor *interceptor)
+void WebKitGtkProfile::setUrlRequestInterceptor(std::shared_ptr<seb::browser::contracts::IRequestInterceptor> interceptor)
 {
-    d->urlRequestInterceptor = interceptor;
+    d->urlRequestInterceptor = std::move(interceptor);
 }
 
 seb::browser::contracts::IRequestInterceptor *WebKitGtkProfile::urlRequestInterceptor() const
 {
-    return d->urlRequestInterceptor;
+    return d->urlRequestInterceptor.get();
 }
 
 void WebKitGtkProfile::deleteAllCookies()
@@ -227,23 +238,27 @@ void WebKitGtkProfile::deleteAllCookies()
     webkit_cookie_manager_delete_all_cookies(cookieManager);
 }
 
-void WebKitGtkProfile::clearHttpCache()
+void WebKitGtkProfile::clearHttpCache(std::function<void(bool)> done)
 {
-    if (!d->context) {
-        return;
-    }
+    auto *manager = d->context ? webkit_web_context_get_website_data_manager(d->context) : nullptr;
+    if (!manager) { if (done) done(false); return; }
+    struct Completion { QPointer<WebKitGtkProfile> owner; std::function<void(bool)> done; };
+    auto *completion = new Completion{this, std::move(done)};
+    webkit_website_data_manager_clear(manager,
+        static_cast<WebKitWebsiteDataTypes>(WEBKIT_WEBSITE_DATA_MEMORY_CACHE | WEBKIT_WEBSITE_DATA_DISK_CACHE),
+        0, nullptr, +[](GObject *source, GAsyncResult *result, gpointer data) {
+            std::unique_ptr<Completion> callback(static_cast<Completion *>(data));
+            GError *error = nullptr;
+            const bool success = webkit_website_data_manager_clear_finish(WEBKIT_WEBSITE_DATA_MANAGER(source), result, &error);
+            if (error) g_error_free(error);
+            if (callback->owner && callback->done) callback->done(success);
+        }, completion);
+}
 
-    WebKitWebsiteDataManager *manager = webkit_web_context_get_website_data_manager(d->context);
-    if (manager) {
-        webkit_website_data_manager_clear(
-            manager,
-            static_cast<WebKitWebsiteDataTypes>(
-                WEBKIT_WEBSITE_DATA_MEMORY_CACHE | WEBKIT_WEBSITE_DATA_DISK_CACHE),
-            0,
-            nullptr,
-            nullptr,
-            nullptr);
-    }
+void WebKitGtkProfile::cancelDownloads()
+{
+    const auto downloads = d->downloads;
+    for (auto *download : downloads) webkit_download_cancel(download);
 }
 
 }  // namespace seb::browser

@@ -16,6 +16,13 @@
     }
 
     new QWebChannel(qt.webChannelTransport, function (channel) {
+        var initializeClipboard = function () {
+            if (typeof window.__sebInstallClipboard === 'function') {
+                window.__sebInstallClipboard(channel.objects.sebClipboardBridge);
+            }
+        };
+        initializeClipboard();
+        document.addEventListener('seb-clipboard-ready', initializeClipboard);
         var bridge = channel.objects.sebSecurityBridge;
         if (!bridge) {
             return;

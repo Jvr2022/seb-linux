@@ -52,7 +52,17 @@ QList<contracts::IBrowserWindow *> BrowserApplication::browserWindows() const
     QList<contracts::IBrowserWindow *> result;
     for (auto *window : session_.browserWindows()) {
         if (window) {
-            result.push_back(new BrowserWindowPort(window));
+            auto *port = windowPorts_.value(window, nullptr);
+            if (!port) {
+                auto *owner = const_cast<BrowserApplication *>(this);
+                port = new BrowserWindowPort(window, owner);
+                windowPorts_.insert(window, port);
+                connect(window, &QObject::destroyed, owner, [this, window, port] {
+                    windowPorts_.remove(window);
+                    port->deleteLater();
+                });
+            }
+            result.push_back(port);
         }
     }
     return result;
@@ -60,15 +70,17 @@ QList<contracts::IBrowserWindow *> BrowserApplication::browserWindows() const
 
 void BrowserApplication::focus(bool forward)
 {
-    Q_UNUSED(forward);
-
     const auto windows = session_.browserWindows();
     if (windows.isEmpty() || !windows.first()) {
         return;
     }
 
-    auto *window = windows.first();
-    window->showNormal();
+    int active = -1;
+    for (int i = 0; i < windows.size(); ++i) if (windows.at(i)->isActiveWindow()) active = i;
+    const int index = active < 0 ? 0 : (active + (forward ? 1 : windows.size() - 1)) % windows.size();
+    auto *window = windows.at(index);
+    if (window->isMinimized()) window->setWindowState(window->windowState() & ~Qt::WindowMinimized);
+    window->show();
     window->raise();
     window->activateWindow();
     window->setFocus();

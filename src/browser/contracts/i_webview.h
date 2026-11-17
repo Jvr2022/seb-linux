@@ -6,8 +6,13 @@
 #include <QUrl>
 #include <functional>
 
+namespace seb::settings {
+struct AppSettings;
+}
+
 namespace seb::settings::browser {
 struct BrowserSettings;
+struct WindowSettings;
 }
 
 namespace seb::configuration::contracts {
@@ -21,6 +26,10 @@ QT_BEGIN_NAMESPACE
 class QWidget;
 class QAuthenticator;
 QT_END_NAMESPACE
+
+namespace seb::browser {
+class Clipboard;
+}
 
 namespace seb::browser::contracts {
 
@@ -36,7 +45,16 @@ public:
      * \brief Returns the actual Qt widget that can be inserted into the UI layout.
      * For WebEngine this is the QWebEngineView. For WebKitGTK this is a QWindow container widget.
      */
+    enum class Command { Back, Forward, Reload, Find, Home, FocusAddressBar,
+                         ZoomIn, ZoomOut, ZoomReset, Print, DeveloperTools, Quit };
+    Q_ENUM(Command)
+
     virtual QWidget *widget() const = 0;
+    virtual void configureBrowser(const seb::settings::AppSettings &,
+                                  const seb::settings::browser::WindowSettings &) {}
+    virtual void initializeClipboard(seb::browser::Clipboard *) {}
+    virtual void setZoomFactor(double) {}
+    virtual void print() {}
 
     virtual QUrl url() const = 0;
     virtual void setUrl(const QUrl &url) = 0;
@@ -76,7 +94,9 @@ public:
 signals:
     void urlChanged(const QUrl &url);
     void titleChanged(const QString &title);
-    void newWindowRequested(const QUrl &targetUrl, bool &handled);
+    void newWindowRequested(const QUrl &targetUrl, IWebView *&targetView);
+    void closeRequested();
+    void commandRequested(Command command);
     void proxyAuthenticationRequired(const QUrl &url, QAuthenticator *authenticator, const QString &proxyHost);
 };
 

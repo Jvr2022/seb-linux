@@ -1,6 +1,7 @@
 #pragma once
 
 #include "settings/Browser/WindowSettings.h"
+#include "browser/contracts/i_webview.h"
 
 #include <QMainWindow>
 
@@ -68,7 +69,9 @@ private:
     void configureShortcuts();
     void findInPage();
     void navigateHome();
-    void handleNewWindowRequest(const QUrl &url, bool &handled);
+    void handleNewWindowRequest(const QUrl &url, seb::browser::contracts::IWebView *&targetView);
+    void handleBrowserCommand(seb::browser::contracts::IWebView::Command command);
+    void changeZoom(int steps);
     void reloadPage();
     void updateAddressBar(const QUrl &url);
     void notifyTaskbarStateChanged();
@@ -81,4 +84,5 @@ private:
     QLineEdit *addressBar_ = nullptr;
     SebTaskbar *taskbar_ = nullptr;
     bool isMainWindow_ = false;
+    int zoomPercentage_ = 100;
 };

@@ -10,24 +10,30 @@
 #include "server/data/exam.h"
 #include "server/server_proxy.h"
 #include "seb_session.h"
+#include "security/security_service.h"
+#include "security/session_integrity_store.h"
 #include "ui/runtime_window.h"
 
 #include <QCoreApplication>
 #include <QDir>
 #include <QDialog>
 #include <QDialogButtonBox>
-#include <QElapsedTimer>
-#include <QEventLoop>
 #include <QFileInfo>
 #include <QFile>
 #include <QInputDialog>
 #include <QLineEdit>
 #include <QMessageBox>
 #include <QListWidget>
+#include <QLabel>
+#include <QPushButton>
+#include <QEvent>
+#include <QApplication>
 #include <QVBoxLayout>
 #include <QTimer>
 #include <QTemporaryDir>
 #include <QTextStream>
+#include <QStandardPaths>
+#include <QPointer>
 
 namespace {
 
@@ -37,49 +43,6 @@ QUrl resourceUrl(const QString &resource)
     return file.exists() ? QUrl::fromLocalFile(file.absoluteFilePath()) : QUrl::fromUserInput(resource);
 }
 
-bool hasArgument(const QStringList &arguments, const QString &name)
-{
-    return arguments.contains(name);
-}
-
-void applyRuntimeOverrides(seb::settings::AppSettings &settings)
-{
-    const QStringList arguments = QCoreApplication::arguments();
-    const int urlIndex = arguments.indexOf(QStringLiteral("--url"));
-    const int shortUrlIndex = arguments.indexOf(QStringLiteral("-u"));
-    const int selectedUrlIndex = urlIndex >= 0 ? urlIndex : shortUrlIndex;
-    if (selectedUrlIndex >= 0 && selectedUrlIndex + 1 < arguments.size()) {
-        settings.Browser.StartUrl = arguments.at(selectedUrlIndex + 1).trimmed();
-    }
-
-    if (hasArgument(arguments, QStringLiteral("--show-toolbar"))) {
-        settings.Browser.MainWindow.ShowToolbar = true;
-    }
-    if (hasArgument(arguments, QStringLiteral("--allow-address-bar"))) {
-        settings.Browser.MainWindow.AllowAddressBar = true;
-        settings.Browser.MainWindow.ShowToolbar = true;
-    }
-    if (hasArgument(arguments, QStringLiteral("--allow-navigation"))) {
-        settings.Browser.MainWindow.AllowBackwardNavigation = true;
-        settings.Browser.MainWindow.AllowForwardNavigation = true;
-    }
-    if (hasArgument(arguments, QStringLiteral("--allow-reload"))) {
-        settings.Browser.MainWindow.AllowReloading = true;
-        settings.Browser.MainWindow.ShowReloadButton = true;
-    }
-    if (hasArgument(arguments, QStringLiteral("--allow-devtools"))) {
-        settings.Browser.MainWindow.AllowDeveloperConsole = true;
-    }
-    if (hasArgument(arguments, QStringLiteral("--windowed"))) {
-        settings.Browser.MainWindow.FullScreenMode = false;
-    }
-    if (hasArgument(arguments, QStringLiteral("--fullscreen"))) {
-        settings.Browser.MainWindow.FullScreenMode = true;
-    }
-    if (hasArgument(arguments, QStringLiteral("--disable-quit"))) {
-        settings.Security.AllowTermination = false;
-    }
-}
 
 QString loadStatusMessage(seb::configuration::contracts::LoadStatus status)
 {
@@ -196,6 +159,14 @@ bool chooseServerExam(
     return false;
 }
 
+class ServerWorkflowDialog : public QDialog
+{
+public:
+    using QDialog::QDialog;
+    std::function<void()> abort;
+    void reject() override { if (abort) abort(); }
+};
+
 enum class ServerFailureAction { Retry, Fallback, Abort };
 
 ServerFailureAction chooseServerFailure(
@@ -281,9 +252,98 @@ AppController::AppController(QObject *parent)
     : QObject(parent)
 {
     sessionConfiguration_ = repository_.initializeSessionConfiguration();
+    qApp->installEventFilter(this);
+    qApp->setQuitOnLastWindowClosed(false);
+    security_ = std::make_unique<seb::security::SecurityService>(this);
+    sessionIntegrityStore_ = std::make_unique<seb::security::SessionIntegrityStore>(
+        sessionConfiguration_.appConfig.sessionCacheFilePath);
+    connect(security_.get(), &seb::security::SecurityService::secureViolationDetected, this, [this](const QString &reason) {
+        qCritical().noquote() << reason;
+        shutdown();
+    }, Qt::QueuedConnection);
 }
 
 AppController::~AppController() = default;
+
+bool AppController::eventFilter(QObject *watched, QEvent *event)
+{
+    if (watched == qApp && event->type() == QEvent::Quit && !shutdownComplete_) {
+        if (serverWorkflowActive_) {
+            quitRequestedDuringWorkflow_ = true;
+            if (abortServerWorkflow_) abortServerWorkflow_();
+            return true;
+        }
+        QTimer::singleShot(0, this, &AppController::shutdown);
+        return true;
+    }
+    return QObject::eventFilter(watched, event);
+}
+
+void AppController::shutdown()
+{
+    if (serverWorkflowActive_) {
+        quitRequestedDuringWorkflow_ = true;
+        if (abortServerWorkflow_) abortServerWorkflow_();
+        return;
+    }
+    if (shuttingDown_) return;
+    shuttingDown_ = true;
+    security_->stopMonitoring();
+    if (session_ && !serverProxy_) serverProxy_ = session_->takeServerProxy();
+    if (session_) for (auto *window : session_->browserWindows()) window->setEnabled(false);
+    auto finish = [this] { QTimer::singleShot(0, this, &AppController::completeShutdown); };
+    if (serverProxy_) serverProxy_->disconnectFromServer([this, finish](auto response) {
+        if (!response.success) sessionIntegrityCleanupAllowed_ = false;
+        finish();
+    });
+    else finish();
+}
+
+void AppController::completeShutdown()
+{
+    if (auto *dialog = qobject_cast<QDialog *>(qApp->activeModalWidget())) {
+        dialog->reject();
+        QTimer::singleShot(0, this, &AppController::completeShutdown);
+        return;
+    }
+    if (session_) {
+        const auto windows = session_->browserWindows();
+        for (auto *window : windows) delete window;
+        mainWindow_ = nullptr;
+        if (!browserShutdownFinalizationStarted_) {
+            browserShutdownFinalizationStarted_ = true;
+            const auto &configuration = session_->configuration();
+            const bool discardProfile = ephemeralBrowserProfile_ && !configuration.isBrowserResource &&
+                configuration.settings.Browser.DeleteCacheOnShutdown &&
+                configuration.settings.Browser.DeleteCookiesOnShutdown;
+            session_->finalizeBrowser([this](bool success) {
+                browserShutdownFinalizationComplete_ = true;
+                browserShutdownFinalizationSucceeded_ = success;
+                if (!success) qWarning() << "Browser cache cleanup could not be confirmed during shutdown.";
+                QTimer::singleShot(0, this, &AppController::completeShutdown);
+            }, discardProfile);
+            return;
+        }
+        if (!browserShutdownFinalizationComplete_) return;
+    }
+    mainWindow_ = nullptr;
+    QString integrityError;
+    if (!sessionIntegrityStore_->finish(
+            sessionIntegrityCleanupAllowed_ && browserShutdownFinalizationSucceeded_,
+            &integrityError))
+        qWarning().noquote() << integrityError;
+    session_.reset();
+    serverProxy_.reset();
+    browserProfile_.reset();
+    browserEngineProvider_.reset();
+    shutdownComplete_ = true;
+    QCoreApplication::quit();
+}
+
+bool AppController::validateSecuritySettings(const seb::settings::AppSettings &settings, QString *error)
+{
+    return security_->validateSettings(settings, error);
+}
 
 bool AppController::loadSettingsWithPassword(
     const QUrl &resource,
@@ -335,36 +395,48 @@ bool AppController::loadSettingsWithPassword(
            status == seb::configuration::contracts::LoadStatus::LoadWithBrowser;
 }
 
-bool AppController::ensureBrowserProfile()
+bool AppController::ensureBrowserProfileContext(const seb::settings::browser::BrowserSettings &settings, QString *error)
 {
-    if (browserProfileDirectory_ && browserProfileDirectory_->isValid()) {
-        return true;
-    }
-
-    browserProfileDirectory_ = std::make_unique<QTemporaryDir>(
-        QDir::tempPath() + QStringLiteral("/seb-linux-profile-XXXXXX"));
-    return browserProfileDirectory_ && browserProfileDirectory_->isValid();
-}
-
-bool AppController::ensureBrowserProfileContext()
-{
-    if (browserEngineProvider_ && browserProfile_) {
-        return true;
-    }
-
-    if (!ensureBrowserProfile()) {
-        return false;
-    }
+    if (!seb::browser::applyWebEngineEnvironment(settings, error)) return false;
+    if (browserEngineProvider_ && browserProfile_) return true;
 
     browserEngineProvider_ = seb::browser::createEngineProvider();
     if (!browserEngineProvider_) {
         return false;
     }
 
-    const QString storageName = QStringLiteral("seb-browser-resource-") +
-        QUuid::createUuid().toString(QUuid::WithoutBraces);
+    const QString storageName = ephemeralBrowserProfile_ ? QString() : QStringLiteral("seb-session");
     browserProfile_ = browserEngineProvider_->createProfile(this, storageName);
-    return browserProfile_ != nullptr;
+    if (!browserProfile_) return false;
+    if (!ephemeralBrowserProfile_) {
+        const QString path = QStandardPaths::writableLocation(QStandardPaths::AppDataLocation);
+        browserProfile_->setPersistentStoragePath(path + QStringLiteral("/profile"));
+        browserProfile_->setCachePath(path + QStringLiteral("/cache"));
+    }
+    return true;
+}
+
+bool AppController::finalizeServerSession(QString *error)
+{
+    if (!serverProxy_) return true;
+    ServerWorkflowDialog finalizing(mainWindow_);
+    finalizing.setWindowTitle(QStringLiteral("Disconnecting SEB Server"));
+    finalizing.setWindowFlag(Qt::WindowCloseButtonHint, false);
+    auto *layout = new QVBoxLayout(&finalizing);
+    layout->addWidget(new QLabel(QStringLiteral("Finalizing server session…"), &finalizing));
+    bool success = false;
+    QTimer::singleShot(0, &finalizing, [&] {
+        serverProxy_->disconnectFromServer([&](auto response) {
+            success = response.success;
+            if (!success && error) *error = response.message;
+            finalizing.accept();
+        });
+    });
+    serverWorkflowActive_ = true;
+    finalizing.exec();
+    serverWorkflowActive_ = false;
+    serverProxy_.reset();
+    return success;
 }
 
 bool AppController::initializeServerSession(
@@ -373,19 +445,6 @@ bool AppController::initializeServerSession(
 {
     using seb::configuration::contracts::LoadStatus;
     using seb::settings::SessionMode;
-
-    if (settings.SessionMode != SessionMode::Server) {
-        return true;
-    }
-
-    if (serverProxy_ && serverProxy_->isConnected() && !serverProxy_->examId().isEmpty()) {
-        const auto info = serverProxy_->connectionInfo();
-        sessionConfiguration_.appConfig.serverApi = info.api;
-        sessionConfiguration_.appConfig.serverConnectionToken = info.connectionToken;
-        sessionConfiguration_.appConfig.serverOauth2Token = info.oauth2Token;
-        sessionConfiguration_.appConfig.serverExamId = serverProxy_->examId();
-        return true;
-    }
 
     if (settings.Server.ServerUrl.trimmed().isEmpty()) {
         if (error) *error = QStringLiteral("SEB Server mode requires sebServerURL.");
@@ -417,7 +476,7 @@ bool AppController::initializeServerSession(
             QUrl::fromLocalFile(fallbackPath),
             fallbackSettings,
             fallbackParameters,
-            QString(),
+            seb::configuration::cryptography::HashAlgorithm().generateHashFor(fallbackPassword),
             true,
             fallbackStatus,
             fallbackAborted);
@@ -426,7 +485,6 @@ bool AppController::initializeServerSession(
         }
         fallbackSettings.SessionMode = SessionMode::Normal;
         settings = fallbackSettings;
-        serverProxy_.reset();
         return true;
     };
     if (!serverProxy_) {
@@ -435,120 +493,119 @@ bool AppController::initializeServerSession(
             this);
     }
 
-    for (int attempt = 0; attempt < 5; ++attempt) {
-        serverProxy_->initialize(connectionServer);
-        const auto connected = serverProxy_->connectToServer();
-        if (!connected.success) {
-            const auto action = chooseServerFailure(
-                mainWindow_, connected.message, connectionServer.PerformFallback);
-            if (action == ServerFailureAction::Retry) continue;
-            if (action == ServerFailureAction::Fallback && connectionServer.PerformFallback) {
-                if (fallbackToLocalSettings()) {
-                    return true;
-                }
-            }
-            if (error) *error = connected.message;
-            return false;
-        }
-
-        QList<seb::server::data::Exam> exams;
-        const auto available = serverProxy_->availableExams(exams, connectionServer.ExamId);
-        if (!available.success) {
-            const auto action = chooseServerFailure(
-                mainWindow_, available.message, connectionServer.PerformFallback);
-            if (action == ServerFailureAction::Retry) continue;
-            if (action == ServerFailureAction::Fallback && connectionServer.PerformFallback) {
-                if (fallbackToLocalSettings()) {
-                    return true;
-                }
-            }
-            if (error) *error = available.message;
-            return false;
-        }
-
-        seb::server::data::Exam selected;
-        if (!connectionServer.ExamId.isEmpty()) {
-            for (const auto &exam : exams) {
-                if (exam.id == connectionServer.ExamId) {
-                    selected = exam;
-                    break;
-                }
-            }
-            if (selected.id.isEmpty()) {
-                if (error) *error = QStringLiteral("The configured SEB Server exam was not available.");
-                return false;
-            }
-        } else if (!chooseServerExam(mainWindow_, exams, selected)) {
-            if (error) *error = QStringLiteral("No SEB Server exam was selected.");
-            return false;
-        }
-
-        const QString directory = sessionConfiguration_.appConfig.temporaryDirectory;
-        if (!QDir().mkpath(directory)) {
-            if (error) *error = QStringLiteral("Could not create temporary SEB Server storage.");
-            return false;
-        }
-        const QString path = QDir(directory).filePath(
-            QStringLiteral("seb-server-%1.seb").arg(QUuid::createUuid().toString(QUuid::WithoutBraces)));
-        const auto downloaded = serverProxy_->downloadExamConfiguration(selected, path);
-        if (!downloaded.success) {
+    ServerWorkflowDialog progress(mainWindow_);
+    progress.setWindowTitle(QStringLiteral("SEB Server"));
+    progress.setWindowFlag(Qt::WindowCloseButtonHint, false);
+    auto *layout = new QVBoxLayout(&progress);
+    auto *statusLabel = new QLabel(QStringLiteral("Connecting to SEB Server…"), &progress);
+    layout->addWidget(statusLabel);
+    auto *cancel = new QPushButton(QStringLiteral("Abort"), &progress);
+    layout->addWidget(cancel);
+    bool success = false;
+    bool finishing = false;
+    int stage = 0;
+    QList<seb::server::data::Exam> exams;
+    seb::server::data::Exam selected;
+    seb::settings::AppSettings examSettings;
+    QTemporaryDir storage;
+    const QString path = storage.filePath(QStringLiteral("exam.seb"));
+    std::function<void()> next;
+    std::function<void(QString, bool)> finish;
+    std::function<void(seb::server::contracts::ServerResponse)> advance;
+    finish = [&](QString message, bool fallback) {
+        if (finishing) return;
+        finishing = true;
+        cancel->setEnabled(false);
+        serverProxy_->disconnectFromServer([&, message, fallback](auto) {
+            success = fallback && fallbackToLocalSettings();
+            if (!success && error) *error = message;
+            progress.accept();
+        });
+    };
+    advance = [&](auto response) {
+        if (finishing) return;
+        if (response.success) { ++stage; QTimer::singleShot(0, &progress, next); return; }
+        const auto action = chooseServerFailure(&progress, response.message, connectionServer.PerformFallback);
+        if (action == ServerFailureAction::Retry) QTimer::singleShot(0, &progress, next);
+        else finish(response.message, action == ServerFailureAction::Fallback);
+    };
+    next = [&] {
+        if (finishing) return;
+        switch (stage) {
+        case 0:
+            serverProxy_->connectToServer(advance); break;
+        case 1:
+            statusLabel->setText(QStringLiteral("Retrieving available exams…"));
+            serverProxy_->availableExams([&](auto response, auto available) {
+                exams = available; advance(response);
+            }, connectionServer.ExamId);
+            break;
+        case 2:
+            if (!connectionServer.ExamId.isEmpty()) {
+                for (const auto &exam : exams) if (exam.id == connectionServer.ExamId) selected = exam;
+            } else chooseServerExam(&progress, exams, selected);
+            if (selected.id.isEmpty()) { finish(QStringLiteral("No SEB Server exam selected."), false); return; }
+            ++stage; QTimer::singleShot(0, &progress, next); break;
+        case 3:
+            statusLabel->setText(QStringLiteral("Downloading exam configuration…"));
+            if (!storage.isValid()) { finish(QStringLiteral("Could not create temporary exam storage."), false); return; }
+            serverProxy_->downloadExamConfiguration(selected, path, advance); break;
+        case 4: {
+            seb::configuration::contracts::cryptography::PasswordParameters password;
+            LoadStatus status = LoadStatus::UnexpectedError;
+            bool aborted = false;
+            const bool loaded = loadSettingsWithPassword(QUrl::fromLocalFile(path), examSettings,
+                password, connectionServer.FallbackPasswordHash, false, status, aborted);
             QFile::remove(path);
-            if (error) *error = downloaded.message;
-            return false;
-        }
-
-        seb::settings::AppSettings examSettings;
-        seb::configuration::contracts::cryptography::PasswordParameters password;
-        LoadStatus status = LoadStatus::UnexpectedError;
-        bool aborted = false;
-        const bool loaded = loadSettingsWithPassword(
-            QUrl::fromLocalFile(path),
-            examSettings,
-            password,
-            connectionServer.FallbackPasswordHash,
-            false,
-            status,
-            aborted);
-        QFile::remove(path);
-        if (!loaded || status != LoadStatus::Success) {
-            if (error) {
-                *error = aborted
-                    ? QStringLiteral("The SEB Server exam configuration password was not accepted.")
-                    : loadStatusMessage(status);
+            if (!loaded || status != LoadStatus::Success) {
+                finish(aborted ? QStringLiteral("Exam configuration loading aborted.") : loadStatusMessage(status), false); return;
             }
-            return false;
+            auto candidate = sessionConfiguration_;
+            candidate.settings = examSettings;
+            QString validationError;
+            if (!examSettings.Browser.EnableBrowser || (!validateVersionRestrictions(candidate, &validationError) || !validateSecuritySettings(examSettings, &validationError))) {
+                finish(validationError.isEmpty() ? QStringLiteral("Exam configuration disables the browser.") : validationError, false); return;
+            }
+            ++stage; QTimer::singleShot(0, &progress, next); break;
         }
-
-        QString browserExamKey;
-        const auto selectedResponse = serverProxy_->selectExam(selected, &browserExamKey);
-        if (!selectedResponse.success) {
-            if (error) *error = selectedResponse.message;
-            return false;
+        case 5:
+            statusLabel->setText(QStringLiteral("Completing exam handshake…"));
+            serverProxy_->selectExam(selected, [&](auto response, const QString &bek) {
+                if (response.success) {
+                    const auto invigilation = examSettings.Server.Invigilation;
+                    examSettings.Server = connectionServer;
+                    examSettings.Server.Invigilation = invigilation;
+                    examSettings.Browser.StartUrl = selected.url;
+                    examSettings.Browser.StartUrlQuery = connectionBrowser.StartUrlQuery;
+                    if (!bek.isEmpty()) examSettings.Browser.CustomBrowserExamKey = bek;
+                    examSettings.SessionMode = SessionMode::Server;
+                    settings = examSettings;
+                }
+                advance(response);
+            }); break;
+        default:
+            success = true; finishing = true; progress.accept(); break;
         }
-
-        examSettings.Browser.StartUrl = selected.url;
-        examSettings.Browser.StartUrlQuery = connectionBrowser.StartUrlQuery;
-        examSettings.Server = connectionServer;
-        examSettings.SessionMode = SessionMode::Server;
-        if (!browserExamKey.isEmpty()) {
-            examSettings.Browser.CustomBrowserExamKey = browserExamKey;
-        }
-        settings = examSettings;
-
-        const auto info = serverProxy_->connectionInfo();
-        sessionConfiguration_.appConfig.serverApi = info.api;
-        sessionConfiguration_.appConfig.serverConnectionToken = info.connectionToken;
-        sessionConfiguration_.appConfig.serverOauth2Token = info.oauth2Token;
-        sessionConfiguration_.appConfig.serverExamId = selected.id;
-        return true;
-    }
-
-    if (error) *error = QStringLiteral("Could not connect to the SEB Server.");
-    return false;
+    };
+    connect(cancel, &QPushButton::clicked, &progress, [&] { finish(QStringLiteral("SEB Server startup aborted."), false); });
+    progress.abort = [&] { finish(QStringLiteral("SEB Server startup aborted."), false); };
+    serverProxy_->initialize(connectionServer);
+    QTimer::singleShot(0, &progress, next);
+    serverWorkflowActive_ = true;
+    abortServerWorkflow_ = progress.abort;
+    progress.exec();
+    abortServerWorkflow_ = {};
+    serverWorkflowActive_ = false;
+    if ((!success || settings.SessionMode != SessionMode::Server) && serverProxy_) serverProxy_.reset();
+    return success;
 }
 
 bool AppController::launch(const QString &resource, QString *error)
 {
+    if (shuttingDown_ || transitionPending_) {
+        if (error) *error = QStringLiteral("Safe Exam Browser is shutting down or replacing its session.");
+        return false;
+    }
     const bool isReconfiguration = session_ != nullptr;
     if (isReconfiguration &&
         (reconfigurationInProgress_ ||
@@ -559,19 +616,11 @@ bool AppController::launch(const QString &resource, QString *error)
         return false;
     }
     ReconfigurationGuard reconfigurationGuard(reconfigurationInProgress_, isReconfiguration);
-    if (session_) {
-        serverProxy_ = session_->takeServerProxy();
-    }
-    const bool previousBrowserResource = sessionConfiguration_.isBrowserResource;
-    const QString previousBrowserProfilePath = sessionConfiguration_.browserProfilePath;
+    const bool previousBrowserResource = session_ && session_->configuration().isBrowserResource;
     const QString previousAdminPasswordHash = session_
         ? session_->settings().Security.AdminPasswordHash
         : QString();
     sessionConfiguration_ = repository_.initializeSessionConfiguration();
-    if (previousBrowserResource && !previousBrowserProfilePath.isEmpty()) {
-        sessionConfiguration_.browserProfilePath = previousBrowserProfilePath;
-        sessionConfiguration_.reuseBrowserProfile = true;
-    }
     const QStringList warnings;
     const bool hasRequestedResource = !resource.trimmed().isEmpty();
 
@@ -642,27 +691,6 @@ bool AppController::launch(const QString &resource, QString *error)
 
         if (status == seb::configuration::contracts::LoadStatus::LoadWithBrowser) {
             sessionConfiguration_.isBrowserResource = true;
-            if (sessionConfiguration_.browserProfilePath.isEmpty()) {
-                if (!previousBrowserResource) {
-                    browserProfile_.reset();
-                    browserEngineProvider_.reset();
-                    browserProfileDirectory_.reset();
-                }
-                if (!ensureBrowserProfile()) {
-                    if (error) {
-                        *error = QStringLiteral("Could not create temporary browser profile storage.");
-                    }
-                    return false;
-                }
-                if (!ensureBrowserProfileContext()) {
-                    if (error) {
-                        *error = QStringLiteral("Could not create a persistent browser profile.");
-                    }
-                    return false;
-                }
-                sessionConfiguration_.browserProfilePath = browserProfileDirectory_->path();
-                sessionConfiguration_.reuseBrowserProfile = true;
-            }
             settings.Applications.Blacklist.clear();
             settings.Applications.Whitelist.clear();
             settings.Browser.DeleteCacheOnShutdown = false;
@@ -674,6 +702,8 @@ bool AppController::launch(const QString &resource, QString *error)
             settings.Security.AllowReconfiguration = true;
             settings.Security.VirtualMachinePolicy = seb::settings::security::VirtualMachinePolicy::Allow;
             settings.Service.IgnoreService = true;
+            settings.Security.VerifySessionIntegrity = false;
+            settings.Security.VerifyCursorConfiguration = false;
             settings.UserInterface.ActionCenter.EnableActionCenter = false;
         } else if (status != seb::configuration::contracts::LoadStatus::Success) {
             if (error) {
@@ -767,19 +797,88 @@ bool AppController::launch(const QString &resource, QString *error)
         }
     }
 
-    if (!initializeServerSession(sessionConfiguration_.settings, error)) {
+    if (!validateVersionRestrictions(sessionConfiguration_, error) ||
+        (sessionConfiguration_.settings.SessionMode != seb::settings::SessionMode::Server &&
+         (!validateSecuritySettings(sessionConfiguration_.settings, error) ||
+          !seb::browser::applyWebEngineEnvironment(sessionConfiguration_.settings.Browser, error)))) return false;
+
+    if (session_) serverProxy_ = session_->takeServerProxy();
+    if (!finalizeServerSession(error)) {
+        if (isReconfiguration) shutdown();
+        return false;
+    }
+    if (quitRequestedDuringWorkflow_) {
+        if (error) *error = QStringLiteral("Session startup cancelled by shutdown.");
+        shutdown();
+        return false;
+    }
+    if (sessionConfiguration_.settings.SessionMode == seb::settings::SessionMode::Server &&
+        !initializeServerSession(sessionConfiguration_.settings, error)) {
+        if (isReconfiguration || quitRequestedDuringWorkflow_) shutdown();
+        return false;
+    }
+    if (!validateVersionRestrictions(sessionConfiguration_, error) || !validateSecuritySettings(sessionConfiguration_.settings, error)) {
+        finalizeServerSession();
+        if (isReconfiguration) shutdown();
         return false;
     }
 
-    if (!validateVersionRestrictions(sessionConfiguration_, error)) {
-        return false;
+    security_->stopMonitoring();
+    const bool applied = applySettings(sessionConfiguration_, warnings, error);
+    if (!applied) {
+        finalizeServerSession();
+        if (isReconfiguration) shutdown();
     }
-
-    applyRuntimeOverrides(sessionConfiguration_.settings);
-    return applySettings(sessionConfiguration_, warnings, error);
+    return applied;
 }
 
 bool AppController::applySettings(
+    const seb::configuration::contracts::SessionConfiguration &configuration,
+    const QStringList &warnings, QString *error)
+{
+    if (!seb::browser::applyWebEngineEnvironment(configuration.settings.Browser, error)) return false;
+    if (!session_) return commitSettings(configuration, warnings, error);
+    if (!sessionIntegrityStore_->prepare(
+            configuration.settings.Browser.ConfigurationKey,
+            !configuration.settings.Security.QuitPasswordHash.isEmpty(),
+            configuration.settings.Security.VerifySessionIntegrity,
+            error)) {
+        if (error && !error->isEmpty())
+            QMessageBox::critical(mainWindow_, QStringLiteral("Session integrity check failed"), *error);
+        return false;
+    }
+    transitionPending_ = true;
+    QTimer::singleShot(0, this, [this, configuration, warnings] {
+        if (shuttingDown_) return;
+        const auto windows = session_->browserWindows();
+        for (auto *window : windows) delete window;
+        mainWindow_ = nullptr;
+        const auto &old = session_->configuration();
+        const bool discardProfile = ephemeralBrowserProfile_ && !old.isBrowserResource &&
+            old.settings.Browser.DeleteCacheOnShutdown && old.settings.Browser.DeleteCookiesOnShutdown;
+        session_->finalizeBrowser([this, configuration, warnings, discardProfile](bool finalized) {
+            QTimer::singleShot(0, this, [this, configuration, warnings, discardProfile, finalized] {
+                if (shuttingDown_) return;
+                session_.reset();
+                if (discardProfile) {
+                    browserProfile_.reset();
+                    ephemeralBrowserProfile_ = false;
+                }
+                QString error;
+                const bool committed = finalized && commitSettings(configuration, warnings, &error);
+                transitionPending_ = false;
+                if (!committed) {
+                    if (error.isEmpty()) error = QStringLiteral("Browser data cleanup could not be confirmed. Restart Safe Exam Browser before starting another exam.");
+                    QMessageBox::critical(nullptr, QStringLiteral("Session replacement failed"), error);
+                    shutdown();
+                }
+            });
+        }, discardProfile);
+    });
+    return true;
+}
+
+bool AppController::commitSettings(
     const seb::configuration::contracts::SessionConfiguration &configuration,
     const QStringList &warnings,
     QString *error)
@@ -792,12 +891,42 @@ bool AppController::applySettings(
         return false;
     }
 
+    if (!settings.Service.IgnoreService &&
+        settings.Service.Policy == seb::settings::service::ServicePolicy::Warn) {
+        QMessageBox::warning(mainWindow_, QStringLiteral("SEB service unavailable"),
+            QStringLiteral("This configuration requests a service warning. A privileged SEB service is unavailable on Linux; its system controls cannot be applied."));
+    }
     QTextStream err(stderr);
     for (const QString &warning : warnings) {
         err << "warning: " << warning << Qt::endl;
     }
 
-    seb::browser::applyWebEngineEnvironment(settings.Browser);
+    if (!browserProfile_) {
+        ephemeralBrowserProfile_ = configuration.isBrowserResource ||
+            (settings.Browser.DeleteCookiesOnStartup && settings.Browser.DeleteCookiesOnShutdown &&
+             settings.Browser.DeleteCacheOnShutdown);
+    }
+    if (!ensureBrowserProfileContext(settings.Browser, error)) return false;
+    const bool hasQuitPassword = !settings.Security.QuitPasswordHash.isEmpty();
+    if (!sessionIntegrityStore_->prepare(
+            settings.Browser.ConfigurationKey,
+            hasQuitPassword,
+            settings.Security.VerifySessionIntegrity,
+            error)) {
+        if (error && !error->isEmpty())
+            QMessageBox::critical(mainWindow_, QStringLiteral("Session integrity check failed"), *error);
+        return false;
+    }
+    if (!security_->configure(settings, error)) return false;
+    if (!sessionIntegrityStore_->activate(
+            settings.Browser.ConfigurationKey,
+            hasQuitPassword,
+            settings.Security.VerifySessionIntegrity,
+            error)) {
+        if (error && !error->isEmpty())
+            QMessageBox::critical(mainWindow_, QStringLiteral("Session integrity check failed"), *error);
+        return false;
+    }
 
     if (!runtimeWindow_) {
         runtimeWindow_ = std::make_unique<RuntimeWindow>();
@@ -810,9 +939,6 @@ bool AppController::applySettings(
     runtimeWindow_->raise();
     runtimeWindow_->activateWindow();
 
-    QElapsedTimer startupTimer;
-    startupTimer.start();
-
     auto nextSession = std::make_unique<SebSession>(
         configuration,
         [this](const QString &resource, QWidget *parent) {
@@ -821,38 +947,24 @@ bool AppController::applySettings(
                 return true;
             }
 
-            QMessageBox::critical(parent, QStringLiteral("Failed to Open SEB Resource"), error);
+            if (!shuttingDown_) QMessageBox::critical(parent, QStringLiteral("Failed to Open SEB Resource"), error);
             return false;
         },
         this,
-        configuration.reuseBrowserProfile ? browserEngineProvider_.get() : nullptr,
-        configuration.reuseBrowserProfile ? browserProfile_.get() : nullptr,
+        browserEngineProvider_.get(),
+        browserProfile_.get(),
         std::move(serverProxy_));
 
+    connect(nextSession.get(), &SebSession::shutdownRequested, this, &AppController::shutdown, Qt::QueuedConnection);
     BrowserWindow *nextWindow = nextSession->createWindow(nextSession->initialUrl(), true);
     runtimeWindow_->setStatusText(QStringLiteral("Opening secure browser window"));
-
-    const qint64 remaining = 5000 - startupTimer.elapsed();
-    if (remaining > 0) {
-        QEventLoop loop;
-        QTimer::singleShot(static_cast<int>(remaining), &loop, &QEventLoop::quit);
-        loop.exec();
-    }
 
     nextWindow->show();
     runtimeWindow_->hide();
 
-    if (mainWindow_) {
-        mainWindow_->hide();
-        mainWindow_->deleteLater();
-        mainWindow_ = nullptr;
-    }
-
-    if (session_) {
-        session_.release()->deleteLater();
-    }
-
     mainWindow_ = nextWindow;
     session_ = std::move(nextSession);
+    session_->startRuntimeMonitoring();
+    security_->startMonitoring();
     return true;
 }

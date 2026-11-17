@@ -15,7 +15,8 @@ QJsonObject object(const QByteArray &body, QString *error)
     const QJsonDocument document = QJsonDocument::fromJson(body, &parseError);
     if (!document.isObject()) {
         if (error) {
-            *error = parseError.errorString();
+            *error = parseError.error == QJsonParseError::NoError ?
+                QStringLiteral("Expected a JSON object from SEB Server.") : parseError.errorString();
         }
         return {};
     }
@@ -82,7 +83,7 @@ bool Parser::parseExams(const QByteArray &body, QList<data::Exam> &exams, QStrin
     QJsonParseError parseError;
     const QJsonDocument document = QJsonDocument::fromJson(body, &parseError);
     if (!document.isArray()) {
-        if (error) *error = parseError.errorString();
+        if (error) *error = QStringLiteral("Malformed SEB Server exam list.");
         return false;
     }
     for (const QJsonValue &value : document.array()) {
@@ -114,8 +115,38 @@ bool Parser::parseInstruction(
         return false;
     }
     instruction.instruction = instructionFor(instructionName);
+    if (instruction.instruction == data::Instruction::None) return false;
+    if (root.contains(QStringLiteral("attributes")) && !root.value(QStringLiteral("attributes")).isObject()) return false;
 
     const QJsonObject attributes = root.value(QStringLiteral("attributes")).toObject();
+    if (instruction.instruction == data::Instruction::Proctoring) {
+        auto &p = instruction.proctoring;
+        const auto provider = attributes.value(QStringLiteral("service-type")).toString();
+        const auto method = attributes.value(QStringLiteral("method")).toString();
+        p.provider = provider == QStringLiteral("SCREEN_PROCTORING") ? data::ProctoringProvider::ScreenProctoring :
+            provider == QStringLiteral("JITSI_MEET") ? data::ProctoringProvider::JitsiMeet :
+            provider == QStringLiteral("ZOOM") ? data::ProctoringProvider::Zoom : data::ProctoringProvider::Unknown;
+        p.method = method == QStringLiteral("JOIN") ? data::ProctoringMethod::Join :
+            method == QStringLiteral("LEAVE") ? data::ProctoringMethod::Leave : data::ProctoringMethod::Unknown;
+        p.clientId = attributes.value(QStringLiteral("screenProctoringClientId")).toString();
+        p.clientSecret = attributes.value(QStringLiteral("screenProctoringClientSecret")).toString();
+        p.groupId = attributes.value(QStringLiteral("screenProctoringGroupId")).toString();
+        p.serviceUrl = attributes.value(QStringLiteral("screenProctoringServiceURL")).toString();
+        p.sessionId = attributes.value(QStringLiteral("screenProctoringClientSessionId")).toString();
+        p.encryptionSecret = attributes.value(QStringLiteral("screenProctoringEncryptSecret")).toString();
+        p.roomName = attributes.value(QStringLiteral("jitsiMeetRoom")).toString();
+        p.token = attributes.value(QStringLiteral("jitsiMeetToken")).toString();
+        p.meetingNumber = attributes.value(QStringLiteral("zoomRoom")).toString();
+        p.password = attributes.value(QStringLiteral("zoomMeetingKey")).toString();
+        p.sdkKey = attributes.value(QStringLiteral("zoomAPIKey")).toString();
+        p.signature = attributes.value(QStringLiteral("zoomToken")).toString();
+        p.subject = attributes.value(QStringLiteral("zoomSubject")).toString();
+        p.userName = attributes.value(QStringLiteral("zoomUserName")).toString();
+        if (p.provider == data::ProctoringProvider::JitsiMeet) p.serviceUrl = attributes.value(QStringLiteral("jitsiMeetServerURL")).toString();
+    }
+    for (const auto &field : {QStringLiteral("instruction-confirm"), QStringLiteral("message"), QStringLiteral("type")}) {
+        if (attributes.contains(field) && !attributes.value(field).isString()) return false;
+    }
     instruction.confirmation = attributes.value(QStringLiteral("instruction-confirm")).toString();
     instruction.message = attributes.value(QStringLiteral("message")).toString();
     instruction.notificationId = attributes.value(QStringLiteral("id")).toInt();
@@ -134,6 +165,13 @@ bool Parser::parseInstruction(
     } else if (type.compare(QStringLiteral("raisehand"), Qt::CaseInsensitive) == 0 ||
                type.compare(QStringLiteral("hand"), Qt::CaseInsensitive) == 0) {
         instruction.notificationType = data::NotificationType::Hand;
+    }
+    if (instruction.instruction == data::Instruction::NotificationConfirm) {
+        const auto id = attributes.value(QStringLiteral("id"));
+        if (!id.isDouble() && !id.isString()) return false;
+        bool validId = false;
+        instruction.notificationId = attributes.value(QStringLiteral("id")).toVariant().toInt(&validId);
+        if (!validId || instruction.notificationId <= 0 || instruction.notificationType == data::NotificationType::Unknown) return false;
     }
     return true;
 }

@@ -17,7 +17,7 @@ class WebKitGtkProfile : public contracts::IWebProfile {
   Q_OBJECT
 
 public:
-  explicit WebKitGtkProfile(QObject *parent = nullptr);
+  explicit WebKitGtkProfile(bool ephemeral, QObject *parent = nullptr);
   ~WebKitGtkProfile() override;
 
   WebKitWebContext *nativeContext() const;
@@ -35,13 +35,13 @@ public:
   void setHttpAcceptLanguage(const QString &language) override;
   void setPersistSessionCookies(bool persist) override;
   QString httpAcceptLanguage() const;
-  void setDevBypass(bool enabled) override {}
 
   void setUrlRequestInterceptor(
-      seb::browser::contracts::IRequestInterceptor *interceptor) override;
+      std::shared_ptr<seb::browser::contracts::IRequestInterceptor> interceptor) override;
   seb::browser::contracts::IRequestInterceptor *urlRequestInterceptor() const;
   void deleteAllCookies() override;
-  void clearHttpCache() override;
+  void clearHttpCache(std::function<void(bool)> done = {}) override;
+  void cancelDownloads() override;
 
 private:
   class Private;

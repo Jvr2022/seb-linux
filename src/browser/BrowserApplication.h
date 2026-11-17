@@ -4,10 +4,14 @@
 #include "contracts/IBrowserApplication.h"
 
 #include <QObject>
+#include <QHash>
 
 class SebSession;
+class BrowserWindow;
 
 namespace seb::browser {
+
+class BrowserWindowPort;
 
 class BrowserApplication : public QObject, public contracts::IBrowserApplication
 {
@@ -31,6 +35,7 @@ public:
 private:
     SebSession &session_;
     BrowserApplicationContext context_;
+    mutable QHash<::BrowserWindow *, BrowserWindowPort *> windowPorts_;
 };
 
 }  // namespace seb::browser

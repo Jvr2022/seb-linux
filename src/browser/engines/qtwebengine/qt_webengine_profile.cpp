@@ -1,5 +1,6 @@
 #include "../../webengine_compat.h"
 #include "qt_webengine_profile.h"
+#include "browser/webengine_environment.h"
 
 
 #if SEB_HAS_QTWEBENGINE
@@ -9,6 +10,7 @@
 #include <QWebEngineUrlRequestInterceptor>
 #include <QWebEngineUrlRequestInfo>
 #include <QDir>
+#include <utility>
 
 namespace seb::browser {
 
@@ -48,9 +50,9 @@ private:
 class NativeRequestInterceptor : public QWebEngineUrlRequestInterceptor
 {
 public:
-    explicit NativeRequestInterceptor(contracts::IRequestInterceptor *abstractInterceptor, QObject *parent = nullptr)
+    explicit NativeRequestInterceptor(std::shared_ptr<contracts::IRequestInterceptor> abstractInterceptor, QObject *parent = nullptr)
         : QWebEngineUrlRequestInterceptor(parent)
-        , abstractInterceptor_(abstractInterceptor)
+        , abstractInterceptor_(std::move(abstractInterceptor))
     {
     }
 
@@ -63,7 +65,7 @@ public:
     }
 
 private:
-    contracts::IRequestInterceptor *abstractInterceptor_;
+    std::shared_ptr<contracts::IRequestInterceptor> abstractInterceptor_;
 };
 
 }  // namespace
@@ -73,10 +75,25 @@ QtWebEngineProfile::QtWebEngineProfile(
     QObject *parent)
     : IWebProfile(parent)
 {
+    freezeWebEngineEnvironment();
     profile_ = storageName.isEmpty()
         ? new QWebEngineProfile(this)
         : new QWebEngineProfile(storageName, this);
     defaultUserAgent_ = profile_->httpUserAgent();
+    cacheTimeout_.setSingleShot(true);
+    cacheTimeout_.setInterval(30000);
+    connect(&cacheTimeout_, &QTimer::timeout, this, [this] {
+        const auto callbacks = std::exchange(cacheWaiters_, {});
+        for (const auto &callback : callbacks) if (callback) callback(false);
+    });
+#if QT_VERSION >= QT_VERSION_CHECK(6, 7, 0)
+    connect(profile_, &QWebEngineProfile::clearHttpCacheCompleted, this, [this] {
+        cacheTimeout_.stop();
+        clearingCache_ = false;
+        const auto callbacks = std::exchange(cacheWaiters_, {});
+        for (const auto &callback : callbacks) if (callback) callback(true);
+    });
+#endif
 
     if (profile_->cookieStore()) {
         connect(profile_->cookieStore(), &QWebEngineCookieStore::cookieAdded,
@@ -85,6 +102,8 @@ QtWebEngineProfile::QtWebEngineProfile(
 
     // Forward native download requests to the abstraction
     connect(profile_, &QWebEngineProfile::downloadRequested, this, [this](auto *download) {
+        downloads_.insert(download);
+        connect(download, &QObject::destroyed, this, [this, download] { downloads_.remove(download); });
         contracts::DownloadRequest request;
         request.id = QUuid::createUuid();
         request.url = download->url();
@@ -186,15 +205,12 @@ void QtWebEngineProfile::setPersistSessionCookies(bool persist)
             : QWebEngineProfile::AllowPersistentCookies);
 }
 
-void QtWebEngineProfile::setUrlRequestInterceptor(contracts::IRequestInterceptor *interceptor)
+void QtWebEngineProfile::setUrlRequestInterceptor(std::shared_ptr<contracts::IRequestInterceptor> interceptor)
 {
-    if (!interceptor) {
-        profile_->setUrlRequestInterceptor(nullptr);
-        return;
-    }
-
-    auto *nativeInterceptor = new NativeRequestInterceptor(interceptor, this);
-    profile_->setUrlRequestInterceptor(nativeInterceptor);
+    auto *previous = nativeInterceptor_;
+    nativeInterceptor_ = interceptor ? new NativeRequestInterceptor(std::move(interceptor), this) : nullptr;
+    profile_->setUrlRequestInterceptor(nativeInterceptor_);
+    if (previous) previous->deleteLater();
 }
 
 void QtWebEngineProfile::deleteAllCookies()
@@ -204,9 +220,24 @@ void QtWebEngineProfile::deleteAllCookies()
     }
 }
 
-void QtWebEngineProfile::clearHttpCache()
+void QtWebEngineProfile::clearHttpCache(std::function<void(bool)> done)
 {
+#if QT_VERSION >= QT_VERSION_CHECK(6, 7, 0)
+    if (done) cacheWaiters_.append(std::move(done));
+    if (clearingCache_) return;
+    clearingCache_ = true;
+    cacheTimeout_.start();
     profile_->clearHttpCache();
+#else
+    profile_->clearHttpCache();
+    if (done) QTimer::singleShot(0, this, [done] { done(false); });
+#endif
+}
+
+void QtWebEngineProfile::cancelDownloads()
+{
+    const auto downloads = downloads_;
+    for (auto *download : downloads) if (!download->isFinished()) download->cancel();
 }
 
 }  // namespace seb::browser

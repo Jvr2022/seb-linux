@@ -27,13 +27,12 @@ endif()
 option(SEB_FORCE_QTWEBENGINE "Force the Qt WebEngine backend" OFF)
 option(SEB_FORCE_WEBKITGTK "Force the WebKitGTK backend" OFF)
 option(SEB_ENABLE_WEBKITGTK_COMPAT "Enable the non-production WebKitGTK compatibility backend" OFF)
-option(SEB_DEV_BYPASS "Enable the persistent developer bypass" OFF)
 
 if(SEB_FORCE_QTWEBENGINE AND SEB_FORCE_WEBKITGTK)
     message(FATAL_ERROR "SEB_FORCE_QTWEBENGINE and SEB_FORCE_WEBKITGTK cannot be used together.")
 endif()
 
-find_package(Qt6 REQUIRED COMPONENTS Core Gui Widgets Network Xml)
+find_package(Qt6 REQUIRED COMPONENTS Core Gui Widgets Network Xml PrintSupport)
 
 set(qtwebengine_available FALSE)
 find_package(Qt6 QUIET COMPONENTS WebEngineCore WebEngineWidgets)
@@ -190,6 +189,7 @@ set(SEB_SOURCES
     src/ui/seb_taskbar.cpp
     src/seb_session.cpp
     src/security/security_service.cpp
+    src/security/session_integrity_store.cpp
     src/server/parser.cpp
     src/server/sanitizer.cpp
     src/server/server_proxy.cpp
@@ -406,6 +406,7 @@ set(SEB_HEADERS
     src/ui/seb_taskbar.h
     src/seb_session.h
     src/security/security_service.h
+    src/security/session_integrity_store.h
     src/server/contracts/server_response.h
     src/server/data/api.h
     src/server/data/connection_info.h
@@ -437,14 +438,11 @@ target_compile_definitions(safe-exam-browser PRIVATE
     SEB_HAS_LIBSECRET=${SEB_HAS_LIBSECRET}
 )
 
-if(SEB_DEV_BYPASS)
-    target_compile_definitions(safe-exam-browser PRIVATE SEB_DEV_BYPASS_DEFAULT=1)
-endif()
-
 target_link_libraries(safe-exam-browser PRIVATE
     Qt6::Core
     Qt6::Gui
     Qt6::Widgets
+    Qt6::PrintSupport
     Qt6::Network
     Qt6::Xml
     z

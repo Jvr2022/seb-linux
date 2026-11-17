@@ -2,13 +2,15 @@
 
 #include "contracts/server_response.h"
 #include "data/api.h"
-#include "data/connection_info.h"
 #include "data/exam.h"
 #include "data/instructions.h"
 
 #include "configuration/contracts/app_config.h"
 #include "settings/Server/ServerSettings.h"
 
+#include <functional>
+#include <QJsonObject>
+#include <QSet>
 #include <QNetworkAccessManager>
 #include <QNetworkReply>
 #include <QQueue>
@@ -30,36 +32,28 @@ public:
     ~ServerProxy() override;
 
     void initialize(const seb::settings::server::ServerSettings &settings);
-    bool initializeConnection(
-        const QString &api,
-        const QString &connectionToken,
-        const QString &examId,
-        const QString &oauth2Token,
-        const seb::settings::server::ServerSettings &settings,
-        QString *error = nullptr);
-
-    contracts::ServerResponse connectToServer();
-    contracts::ServerResponse disconnectFromServer();
-    contracts::ServerResponse availableExams(
-        QList<data::Exam> &exams,
-        const QString &examId = {});
-    contracts::ServerResponse downloadExamConfiguration(
-        const data::Exam &exam,
-        const QString &path);
-    contracts::ServerResponse selectExam(
-        const data::Exam &exam,
-        QString *browserExamKey = nullptr);
-
-    contracts::ServerResponse sendUserIdentifier(const QString &identifier);
-    contracts::ServerResponse raiseHand(const QString &message = {});
-    contracts::ServerResponse lowerHand();
-    contracts::ServerResponse lockScreen(const QString &message = {});
-    contracts::ServerResponse confirmLockScreen();
-
+    using Completion = std::function<void(contracts::ServerResponse)>;
+    enum class ConnectionState { Disconnected, Authenticated, AwaitingExamSelection,
+                                 Handshaking, Connected, Disconnecting };
+    void connectToServer(Completion done);
+    void disconnectFromServer(Completion done = {});
+    void availableExams(std::function<void(contracts::ServerResponse, QList<data::Exam>)> done,
+                        const QString &examId = {});
+    void downloadExamConfiguration(const data::Exam &exam, const QString &path, Completion done);
+    void selectExam(const data::Exam &exam,
+                    std::function<void(contracts::ServerResponse, QString)> done);
+    void sendUserIdentifier(const QString &identifier, Completion done = {});
+    void raiseHand(const QString &message, Completion done);
+    void lowerHand(Completion done);
+    void lockScreen(const QString &message = {});
+    void confirmLockScreen();
+    void logEvent(const QString &text, const QString &severity = QStringLiteral("INFO"));
+    void reportBattery(int percentage, bool online);
+    void reportWireless(int signal);
+    ConnectionState connectionState() const { return state_; }
     void startConnectivity();
     void stopConnectivity();
-    bool isConnected() const { return connected_; }
-    data::ConnectionInfo connectionInfo() const;
+    bool isConnected() const { return state_ == ConnectionState::Connected; }
     QString examId() const { return examId_; }
 
 signals:
@@ -67,11 +61,10 @@ signals:
     void lockScreenRequested(const QString &message);
     void lockScreenConfirmed();
     void handConfirmed();
-    void proctoringInstructionReceived(const QString &instruction);
-    void proctoringConfigurationReceived(bool allowChat, bool receiveAudio, bool receiveVideo);
 
 private:
-    contracts::ServerResponse execute(
+    void execute(
+        Completion done,
         const QByteArray &method,
         const QString &endpoint,
         const QByteArray &body = {},
@@ -80,8 +73,11 @@ private:
         bool connectionToken = false,
         bool refreshToken = true,
         const QHash<QByteArray, QByteArray> &additionalHeaders = {});
-    bool requestOAuthToken(QString *error = nullptr);
-    contracts::ServerResponse finishHandshake();
+    void requestOAuthToken(Completion done);
+    void cancelRequests();
+    void clearConnection();
+    void flushLogs();
+    void sendNotification(const QJsonObject &object, Completion done = {});
     void performPing();
     void handleInstruction(const data::InstructionData &instruction);
     QUrl endpointUrl(const QString &endpoint) const;
@@ -103,8 +99,21 @@ private:
     int pingNumber_ = 0;
     int notificationId_ = 0;
     int currentHandId_ = 0;
+    int pendingHandId_ = 0;
+    quint64 handRevision_ = 0;
     int currentLockScreenId_ = 0;
-    bool connected_ = false;
+    ConnectionState state_ = ConnectionState::Disconnected;
+    QTimer logTimer_;
+    QQueue<QJsonObject> logs_;
+    QSet<QNetworkReply *> replies_;
+    QSet<QTimer *> retryTimers_;
+    QList<Completion> tokenWaiters_;
+    quint64 generation_ = 0;
+    bool refreshingToken_ = false;
+    bool logInFlight_ = false;
+    int batteryPercentage_ = -1;
+    int batteryOnline_ = -1;
+    int wirelessSignal_ = -2;
     bool pingInFlight_ = false;
 };
 

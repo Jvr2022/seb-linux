@@ -12,7 +12,7 @@ BrowserWindowPort::BrowserWindowPort(::BrowserWindow *window, QObject *parent)
 
 QString BrowserWindowPort::handle() const
 {
-    return window_ ? QString::number(reinterpret_cast<quintptr>(window_)) : QString();
+    return window_ ? QString::number(reinterpret_cast<quintptr>(window_.data())) : QString();
 }
 
 QString BrowserWindowPort::iconPath() const
@@ -31,7 +31,8 @@ void BrowserWindowPort::activate()
         return;
     }
 
-    window_->showNormal();
+    if (window_->isMinimized()) window_->setWindowState(window_->windowState() & ~Qt::WindowMinimized);
+    window_->show();
     window_->raise();
     window_->activateWindow();
 }
@@ -50,7 +51,7 @@ BrowserWindowContext BrowserWindowPort::context() const
 {
     BrowserWindowContext context;
     if (window_) {
-        context.id = static_cast<int>(reinterpret_cast<quintptr>(window_) & 0x7fffffff);
+        context.id = static_cast<int>(reinterpret_cast<quintptr>(window_.data()) & 0x7fffffff);
         context.isMainWindow = window_->isMainWindow();
         context.title = window_->taskbarTitle();
         context.url = window_->currentUrl().toString();

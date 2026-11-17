@@ -5,6 +5,7 @@
 #include "request_filter.h"
 
 #include "contracts/i_request_interceptor.h"
+#include <memory>
 
 namespace seb::browser {
 
@@ -13,7 +14,7 @@ class RequestInterceptor : public contracts::IRequestInterceptor
 public:
     RequestInterceptor(
         const seb::settings::browser::BrowserSettings &settings,
-        seb::configuration::contracts::cryptography::IKeyGenerator &keyGenerator);
+        std::shared_ptr<seb::configuration::contracts::cryptography::IKeyGenerator> keyGenerator);
 
     void interceptRequest(contracts::IRequest &request) override;
     FilterDecision evaluate(
@@ -26,7 +27,7 @@ private:
 
     seb::settings::browser::BrowserSettings settings_;
     RequestFilter filter_;
-    seb::configuration::contracts::cryptography::IKeyGenerator &keyGenerator_;
+    std::shared_ptr<seb::configuration::contracts::cryptography::IKeyGenerator> keyGenerator_;
 };
 
 }  // namespace seb::browser

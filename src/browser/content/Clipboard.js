@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2026 ETH Zürich, IT Services
+ * Copyright (c) 2026 ETH ZÃ¼rich, IT Services
  * 
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
@@ -10,7 +10,7 @@
 
 if (typeof SafeExamBrowser.clipboard === 'undefined') {
 	SafeExamBrowser.clipboard = {
-		id: crypto.randomUUID(),
+		id: Array.from(crypto.getRandomValues(new Uint8Array(16)), function (b) { return b.toString(16).padStart(2, "0"); }).join(""),
 		ranges: [],
 		text: "",
 
@@ -21,7 +21,11 @@ if (typeof SafeExamBrowser.clipboard === 'undefined') {
 
 		getContentEncoded: function () {
 			var bytes = new TextEncoder().encode(this.text);
-			var base64 = btoa(String.fromCodePoint(...bytes));
+			var binary = "";
+			for (var offset = 0; offset < bytes.length; offset += 8192) {
+				binary += String.fromCharCode.apply(null, bytes.subarray(offset, offset + 8192));
+			}
+			var base64 = btoa(binary);
 
 			return base64;
 		},
@@ -44,7 +48,7 @@ if (typeof copySelection === 'undefined') {
 			SafeExamBrowser.clipboard.text = e.target.value.substring(e.target.selectionStart, e.target.selectionEnd);
 			SafeExamBrowser.clipboard.ranges = [];
 		} else {
-			var selection = e.target.ownerDocument.defaultView.getSelection();
+			var selection = (e.target.ownerDocument || document).defaultView.getSelection();
 			var text = "";
 
 			for (var i = 0; i < selection.rangeCount; i++) {
@@ -57,109 +61,72 @@ if (typeof copySelection === 'undefined') {
 	}
 }
 
-if (typeof cutSelection === 'undefined') {
-	function cutSelection(e) {
-		if (e.target.contentEditable && e.target.setRangeText) {
-			e.target.setRangeText("", e.target.selectionStart, e.target.selectionEnd, 'select');
-		} else {
-			var designMode = e.target.ownerDocument.designMode;
-			var contentEditables = e.target.ownerDocument.querySelectorAll('*[contenteditable]');
-			var selection = e.target.ownerDocument.defaultView.getSelection();
-
-			for (var i = 0; i < selection.rangeCount; i++) {
-				var range = selection.getRangeAt(i);
-
-				if (designMode === 'on') {
-					range.deleteContents();
-				} else {
-					if (contentEditables.length) {
-						contentEditables.forEach(node => {
-							if (node.contains(range.commonAncestorContainer)) {
-								range.deleteContents();
-							}
-						});
-					}
-				}
-			}
-		}
-	}
+function editableSelection(target, selection) {
+	if (target.disabled || target.readOnly || !selection || !selection.rangeCount) return null;
+	var range = selection.getRangeAt(0);
+	var node = range.commonAncestorContainer;
+	var element = node.nodeType === 1 ? node : node.parentElement;
+	var doc = target.ownerDocument || document;
+	return doc.designMode === "on" || (element && element.isContentEditable) ? range : null;
 }
 
-if (typeof pasteContent === 'undefined') {
-	function pasteContent(e) {
-		if (e.target.contentEditable && e.target.setRangeText) {
-			e.target.setRangeText("", e.target.selectionStart, e.target.selectionEnd, 'select');
-			e.target.setRangeText(SafeExamBrowser.clipboard.text, e.target.selectionStart, e.target.selectionStart + SafeExamBrowser.clipboard.text.length, 'end');
-		} else {
-			var targetWindow = e.target.ownerDocument.defaultView;
-			var designMode = e.target.ownerDocument.designMode;
-			var contentEditables = e.target.ownerDocument.querySelectorAll('*[contenteditable]');
-			var selection = targetWindow.getSelection();
+function cutSelection(e) {
+	var target = e.target;
+	if (target.disabled || target.readOnly) return false;
+	if (typeof target.selectionStart === "number" && typeof target.setRangeText === "function") {
+		target.setRangeText("", target.selectionStart, target.selectionEnd, "end");
+		return true;
+	}
+	var doc = target.ownerDocument || document;
+	var range = editableSelection(target, doc.defaultView.getSelection());
+	if (!range) return false;
+	range.deleteContents();
+	return true;
+}
 
-			for (var i = 0; i < selection.rangeCount; i++) {
-				var r = selection.getRangeAt(i);
+function pasteContent(e) {
+	if (!SafeExamBrowser.clipboard.text && !SafeExamBrowser.clipboard.ranges.length) return false;
+	var target = e.target;
+	if (target.disabled || target.readOnly) return false;
+	if (typeof target.selectionStart === "number" && typeof target.setRangeText === "function") {
+		target.setRangeText(SafeExamBrowser.clipboard.text, target.selectionStart, target.selectionEnd, "end");
+		return true;
+	}
+	var doc = target.ownerDocument || document;
+	var selection = doc.defaultView.getSelection();
+	var range = editableSelection(target, selection);
+	if (!range) return false;
+	var fragment = doc.createDocumentFragment();
+	if (SafeExamBrowser.clipboard.ranges.length) {
+		SafeExamBrowser.clipboard.ranges.forEach(function (part) { fragment.appendChild(part.cloneNode(true)); });
+	} else {
+		fragment.appendChild(doc.createTextNode(SafeExamBrowser.clipboard.text));
+	}
+	var last = fragment.lastChild;
+	range.deleteContents();
+	range.insertNode(fragment);
+	if (last) range.setStartAfter(last);
+	range.collapse(true);
+	selection.removeAllRanges();
+	selection.addRange(range);
+	return true;
+}
 
-				if (designMode === 'on') {
-					r.deleteContents();
-				} else {
-					if (contentEditables.length) {
-						contentEditables.forEach(node => {
-							if (node.contains(r.commonAncestorContainer)) {
-								r.deleteContents();
-							}
-						});
-					}
-				}
-			}
-
-			if (designMode === 'on') {
-				var range = targetWindow.getSelection().getRangeAt(0);
-
-				if (SafeExamBrowser.clipboard.ranges.length > 0) {
-					SafeExamBrowser.clipboard.ranges.map(r => {
-						range = targetWindow.getSelection().getRangeAt(0);
-						range.collapse();
-						const newNode = r.cloneNode(true);
-						range.insertNode(newNode);
-						range.collapse();
-					});
-				} else {
-					range.collapse();
-					range.insertNode(targetWindow.document.createTextNode(SafeExamBrowser.clipboard.text));
-					range.collapse();
-				}
-			} else {
-
-				if (contentEditables.length) {
-					contentEditables.forEach(node => {
-						var range = targetWindow.getSelection().getRangeAt(0);
-
-						if (node.contains(range.commonAncestorContainer)) {
-							if (SafeExamBrowser.clipboard.ranges.length > 0) {
-
-								SafeExamBrowser.clipboard.ranges.map(r => {
-									range = targetWindow.getSelection().getRangeAt(0);
-									range.collapse();
-									const newNode = r.cloneNode(true);
-									range.insertNode(newNode);
-									range.collapse();
-								});
-							} else {
-								range = targetWindow.getSelection().getRangeAt(0);
-								range.collapse();
-								range.insertNode(targetWindow.document.createTextNode(SafeExamBrowser.clipboard.text));
-								range.collapse();
-							}
-						}
-					});
-				}
-			}
+if (typeof notifyInput === 'undefined') {
+	function notifyInput(target, inputType) {
+		if (target && typeof target.dispatchEvent === 'function') {
+			target.dispatchEvent(new InputEvent("input", { bubbles: true, inputType: inputType }));
 		}
 	}
 }
 
 if (typeof onCopy === 'undefined') {
 	function onCopy(e) {
+		e.stopImmediatePropagation();
+		if (!e.isTrusted || (e.target.tagName === "INPUT" && e.target.type === "password")) {
+			e.preventDefault();
+			return false;
+		}
 		try {
 			SafeExamBrowser.clipboard.clear();
 
@@ -173,18 +140,25 @@ if (typeof onCopy === 'undefined') {
 		return false;
 	}
 
-	window.document.addEventListener("copy", onCopy, true);
+	window.addEventListener("copy", onCopy, true);
 }
 
 if (typeof onCut === 'undefined') {
 	function onCut(e) {
+		e.stopImmediatePropagation();
+		if (!e.isTrusted || (e.target.tagName === "INPUT" && e.target.type === "password")) {
+			e.preventDefault();
+			return false;
+		}
 		try {
 			SafeExamBrowser.clipboard.clear();
 
 			copySelection(e);
-			cutSelection(e);
+			var changed = cutSelection(e);
 
 			CefSharp.PostMessage({ Type: "Clipboard", Id: SafeExamBrowser.clipboard.id, Content: SafeExamBrowser.clipboard.getContentEncoded() });
+
+			if (changed) notifyInput(e.target, "deleteByCut");
 		} finally {
 			e.preventDefault();
 		}
@@ -192,14 +166,19 @@ if (typeof onCut === 'undefined') {
 		return false;
 	}
 
-	window.document.addEventListener("cut", onCut, true);
+	window.addEventListener("cut", onCut, true);
 }
 
 
 if (typeof onPaste === 'undefined') {
 	function onPaste(e) {
+		e.stopImmediatePropagation();
+		if (!e.isTrusted) {
+			e.preventDefault();
+			return false;
+		}
 		try {
-			pasteContent(e);
+			if (pasteContent(e)) notifyInput(e.target, "insertFromPaste");
 		} finally {
 			e.preventDefault();
 		}
@@ -207,5 +186,5 @@ if (typeof onPaste === 'undefined') {
 		return false;
 	}
 
-	window.document.addEventListener("paste", onPaste, true);
+	window.addEventListener("paste", onPaste, true);
 }

@@ -5,6 +5,8 @@
 #include <QtGlobal>
 #include <QString>
 #include <QStringList>
+#include <memory>
+#include <functional>
 
 #include "download_request.h"
 
@@ -39,10 +41,10 @@ public:
     virtual void setHttpUserAgent(const QString &userAgent) = 0;
     virtual void setHttpAcceptLanguage(const QString &language) = 0;
     virtual void setPersistSessionCookies(bool persist) = 0;
-    virtual void setDevBypass(bool enabled) = 0;
-    virtual void setUrlRequestInterceptor(IRequestInterceptor *interceptor) = 0;
+    virtual void setUrlRequestInterceptor(std::shared_ptr<IRequestInterceptor> interceptor) = 0;
     virtual void deleteAllCookies() = 0;
-    virtual void clearHttpCache() = 0;
+    virtual void clearHttpCache(std::function<void(bool)> done = {}) = 0;
+    virtual void cancelDownloads() = 0;
 
 signals:
     void downloadRequested(DownloadRequest &request);

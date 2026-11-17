@@ -20,8 +20,8 @@ class RaiseHandControl : public QWidget
 public:
     explicit RaiseHandControl(QWidget *parent = nullptr);
     void setServerCallbacks(
-        std::function<bool(const QString &)> raise,
-        std::function<bool()> lower);
+        std::function<void(const QString &, std::function<void(bool)>)> raise,
+        std::function<void(std::function<void(bool)>)> lower);
     void setMessageRequired(bool required);
     void resetRaisedState();
 
@@ -33,10 +33,12 @@ private:
     TaskbarPopup *popup_ = nullptr;
     QLineEdit *messageEdit_ = nullptr;
     TaskbarButton *actionButton_ = nullptr;
+    bool pending_ = false;
+    quint64 generation_ = 0;
     bool handRaised_ = false;
     bool messageRequired_ = false;
-    std::function<bool(const QString &)> raiseCallback_;
-    std::function<bool()> lowerCallback_;
+    std::function<void(const QString &, std::function<void(bool)>)> raiseCallback_;
+    std::function<void(std::function<void(bool)>)> lowerCallback_;
 };
 
 }  // namespace seb::ui::taskbar

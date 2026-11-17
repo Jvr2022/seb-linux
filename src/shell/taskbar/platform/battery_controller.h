@@ -13,6 +13,7 @@ struct BatteryState
 {
     bool available = false;
     bool charging = false;
+    bool powerConnected = false;
     int percentage = 0;
     QString timeRemaining;
 };
@@ -26,13 +27,17 @@ public:
 
     const BatteryState &state() const;
     void refresh();
+    void stopMonitoring();
 
 signals:
     void stateChanged();
 
 private:
+    void applySnapshot(const QString &output);
     BatteryState state_;
     QTimer *timer_ = nullptr;
+    bool refreshInFlight_ = false;
+    quint64 generation_ = 0;
 };
 
 }  // namespace seb::shell::taskbar::platform

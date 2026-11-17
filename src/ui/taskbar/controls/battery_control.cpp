@@ -67,6 +67,8 @@ void BatteryControl::updateState()
         }
     }
 
+    setVisible(state.available);
+    if (!state.available) popup_->hide();
     button_->setEnabled(state.available);
     button_->setToolTip(tooltip);
     button_->setIconPath(QStringLiteral(":/assets/taskbar/battery.svg"));

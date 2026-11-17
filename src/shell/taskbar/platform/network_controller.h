@@ -43,6 +43,7 @@ public:
 
     const NetworkState &state() const;
     void refresh();
+    void stopMonitoring();
 
 signals:
     void stateChanged();
@@ -50,6 +51,8 @@ signals:
 private:
     NetworkState state_;
     QTimer *timer_ = nullptr;
+    bool refreshInFlight_ = false;
+    quint64 generation_ = 0;
 };
 
 }  // namespace seb::shell::taskbar::platform

@@ -15,8 +15,7 @@ std::unique_ptr<contracts::IWebProfile> WebKitGtkProvider::createProfile(
     QObject *parent,
     const QString &storageName)
 {
-    Q_UNUSED(storageName);
-    return std::make_unique<WebKitGtkProfile>(parent);
+    return std::make_unique<WebKitGtkProfile>(storageName.isEmpty(), parent);
 }
 
 std::unique_ptr<contracts::IWebView> WebKitGtkProvider::createWebView(contracts::IWebProfile *profile, QWidget *parent)
